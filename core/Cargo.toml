@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# sce-spec-workbench-core — the part of the specification workbench that has no screen.
+#
+# The works folder is SCE's (`sce-works`, in the `sce` submodule): the desktop app and its browser
+# shell read and write it through that crate, and the authoring MCP through the `sce-work` command
+# it builds, so there is ONE implementation of what a save is. What is here is what the workbench
+# adds: the ways a person reaches a model (connections, kept in their own settings folder), the AI
+# clients it runs for a request of the works, and the commands a screen asks about them.
+#
+# Nothing here links a GUI toolkit, so this crate builds and is tested on a machine that has none.
+
+[package]
+name = "sce-spec-workbench-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "The specification workbench without its screen: connections, AI clients and the commands a screen asks about them"
+
+[lib]
+name = "sce_spec_workbench_core"
+
+[dependencies]
+sce-works = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# A model server the person reaches over https (a tunnel, a server on another computer). rustls
+# with the ring provider and the web's roots, so that a build needs no TLS library of the system's.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+# The stand-ins a test holds a work against (`sce_works::testing`).
+sce-works = { workspace = true, features = ["testing"] }
+# The certificates a test server is given, made when the test runs: nothing secret is kept in
+# the tree, and none of them can run out.
+rcgen = "0.13"
+
+[lints]
+workspace = true

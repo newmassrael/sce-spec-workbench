@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# The specification workbench: an application in which a person writes a specification, sees the
+# model an AI client drew from it, and accepts what they checked.
+#
+#   core/        what the application has that needs no screen: the ways a person reaches a model
+#                (connections), the AI clients a request is run with, the application's commands
+#   src-tauri/   the desktop application (Tauri 2)
+#   web-shell/   the same commands over HTTP, for developing the screen on a machine that has no
+#                display (see README.md). A separate program, so a release build of the
+#                application cannot contain it.
+#   ui/          the screen, TypeScript, served to either entrance
+#   sce/         SCE itself, as a submodule at ONE revision: the works folder the application
+#                links (`sce/sce-works`), and the generator, `sce-work` and the authoring server an
+#                installer carries. One revision, so that the crate the application links and the
+#                programs it ships beside it are never of two versions.
+#
+# `sce` is excluded and not a member: its crates belong to SCE's own workspace and take their
+# version, edition and lints from it.
+
+[workspace]
+resolver = "2"
+members = ["core", "src-tauri", "web-shell"]
+exclude = ["sce"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial"
+repository = "https://github.com/newmassrael/sce-spec-workbench"
+authors = ["newmassrael <newmassrael@gmail.com>"]
+
+[workspace.dependencies]
+sce-spec-workbench-core = { path = "core" }
+sce-works = { path = "sce/sce-works" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace.lints.rust]
+warnings = "deny"
+
+# The tests are built as SCE builds its own (`sce/Cargo.toml`, `[profile.test]`), which is the
+# profile the core's tests were written and timed under when the core was a member of that
+# workspace. At opt 0 a test that hands a client a 16 MiB argument spends about five seconds
+# writing it as JSON before the client looks at its deadline, and fails a bound of three
+# (`core/tests/mcp_client.rs`, measured 2026-10-14: 5.1s and 5.5s at opt 0).
+[profile.test]
+opt-level = 1

@@ -1,0 +1,79 @@
+name: Installer
+
+# The workbench's installer, judged by installing it: built as a `.deb` that carries the
+# generator, `sce-work` and the authoring server (all from the `sce` submodule), unpacked into a
+# scratch directory and started under a virtual display with nothing on the machine to help. The
+# application it installs has to find what the installer carried and say so.
+#
+# A workflow of its own and not a job of `check.yml`: building the installer compiles SCE's
+# generator and the desktop shell, which the screen's lane has no reason to wait for.
+#
+# `scripts/check_installer.sh` is the whole of what is judged. This file only installs what that
+# script needs and calls it, so the lane and a local run cannot differ in what they check.
+#
+# Linux only. No installer for another platform is built, so none is judged (README.md).
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  installer:
+    name: The installer, installed and started
+    runs-on: ubuntu-latest
+    # Cold: SCE's generator, the Tauri CLI, the desktop shell, then the bundle.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Install what the installer is built and tried with
+        # WebKitGTK's development files for the desktop shell; libxml2 for the generator's XSD
+        # validator; xvfb to start the installed application; and the packages the `.deb` declares
+        # for the SYSTEM Python (PyYAML, jsonschema), because the application is started with the
+        # system's search path alone and its authoring launcher runs the `python3` found there. The
+        # list is the authoring server's (`sce/tools/authoring/sce_author/needs.py`), and
+        # `scripts/verify_installed_app.sh` holds the deb to it.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libxml2-dev pkg-config build-essential \
+            xvfb python3-yaml python3-jsonschema
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            sce/target
+          key: ${{ runner.os }}-cargo-installer-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-installer-
+      - name: Cache the Tauri CLI
+        id: tauri-cli
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: ${{ runner.os }}-cargo-tauri-cli-2
+      - name: Install the Tauri CLI
+        if: steps.tauri-cli.outputs.cache-hit != 'true'
+        run: cargo install tauri-cli --version '^2' --locked
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Check the installer
+        run: scripts/check_installer.sh

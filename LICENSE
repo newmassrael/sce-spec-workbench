@@ -1,0 +1,141 @@
+SCE Spec Workbench Non-Commercial License, Version 1.0
+
+SPDX identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0
+
+Copyright (c) 2026 newmassrael. All rights reserved except as granted below.
+
+This is a source-available license. It is not an open-source license: it does not permit
+commercial use. Read section 4 before using the Software in or for an organization.
+
+
+1. Definitions
+
+"Software" means SCE Spec Workbench: the source code, build files, documentation and other
+material in this repository, and any program built from them, excluding the Third-Party
+Components of section 7.
+
+"Licensor" means newmassrael, the copyright holder.
+
+"You" means the individual or the Organization exercising rights under this license.
+
+"Organization" means a company, a public body, or any other legal entity, and anyone acting on
+its behalf or for its benefit, including employees and contractors in the course of their work.
+
+"Production Environment" means any setting in which the Software, or anything made with it, is
+used to do the actual work of an Organization or is relied on by anyone outside an evaluation.
+That includes, without limitation: writing, reviewing or accepting specifications, models or
+requirement lists that are used in a real project; development of a product or of internal tools;
+anything delivered to a customer; and any service offered to others.
+
+"Evaluation" means installing and running the Software only to decide whether the Organization
+will obtain a commercial license for it.
+
+
+2. Personal learning and non-commercial research: free of charge
+
+Subject to section 6, the Licensor grants You a worldwide, royalty-free, non-exclusive,
+non-transferable license to use, copy and modify the Software, free of charge, for either of:
+
+  (a) personal learning: use by an individual, for that individual's own study, and not for or
+      on behalf of an Organization;
+
+  (b) non-commercial research: research whose results are not sold, not used to develop a
+      product or a service, and not carried out for the commercial benefit of an Organization.
+
+
+3. Evaluation by an Organization: permitted within the evaluation only
+
+Subject to section 6, the Licensor grants an Organization a worldwide, royalty-free,
+non-exclusive, non-transferable license to install, run and modify the Software for Evaluation,
+on these conditions:
+
+  (a) the Software is not used in a Production Environment;
+
+  (b) nothing produced with the Software during the Evaluation (a specification, a model, a
+      requirement list, an acceptance record, generated code or any other output) is used in a
+      Production Environment, delivered to a customer, or shipped in a product;
+
+  (c) the Evaluation ends when the Organization has decided whether to obtain a commercial
+      license. Use that continues after that decision, or that goes beyond what deciding
+      requires, is not Evaluation.
+
+
+4. Commercial use: a separate commercial agreement is required
+
+Any use not granted by section 2 or section 3 requires a separate written commercial agreement
+with the Licensor. That includes, without limitation, use by or for an Organization for any of:
+
+  (a) internal business or development work;
+
+  (b) inclusion of the Software, in whole or in part, in a product;
+
+  (c) delivery to a customer, whether as software, as part of a deliverable, or as the means by
+      which a deliverable is made;
+
+  (d) operation of a service, whether offered to others or run internally.
+
+To obtain a commercial license, contact the Licensor: newmassrael@gmail.com
+
+
+5. Redistribution
+
+You may give copies of the Software, with or without Your modifications, to others only if:
+
+  (a) the copies are given free of charge and under this license, unchanged;
+
+  (b) this license text and every copyright and license notice in the Software are kept;
+
+  (c) modified files say that they were changed.
+
+A recipient gets its rights from the Licensor under this license and gets no commercial rights
+from You.
+
+
+6. Conditions
+
+  (a) You must not remove or alter any copyright, license or attribution notice in the Software.
+
+  (b) You must not sublicense the Software, or offer it under any other terms.
+
+  (c) This license does not grant any right in the names, logos or trademarks of the Licensor or
+      of the Software, except to state truthfully where the Software came from.
+
+  (d) No right is granted except those stated in this license. All other rights are reserved.
+
+
+7. Third-Party Components
+
+This license covers the Software only. Other material that the Software is built with or
+distributed beside is licensed by its own terms, which this license neither changes nor
+replaces. In particular:
+
+  (a) SCE (SCXML Core Engine), which this repository refers to as the `sce` submodule and which
+      is not part of this repository, is licensed under its own terms (see the LICENSE files in
+      that repository);
+
+  (b) the libraries named in Cargo.lock and ui/package-lock.json are licensed by their own
+      authors.
+
+You are responsible for complying with those terms.
+
+
+8. Termination
+
+Your rights under this license end automatically if You do not comply with it. If You come back
+into compliance within 30 days of first learning of the breach, and it is Your first breach,
+Your rights are restored. When Your rights end, You must stop using the Software and destroy
+every copy of it in Your possession.
+
+
+9. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT.
+
+
+10. Limitation of liability
+
+TO THE EXTENT THE LAW ALLOWS, THE LICENSOR IS NOT LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE.
