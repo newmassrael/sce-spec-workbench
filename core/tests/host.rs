@@ -17,14 +17,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use sce_spec_workbench_core::host::{start, start_with, HostSettings, NotHosted};
+use sce_spec_workbench_core::host::{start, HostSettings, NotHosted};
 use sce_spec_workbench_core::installed::Installed;
-use sce_spec_workbench_core::{
-    AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
-};
-use sce_works::requests::{Inputs, Pin, State};
-use sce_works::{ConnectionId, ManualClock, Registration, Saved, WorkId, WorkStore};
-use serde_json::json;
+use sce_works::{ManualClock, WorkStore};
 
 use common::FakeRenderer;
 
@@ -224,10 +219,20 @@ fn a_shell_with_no_claude_hosts_nothing_and_says_what_to_install() {
         .contains("SCE_CLAUDE"));
 }
 
+/// What hosting does, with stand-in programs: shell scripts, so Unix only. The imports only these
+/// read are here and not above, where a build for another platform would find them unused.
 #[cfg(unix)]
 mod hosting {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+
+    use sce_spec_workbench_core::host::start_with;
+    use sce_spec_workbench_core::{
+        AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
+    };
+    use sce_works::requests::{Inputs, Pin, State};
+    use sce_works::{ConnectionId, Registration, Saved, WorkId};
+    use serde_json::json;
 
     use super::*;
 
