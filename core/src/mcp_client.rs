@@ -13,9 +13,10 @@
 //!
 //! - **A call ends when it is told to or when its time is up.** The server is a process that can
 //!   hang, so what it says is read on a thread of its own and waited for in slices, and what is
-//!   sent to it is written on another: a server that reads none of it (and a call can be longer
-//!   than a pipe holds) holds a write for as long as it lives, and a caller that waited on that
-//!   could not be told to stop.
+//!   sent to it is made into text and written on another: a server that reads none of it (and a
+//!   call can be longer than a pipe holds) holds a write for as long as it lives, and a call of
+//!   many megabytes takes seconds to make into text in a build that is not optimised; a caller
+//!   that did either first could not be told to stop until it was done.
 //! - **The server is the application's and nothing else's.** It is started with the arguments and
 //!   the environment the host gave it, in a folder of its own, and it is killed when this is
 //!   dropped, so a run that ends does not leave one behind.
@@ -97,10 +98,11 @@ impl std::error::Error for McpError {}
 /// A started server, asked for its tools and called.
 pub struct McpClient {
     child: Child,
-    /// What is to be written to the server's standard input. It is written on a thread of its own:
-    /// a server that does not read what it is sent holds a write for as long as it lives, and a
-    /// caller that waited on it could not be told to stop.
-    writes: mpsc::Sender<Vec<u8>>,
+    /// The messages to send the server. They are made into text and written to its standard input
+    /// on a thread of its own: a server that does not read what it is sent holds a write for as
+    /// long as it lives, a large message takes long to make into text, and a caller that waited on
+    /// either could not be told to stop.
+    writes: mpsc::Sender<Value>,
     /// Why that thread stopped, when it did: the server closed its input or went away.
     write_failed: Arc<Mutex<Option<String>>>,
     lines: Receiver<Result<String, String>>,
@@ -163,7 +165,7 @@ impl McpClient {
             .filter(|text| !text.trim().is_empty())
             .map(str::to_string);
         // Said as a notification, which wants no answer.
-        client.write(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}))?;
+        client.write(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}))?;
         Ok(client)
     }
 
@@ -226,12 +228,11 @@ impl McpClient {
         })
     }
 
-    /// Hand the server a message. It is written by the thread that owns the server's input, so this
-    /// returns at once; that the server did not take it is found by the wait for its answer.
-    fn write(&mut self, message: &Value) -> Result<(), McpError> {
-        let mut line = message.to_string();
-        line.push('\n');
-        self.writes.send(line.into_bytes()).map_err(|_| {
+    /// Hand the server a message. It is made into text and written by the thread that owns the
+    /// server's input, so this returns at once, however large the message; that the server did not
+    /// take it is found by the wait for its answer.
+    fn write(&mut self, message: Value) -> Result<(), McpError> {
+        self.writes.send(message).map_err(|_| {
             McpError::Gone(format!(
                 "{}{}",
                 self.write_failure()
@@ -272,7 +273,14 @@ impl McpClient {
     ) -> Result<Value, McpError> {
         let id = self.next;
         self.next += 1;
-        self.write(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}))?;
+        // `params` is moved into the message and not copied: `json!` would copy it, which for the
+        // arguments of a call is the size of a specification.
+        let mut message = serde_json::Map::new();
+        message.insert("jsonrpc".to_string(), json!("2.0"));
+        message.insert("id".to_string(), json!(id));
+        message.insert("method".to_string(), json!(method));
+        message.insert("params".to_string(), params);
+        self.write(Value::Object(message))?;
         loop {
             if cancel.is_cancelled() {
                 return Err(McpError::Cancelled);
@@ -322,15 +330,17 @@ impl Drop for McpClient {
     }
 }
 
-/// Write each message to the server, in order, until the messages end (the client was dropped) or
-/// the server will not take one, and say why when it will not.
-fn write_lines(
-    mut stdin: ChildStdin,
-    messages: &Receiver<Vec<u8>>,
-    failed: &Mutex<Option<String>>,
-) {
+/// Write each message to the server, one JSON document to a line, in order, until the messages end
+/// (the client was dropped) or the server will not take one, and say why when it will not. A
+/// message is made into text here and not by the caller, which is waiting on its deadline.
+fn write_lines(mut stdin: ChildStdin, messages: &Receiver<Value>, failed: &Mutex<Option<String>>) {
     for message in messages {
-        if let Err(e) = stdin.write_all(&message).and_then(|()| stdin.flush()) {
+        let mut line = message.to_string();
+        line.push('\n');
+        if let Err(e) = stdin
+            .write_all(line.as_bytes())
+            .and_then(|()| stdin.flush())
+        {
             *failed.lock().unwrap_or_else(|e| e.into_inner()) = Some(e.to_string());
             return;
         }
