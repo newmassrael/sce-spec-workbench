@@ -132,6 +132,19 @@ fn store(label: &str) -> (Arc<ManualClock>, Arc<WorkStore<Arc<ManualClock>>>) {
     (clock, store)
 }
 
+/// A launcher for the authoring server that is a file and is never run, in a folder of its own:
+/// the shell checks that it is there before it looks for the client, and a test of what it says
+/// of the client has to get past that. A file of the machine (`/bin/sh`) is one only on Unix.
+fn a_launcher_that_is_a_file(label: &str) -> PathBuf {
+    let launcher = common::scratch(label).join("sce-author-mcp");
+    std::fs::write(
+        &launcher,
+        "never run: no client is found before it would be\n",
+    )
+    .unwrap();
+    launcher
+}
+
 #[test]
 fn a_shell_that_is_told_not_to_host_hosts_nothing_and_says_why() {
     let (_, store) = store("host-off");
@@ -165,7 +178,7 @@ fn a_shell_that_is_dropped_while_it_waits_to_look_again_stops_at_once() {
     let (_, store) = store("host-drop-waiting");
     let mut settings = HostSettings::from_lookup("desktop", lookup(&[]));
     settings.claude = Some(PathBuf::from("/nowhere/claude"));
-    settings.author = Some(PathBuf::from("/bin/sh"));
+    settings.author = Some(a_launcher_that_is_a_file("host-drop-waiting-author"));
     settings.retry = Duration::from_secs(60);
     let host = start(store, Arc::new(FakeRenderer), settings);
 
@@ -183,7 +196,7 @@ fn what_a_shell_cannot_host_is_said_where_the_owner_looks_and_not_only_to_the_te
     let (_, store) = store("host-says-why");
     let mut settings = HostSettings::from_lookup("desktop", lookup(&[]));
     settings.claude = Some(PathBuf::from("/nowhere/claude"));
-    settings.author = Some(PathBuf::from("/bin/sh"));
+    settings.author = Some(a_launcher_that_is_a_file("host-says-why-author"));
 
     let host = start(Arc::clone(&store), Arc::new(FakeRenderer), settings);
 
@@ -206,7 +219,7 @@ fn a_shell_with_no_claude_hosts_nothing_and_says_what_to_install() {
     let (_, store) = store("host-no-claude");
     let mut settings = HostSettings::from_lookup("desktop", lookup(&[]));
     settings.claude = Some(PathBuf::from("/nowhere/claude"));
-    settings.author = Some(PathBuf::from("/bin/sh"));
+    settings.author = Some(a_launcher_that_is_a_file("host-no-claude-author"));
 
     let host = start(store, Arc::new(FakeRenderer), settings);
 
