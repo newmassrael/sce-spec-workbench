@@ -43,7 +43,7 @@ function failureOf(name: string): CommandFailure {
 }
 
 describe("the revision panel", () => {
-  it("has no panel for a work nobody accepted, and shows the report of one that did", () => {
+  it("has no panel for a spec nobody accepted, and shows the report of one that did", () => {
     expect(panelOfRead(parseReadRevisionReport(replies.answers["read_revision_report_none"]))).toBeNull();
     expect(panelOfRead(read)).toEqual({ phase: "read", report: report() });
   });

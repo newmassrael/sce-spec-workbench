@@ -4,18 +4,18 @@
 //! The part of the specification workbench that has no screen.
 //!
 //! A person writes a specification in prose, an AI client turns it into a model through the
-//! authoring MCP, and the workbench shows both side by side. What they work on lives in the works
-//! folder, which is SCE's ([`sce_works`]): the workbench links it, and the MCP reaches it through
-//! `sce-work`. What is here is what the workbench adds to it:
+//! authoring MCP, and the workbench shows both side by side. What they work on lives in the specs
+//! folder, which is SCE's ([`sce_specs`]): the workbench links it, and the MCP reaches it through
+//! `sce-spec`. What is here is what the workbench adds to it:
 //!
-//! - [`commands`] is the application's command layer, in front of the works': the commands
+//! - [`commands`] is the application's command layer, in front of the specs': the commands
 //!   that are the workbench's, and who is asking ([`commands::Entrance`]).
 //! - [`connection`] and its store ([`connection_store`]) are the ways a person reaches a model
 //!   (which client, which model, where its credentials come from), kept in their own settings
-//!   folder and not with the works, which are shared and moved.
+//!   folder and not with the specs, which are shared and moved.
 //! - [`auth_policy`] is which ways of signing in the workbench uses: a table of routes, each
 //!   allowed, conditional, forbidden or unconfirmed, as a constant of the build.
-//! - [`runner`] and [`host`] take the requests of the works for a generator, and [`directory`]
+//! - [`runner`] and [`host`] take the requests of the specs for a generator, and [`directory`]
 //!   finds the generator for the connection a request was made for: Claude Code
 //!   ([`claude_code`]), Codex ([`codex`]) or a model server of the person's ([`local`]).
 //! - [`claude_status`], [`codex_status`] and [`server_status`] are what a screen says of the

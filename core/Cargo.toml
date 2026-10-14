@@ -3,11 +3,11 @@
 #
 # sce-spec-workbench-core — the part of the specification workbench that has no screen.
 #
-# The works folder is SCE's (`sce-works`, in the `sce` submodule): the desktop app and its browser
-# shell read and write it through that crate, and the authoring MCP through the `sce-work` command
+# The specs folder is SCE's (`sce-specs`, in the `sce` submodule): the desktop app and its browser
+# shell read and write it through that crate, and the authoring MCP through the `sce-spec` command
 # it builds, so there is ONE implementation of what a save is. What is here is what the workbench
 # adds: the ways a person reaches a model (connections, kept in their own settings folder), the AI
-# clients it runs for a request of the works, and the commands a screen asks about them.
+# clients it runs for a request of the specs, and the commands a screen asks about them.
 #
 # Nothing here links a GUI toolkit, so this crate builds and is tested on a machine that has none.
 
@@ -25,7 +25,7 @@ description = "The specification workbench without its screen: connections, AI c
 name = "sce_spec_workbench_core"
 
 [dependencies]
-sce-works = { workspace = true }
+sce-specs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # A model server the person reaches over https (a tunnel, a server on another computer). rustls
@@ -34,8 +34,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 
 [dev-dependencies]
-# The stand-ins a test holds a work against (`sce_works::testing`).
-sce-works = { workspace = true, features = ["testing"] }
+# The stand-ins a test holds a spec against (`sce_specs::testing`).
+sce-specs = { workspace = true, features = ["testing"] }
 # The certificates a test server is given, made when the test runs: nothing secret is kept in
 # the tree, and none of them can run out.
 rcgen = "0.13"

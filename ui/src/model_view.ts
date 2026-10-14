@@ -13,7 +13,7 @@
 import type { Figures, ModelText, Review, Revision, Standing } from "./contract";
 import { CommandFailure } from "./ipc";
 
-/** The model a work has, and how it stands to the text now. */
+/** The model a spec has, and how it stands to the text now. */
 export interface ModelRead {
   readonly model: ModelText;
   readonly standing: Standing;
@@ -58,7 +58,7 @@ const NOT_DRAWN = new Set(["sce-refused", "sce-unavailable", "sce-timeout", "sce
 
 /**
  * `error` as a failure to draw, or `null` when it is something else (the server
- * unreachable, a token wanted, a work that is gone), which the screen reports the
+ * unreachable, a token wanted, a spec that is gone), which the screen reports the
  * way it reports those everywhere.
  */
 export function drawFailureOf(error: unknown): DrawFailure | null {

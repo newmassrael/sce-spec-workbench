@@ -4,8 +4,8 @@
 //! What every client that writes a draft shares: the task it is given, the form it answers in,
 //! the folder it works in, and the way it is run and stopped.
 //!
-//! A client is a program the application starts to write the model of a work (Claude Code,
-//! Codex). What it is told, and what it must answer, is the same for each: the work is read through
+//! A client is a program the application starts to write the model of a spec (Claude Code,
+//! Codex). What it is told, and what it must answer, is the same for each: the spec is read through
 //! the SCE authoring server and the draft comes back as one JSON document in one form. What
 //! differs is how each program is started, what it is refused, and how its own result is
 //! wrapped, and that is each adapter's own. Keeping the shared part here is what keeps a change
@@ -19,8 +19,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sce_works::document_files::refuse_file_access;
-use sce_works::{Document, ModelFiles, Requirements, Revision, WorkId};
+use sce_specs::document_files::refuse_file_access;
+use sce_specs::{Document, ModelFiles, Requirements, Revision, SpecId};
 use serde_json::{json, Value};
 
 use crate::claude_code::AuthorServer;
@@ -33,11 +33,11 @@ const KEPT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const SERVER: &str = "sce-author";
 
 /// The authoring server's tools a client may use, by the names the server gives them. Reading a
-/// work and checking a draft; not saving, not taking a request, not accepting. A client that
+/// spec and checking a draft; not saving, not taking a request, not accepting. A client that
 /// reaches the server by its own means offers these and no others; one that is told by name
 /// (Claude Code, `claude_code::ALLOWED_TOOLS`) is told the same nine with the server's prefix.
 pub const AUTHOR_TOOLS: [&str; 9] = [
-    "works_read",
+    "specs_read",
     "scxml_kinds",
     "validate_scxml",
     "validate_scxml_set",
@@ -48,19 +48,19 @@ pub const AUTHOR_TOOLS: [&str; 9] = [
     "render_scxml_pseudocode",
 ];
 
-/// The variable that tells the authoring server which work a run is for.
-pub(crate) const WORK_SCOPE: &str = "SCE_AUTHOR_WORK";
+/// The variable that tells the authoring server which spec a run is for.
+pub(crate) const SPEC_SCOPE: &str = "SCE_AUTHOR_SPEC";
 
-/// The authoring server a run reaches: the one the host knows, told which work the run is for.
-/// Told, the server advertises only [`AUTHOR_TOOLS`], refuses a read of another work, reads a
+/// The authoring server a run reaches: the one the host knows, told which spec the run is for.
+/// Told, the server advertises only [`AUTHOR_TOOLS`], refuses a read of another spec, reads a
 /// document only as text under a plain name, and holds the generator to its working folder. Not
-/// told, it answers for every work of the folder, so a specification that names another work in a
-/// call is read by the client. A work the host named for the server is replaced: the work is the
+/// told, it answers for every spec of the folder, so a specification that names another spec in a
+/// call is read by the client. A spec the host named for the server is replaced: the spec is the
 /// run's to say, and not a setting that was there before it.
-pub(crate) fn scoped_to(author: &AuthorServer, work: &str) -> AuthorServer {
+pub(crate) fn scoped_to(author: &AuthorServer, spec: &str) -> AuthorServer {
     let mut scoped = author.clone();
-    scoped.env.retain(|(name, _)| name != WORK_SCOPE);
-    scoped.env.push((WORK_SCOPE.to_string(), work.to_string()));
+    scoped.env.retain(|(name, _)| name != SPEC_SCOPE);
+    scoped.env.push((SPEC_SCOPE.to_string(), spec.to_string()));
     scoped
 }
 
@@ -161,14 +161,14 @@ pub(crate) fn schema() -> Value {
 pub(crate) const SYSTEM_PROMPT: &str = "You are the model-writing step of the SCE specification \
 workbench. No person is on the other end of this conversation, so never ask a question: a \
 decision the specification does not make is marked in the model as the authoring flow says \
-(sce:unresolved), never guessed. You can read the work and check what you write, and you \
+(sce:unresolved), never guessed. You can read the spec and check what you write, and you \
 cannot save anything: the application saves what you answer, in the form it asks for. Your \
 last message is that answer and nothing else.";
 
-/// A job with nothing of a work in it: the task's wording, for naming a version of it.
+/// A job with nothing of a spec in it: the task's wording, for naming a version of it.
 pub(crate) fn blank_job() -> Job {
     Job {
-        work: WorkId::parse("work").expect("a valid id"),
+        spec: SpecId::parse("spec").expect("a valid id"),
         title: String::new(),
         request: String::new(),
         attempt: 0,
@@ -184,11 +184,11 @@ pub(crate) fn blank_job() -> Job {
 /// What a client is asked to do for `job`.
 pub(crate) fn prompt(job: &Job) -> String {
     let mut text = format!(
-        "Write the model for the work `{work}` (\"{title}\"), for request {request}, attempt \
+        "Write the model for the spec `{spec}` (\"{title}\"), for request {request}, attempt \
          {attempt}.\n\n\
-         1. Call works_read with work = \"{work}\". It gives the specification (`source.text`), \
+         1. Call specs_read with spec = \"{spec}\". It gives the specification (`source.text`), \
             the owner's answers to the questions an earlier model left open (`answers`) and the \
-            decision record they make (`decisions_text`), and the model the work has now, if it \
+            decision record they make (`decisions_text`), and the model the spec has now, if it \
             has one.\n\
          2. Follow the authoring flow in your instructions: choose the document kind from what \
             the specification states (scxml_kinds), write the SCXML, check it with validate_scxml \
@@ -197,19 +197,19 @@ pub(crate) fn prompt(job: &Job) -> String {
             and cite it as sce:assumed=\"<id>\"; never leave an answered question \
             sce:unresolved.\n\
          3. Build the requirement list from `source.text` with scxml_requirement_set, and check \
-            the design against it with scxml_requirements. When works_read gave \
-            `requirements.lineage_text`, the work already holds a list: build this one against \
+            the design against it with scxml_requirements. When specs_read gave \
+            `requirements.lineage_text`, the spec already holds a list: build this one against \
             it, giving that as `lineage_text` and `requirements.sidecar_text` as \
             `previous_sidecar_text`, so that every requirement keeps the id it had and a retired \
             id is not issued again. Hand documents over as text. For a tool that takes \
             document_text, also provide companions_text for every imported SCXML document, under \
-            the exact file name used by its import. Call decisions only when works_read provided \
+            the exact file name used by its import. Call decisions only when specs_read provided \
             a decisions_text record.\n\
          4. Do not call any tool that saves, takes a request or accepts: you have none. Your \
             last message is the draft in the form asked for: the model's documents exactly as \
             you checked them, and `manifest_text`, `sidecar_text` and `lineage_text` exactly as \
             scxml_requirement_set returned them.\n",
-        work = job.work.as_str(),
+        spec = job.spec.as_str(),
         title = job.title,
         request = job.request,
         attempt = job.attempt,
@@ -220,7 +220,7 @@ pub(crate) fn prompt(job: &Job) -> String {
         text.push_str(
             "\nThe owner asked for every requirement to be issued a new id. In step 3 give \
              scxml_requirement_set `fresh` set to true beside the `lineage_text` and \
-             `previous_sidecar_text` it takes: nothing is carried, every id the work had is \
+             `previous_sidecar_text` it takes: nothing is carried, every id the spec had is \
              retired, and the new ids number on from where the lineage left off, never from R1. \
              The design has to cite the new ids, not the old ones. A list that still carries an \
              old id is refused.\n",
@@ -476,7 +476,7 @@ mod tests {
     }
 
     /// The form a client answers in asks for a lineage and the task tells it to build the list
-    /// against the one the work holds. That form and the task beside it are what a Codex version
+    /// against the one the spec holds. That form and the task beside it are what a Codex version
     /// is verified against, so asking for it is a new execution contract, to be verified again
     /// with the real client before a Codex version is listed for it. The draft reads a lineage when an answer has one, and a draft
     /// without one is a list without one, as every list was before lineages.
@@ -598,7 +598,7 @@ mod tests {
     }
 
     /// What the task tells a client about a lineage is the names the authoring server gives the
-    /// pieces: it reads `requirements.lineage_text` from works_read and gives it back to
+    /// pieces: it reads `requirements.lineage_text` from specs_read and gives it back to
     /// scxml_requirement_set as `lineage_text` beside `previous_sidecar_text`. A wording that
     /// drifts from either name sends the client to an argument the tool does not have.
     #[test]

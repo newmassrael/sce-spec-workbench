@@ -15,8 +15,8 @@ import type { Revision, Saved, SourceText } from "./contract";
 export type Phase = "idle" | "saving" | "conflict" | "failed";
 
 export interface EditorModel {
-  readonly workId: string;
-  /** The revision the buffer was loaded from, or last saved as. `null`: the work has no text yet. */
+  readonly specId: string;
+  /** The revision the buffer was loaded from, or last saved as. `null`: the spec has no text yet. */
   readonly base: Revision | null;
   /** The text at `base` (empty when there is none). */
   readonly saved: string;
@@ -35,9 +35,9 @@ export interface SaveRequest {
   readonly base: Revision | null;
 }
 
-export function open(workId: string, source: SourceText | null): EditorModel {
+export function open(specId: string, source: SourceText | null): EditorModel {
   return {
-    workId,
+    specId,
     base: source?.revision ?? null,
     saved: source?.text ?? "",
     text: source?.text ?? "",
@@ -60,7 +60,7 @@ export function isDirty(model: EditorModel): boolean {
 /** The save to send now, or `null` when there is nothing to send or one is in flight. */
 export function saveRequest(model: EditorModel): SaveRequest | null {
   if (model.phase === "saving" || model.phase === "conflict" || !isDirty(model)) return null;
-  return { id: model.workId, text: model.text, base: model.base };
+  return { id: model.specId, text: model.text, base: model.base };
 }
 
 export function saving(model: EditorModel): EditorModel {
@@ -90,7 +90,7 @@ export function failed(model: EditorModel, message: string): EditorModel {
 
 /** Discard the buffer for the text that was saved over it. */
 export function takeTheirs(model: EditorModel, theirs: SourceText | null): EditorModel {
-  return open(model.workId, theirs);
+  return open(model.specId, theirs);
 }
 
 /**

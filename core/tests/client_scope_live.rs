@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
 //! The real authoring server, started the way each client starts it, held against what a
-//! specification could make the client ask of it: another work, a file outside the folder a run
+//! specification could make the client ask of it: another spec, a file outside the folder a run
 //! works in, a tool that saves.
 //!
 //! No model and no account. A model that has read a hostile specification is replaced by a
@@ -32,7 +32,7 @@ use sce_spec_workbench_core::http_client::Endpoint;
 use sce_spec_workbench_core::local::{Local, LocalConfig};
 use sce_spec_workbench_core::mcp_client::McpClient;
 use sce_spec_workbench_core::runner::{Cancel, Generator, Job};
-use sce_works::{Revision, SystemClock, WorkId, WorkStore};
+use sce_specs::{Revision, SpecId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
 use common::model_server::{calls, chat_server, draft, says};
@@ -40,15 +40,15 @@ use common::{scratch, write_program};
 
 const DOOR: &str = "DOOR-SPEC: the door opens when the card matches.\n";
 
-/// A work a run is for, a work it is not, and a file outside every work, each with a sentence that
+/// A spec a run is for, a spec it is not, and a file outside every spec, each with a sentence that
 /// shows up in an answer if the server read it.
 struct Setting {
-    store: WorkStore,
-    works: PathBuf,
+    store: SpecStore,
+    specs: PathBuf,
     codegen: PathBuf,
-    assigned: WorkId,
-    other: WorkId,
-    /// What the other work says.
+    assigned: SpecId,
+    other: SpecId,
+    /// What the other spec says.
     secret: String,
     /// What the file outside says: the name of a parameter a diagnostic quotes.
     marker: String,
@@ -62,13 +62,13 @@ fn setting(label: &str) -> Setting {
         .unwrap_or_else(|| repo.join("target/debug/sce-codegen"));
     assert!(codegen.is_file(), "build sce-codegen first");
     let root = scratch(label);
-    let works = root.join("works");
-    let store = WorkStore::with_clock(&works, SystemClock);
+    let specs = root.join("specs");
+    let store = SpecStore::with_clock(&specs, SystemClock);
     let secret = format!("PRIVATE-NOTES-{}", std::process::id());
     let marker = format!("SCOPE_MARKER_{}", std::process::id());
-    let assigned = store.create_work("Door lock").unwrap().id;
+    let assigned = store.create_spec("Door lock").unwrap().id;
     store.save_source(&assigned, DOOR, None).unwrap();
-    let other = store.create_work("Private notes").unwrap().id;
+    let other = store.create_spec("Private notes").unwrap().id;
     store
         .save_source(&other, &format!("{secret}\n"), None)
         .unwrap();
@@ -86,7 +86,7 @@ fn setting(label: &str) -> Setting {
     .unwrap();
     Setting {
         store,
-        works,
+        specs,
         codegen,
         assigned,
         other,
@@ -97,7 +97,7 @@ fn setting(label: &str) -> Setting {
 }
 
 impl Setting {
-    /// The authoring server as the host knows it: not told which work a run is for.
+    /// The authoring server as the host knows it: not told which spec a run is for.
     fn server(&self) -> AuthorServer {
         let repo = common::sce_root();
         AuthorServer {
@@ -107,8 +107,8 @@ impl Setting {
                 "from sce_author import mcp; mcp.main()".to_string(),
             ],
             env: vec![
-                ("SCE_WORK".into(), common::sce_work().display().to_string()),
-                ("SCE_WORKS_DIR".into(), self.works.display().to_string()),
+                ("SCE_SPEC".into(), common::sce_spec().display().to_string()),
+                ("SCE_SPECS_DIR".into(), self.specs.display().to_string()),
                 ("SCE_CODEGEN".into(), self.codegen.display().to_string()),
                 (
                     "PYTHONPATH".into(),
@@ -120,7 +120,7 @@ impl Setting {
 
     fn job(&self) -> Job {
         Job {
-            work: self.assigned.clone(),
+            spec: self.assigned.clone(),
             title: "Door lock".to_string(),
             request: "req-scope".to_string(),
             attempt: 1,
@@ -146,8 +146,8 @@ impl Setting {
         })
     }
 
-    fn reads(&self, work: &WorkId) -> Value {
-        json!({"work": work.as_str()})
+    fn reads(&self, spec: &SpecId) -> Value {
+        json!({"spec": spec.as_str()})
     }
 }
 
@@ -223,7 +223,7 @@ fn the_server_claude_code_is_given_refuses_what_a_specification_could_ask_of_it(
     let setting = setting("claude-scope");
     let given = server_claude_is_given(&setting);
 
-    // Told which work the run is for, it offers the nine tools of a run and no others.
+    // Told which spec the run is for, it offers the nine tools of a run and no others.
     let mut scoped = start(&given);
     let offered: std::collections::BTreeSet<String> = scoped
         .tools(within(), &Cancel::new())
@@ -235,16 +235,16 @@ fn the_server_claude_code_is_given_refuses_what_a_specification_could_ask_of_it(
         AUTHOR_TOOLS.iter().map(|t| t.to_string()).collect();
     assert_eq!(offered, allowed);
 
-    // The work it is for is read.
-    let (failed, text) = call(&mut scoped, "works_read", &setting.reads(&setting.assigned));
+    // The spec it is for is read.
+    let (failed, text) = call(&mut scoped, "specs_read", &setting.reads(&setting.assigned));
     assert!(!failed && text.contains("DOOR-SPEC"), "{failed} {text}");
-    // Another work of the same folder is not, and a tool that saves is not run.
-    let (failed, text) = call(&mut scoped, "works_read", &setting.reads(&setting.other));
+    // Another spec of the same folder is not, and a tool that saves is not run.
+    let (failed, text) = call(&mut scoped, "specs_read", &setting.reads(&setting.other));
     assert!(failed && !text.contains(&setting.secret), "{failed} {text}");
     let (failed, text) = call(
         &mut scoped,
-        "works_save_model",
-        &json!({"work": setting.assigned.as_str(), "text": "<scxml/>"}),
+        "specs_save_model",
+        &json!({"spec": setting.assigned.as_str(), "text": "<scxml/>"}),
     );
     assert!(failed, "a tool that saves was run: {text}");
     assert!(setting
@@ -264,10 +264,10 @@ fn the_server_claude_code_is_given_refuses_what_a_specification_could_ask_of_it(
     // The same attacks on the server as the host knows it, told nothing, get what they ask for:
     // this is how the check is shown to tell the two apart.
     let mut unscoped = start(&setting.server());
-    let (_, text) = call(&mut unscoped, "works_read", &setting.reads(&setting.other));
+    let (_, text) = call(&mut unscoped, "specs_read", &setting.reads(&setting.other));
     assert!(
         text.contains(&setting.secret),
-        "the unscoped server did not read the other work: {text}"
+        "the unscoped server did not read the other spec: {text}"
     );
     let (_, text) = call(
         &mut unscoped,
@@ -287,12 +287,12 @@ fn the_server_a_local_model_is_given_refuses_what_a_specification_could_ask_of_i
     let other = setting.reads(&setting.other).to_string();
     let outside = setting.names_a_file_outside().to_string();
     let own = setting.reads(&setting.assigned).to_string();
-    // A model that did what the specification said: read its own work, then another, then name a
+    // A model that did what the specification said: read its own spec, then another, then name a
     // file outside, and then answer.
     let model = chat_server(vec![
         calls(&[
-            (Some("c0"), "works_read", &own),
-            (Some("c1"), "works_read", &other),
+            (Some("c0"), "specs_read", &own),
+            (Some("c1"), "specs_read", &other),
             (Some("c2"), "validate_scxml", &outside),
         ]),
         says(&draft("<scxml/>")),

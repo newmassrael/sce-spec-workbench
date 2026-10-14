@@ -7,10 +7,10 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 
 use sce_spec_workbench_core::ConnectionStore;
+use sce_specs::{NoRenderer, SpecStore};
 use sce_web_shell::address::check_bind;
 use sce_web_shell::assets::Assets;
 use sce_web_shell::{token, Reply, Shell};
-use sce_works::{NoRenderer, WorkStore};
 use serde_json::{json, Value};
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef";
@@ -36,7 +36,7 @@ impl Drop for Scratch {
 
 fn shell(scratch: &Scratch, assets: Option<Assets>) -> Shell {
     Shell::new(
-        WorkStore::at(scratch.0.join("works")),
+        SpecStore::at(scratch.0.join("specs")),
         Box::new(NoRenderer),
         TOKEN.to_string(),
         assets,
@@ -59,7 +59,7 @@ fn json_of(reply: &Reply) -> Value {
 fn a_call_without_the_token_is_refused_before_it_is_read() {
     let scratch = Scratch::new("no-token");
     let shell = shell(&scratch, None);
-    let body = json!({"name": "list_works"});
+    let body = json!({"name": "list_specs"});
     for auth in [None, Some("Bearer wrong"), Some("Basic abc"), Some(TOKEN)] {
         let reply = post(&shell, auth, &body);
         assert_eq!(reply.status, 401, "{auth:?}");
@@ -74,7 +74,7 @@ fn a_call_with_the_token_reaches_the_command_layer() {
     let created = post(
         &shell,
         Some(&bearer()),
-        &json!({"name": "create_work", "args": {"title": "Door lock"}}),
+        &json!({"name": "create_spec", "args": {"title": "Door lock"}}),
     );
     assert_eq!(
         created.status,
@@ -82,9 +82,9 @@ fn a_call_with_the_token_reaches_the_command_layer() {
         "{}",
         String::from_utf8_lossy(&created.body)
     );
-    let listed = post(&shell, Some(&bearer()), &json!({"name": "list_works"}));
+    let listed = post(&shell, Some(&bearer()), &json!({"name": "list_specs"}));
     assert_eq!(listed.status, 200);
-    assert_eq!(json_of(&listed)["works"][0]["title"], "Door lock");
+    assert_eq!(json_of(&listed)["specs"][0]["title"], "Door lock");
 }
 
 #[test]
@@ -92,12 +92,12 @@ fn a_stale_save_travels_as_409_with_both_revisions() {
     let scratch = Scratch::new("conflict");
     let shell = shell(&scratch, None);
     let auth = bearer();
-    let work = json_of(&post(
+    let spec = json_of(&post(
         &shell,
         Some(&auth),
-        &json!({"name": "create_work", "args": {"title": "Pump"}}),
+        &json!({"name": "create_spec", "args": {"title": "Pump"}}),
     ));
-    let id = work["id"].as_str().unwrap();
+    let id = spec["id"].as_str().unwrap();
     let first = json_of(&post(
         &shell,
         Some(&auth),
@@ -131,27 +131,27 @@ fn each_refusal_travels_under_its_own_status() {
     let cases = [
         (json!({"name": "nope"}), 404, "unknown-command"),
         (
-            json!({"name": "read_work", "args": {"id": "absent"}}),
+            json!({"name": "read_spec", "args": {"id": "absent"}}),
             404,
             "not-found",
         ),
         (
-            json!({"name": "read_work", "args": {"id": "../x"}}),
+            json!({"name": "read_spec", "args": {"id": "../x"}}),
             400,
             "invalid-id",
         ),
         (
-            json!({"name": "create_work", "args": {"title": ""}}),
+            json!({"name": "create_spec", "args": {"title": ""}}),
             400,
             "invalid-title",
         ),
         (
-            json!({"name": "list_works", "args": {"extra": 1}}),
+            json!({"name": "list_specs", "args": {"extra": 1}}),
             400,
             "bad-request",
         ),
         (
-            json!({"name": "list_works", "extra": 1}),
+            json!({"name": "list_specs", "extra": 1}),
             400,
             "bad-request",
         ),

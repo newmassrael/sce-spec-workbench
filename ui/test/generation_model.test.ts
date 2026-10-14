@@ -40,7 +40,7 @@ const listing = (...adapters: AdapterStatus[]): AdapterListing => ({ adapters, u
 
 const detail = (over: Partial<GenerationRequest> = {}): GenerationRequest => ({
   id: "req-1",
-  work: "door",
+  spec: "door",
   seq: 1,
   key: "k",
   origin: "gui",
@@ -119,7 +119,7 @@ describe("what the screen reads of the shells, as one thing to compare", () => {
     ],
     unreadable: [],
   });
-  const left = (reason: string) => [{ work: "door", request: "req-1", connection: "claude", reason }];
+  const left = (reason: string) => [{ spec: "door", request: "req-1", connection: "claude", reason }];
 
   it("moves when a shell says why a request waits, or says something else", () => {
     expect(hostsKey(shell(left("nobody is signed in")))).not.toBe(hostsKey(shell([])));
@@ -138,7 +138,7 @@ describe("what the screen reads of the shells, as one thing to compare", () => {
 });
 
 describe("where the latest request stands", () => {
-  it("is idle for a work nobody asked a model for", () => {
+  it("is idle for a spec nobody asked a model for", () => {
     expect(statusOf(null, null, null)).toEqual({ kind: "idle" });
   });
 
@@ -156,8 +156,8 @@ describe("where the latest request stands", () => {
       reason: null,
       client_version: "2.1.291",
       waiting: [
-        { work: "door", request: "req-1", connection: "claude", reason: "nobody is signed in to Claude Code" },
-        { work: "door", request: "req-9", connection: "claude", reason: "another request's reason" },
+        { spec: "door", request: "req-1", connection: "claude", reason: "nobody is signed in to Claude Code" },
+        { spec: "door", request: "req-9", connection: "claude", reason: "another request's reason" },
       ],
       seen_at: "2026-10-05T09:00:00Z",
       live: true,
@@ -260,7 +260,7 @@ describe("what the person may do", () => {
           hosting: true,
           reason: null,
           client_version: null,
-          waiting: [{ work: "door", request: "req-1", connection: "claude", reason: "nobody is signed in" }],
+          waiting: [{ spec: "door", request: "req-1", connection: "claude", reason: "nobody is signed in" }],
           seen_at: "2026-10-05T09:00:00Z",
           live: true,
         },

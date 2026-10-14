@@ -28,7 +28,7 @@ use sce_spec_workbench_core::codex::{auth_store_override, instructions_of};
 use sce_spec_workbench_core::codex_status;
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy, Route};
-use sce_works::WorkStore;
+use sce_specs::SpecStore;
 use serde_json::{json, Value};
 
 use common::{scratch, FakeRenderer};
@@ -647,10 +647,10 @@ mod command {
     use super::*;
 
     fn ask(entrance: Entrance, codex: Option<&Path>) -> Result<Value, (String, String)> {
-        let works = WorkStore::at(scratch("cst-cmd-works"));
+        let specs = SpecStore::at(scratch("cst-cmd-specs"));
         let settings = ConnectionStore::at(scratch("cst-cmd-settings"));
         let policy = Policy::shipped();
-        let context = Context::new(&works, &FakeRenderer, &policy, entrance)
+        let context = Context::new(&specs, &FakeRenderer, &policy, entrance)
             .with_connections(Some(&settings))
             .with_codex(codex);
         call_in(&context, "read_codex_status", json!({})).map_err(|e| (e.kind, e.message))
@@ -680,9 +680,9 @@ mod command {
 
     #[test]
     fn arguments_it_does_not_take_are_refused() {
-        let works = WorkStore::at(scratch("cst-cmd-args-works"));
+        let specs = SpecStore::at(scratch("cst-cmd-args-specs"));
         let policy = Policy::shipped();
-        let context = Context::new(&works, &FakeRenderer, &policy, Entrance::Desktop);
+        let context = Context::new(&specs, &FakeRenderer, &policy, Entrance::Desktop);
 
         let refused = call_in(&context, "read_codex_status", json!({ "path": "/bin/sh" }));
 

@@ -52,7 +52,7 @@ impl Billing {
 #[serde(tag = "state", rename_all = "kebab-case")]
 pub enum Client {
     /// It answered `--version`. `path` is the program that did: the screen of this computer says
-    /// which one it asked, and it is not kept anywhere a work is.
+    /// which one it asked, and it is not kept anywhere a spec is.
     Installed { version: String, path: String },
     /// A file is there and did not answer `--version`: not something to run until it does.
     Unverified,

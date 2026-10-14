@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! A [`Generator`] that runs Codex, headless, to write the model of a work.
+//! A [`Generator`] that runs Codex, headless, to write the model of a spec.
 //!
 //! The client is started once per draft with `codex exec`, in a folder of its own that is removed
 //! when it is done, and is given:
 //!
 //! - **the authoring server and nothing else to reach**, and of its tools only [`AUTHOR_TOOLS`]:
-//!   it can read the work it was started for and check what it writes, and it cannot save to any
-//!   work, take or finish a request, or record an acceptance. The application saves what it
+//!   it can read the spec it was started for and check what it writes, and it cannot save to any
+//!   spec, take or finish a request, or record an acceptance. The application saves what it
 //!   answers;
 //! - **a sandbox that does not write and reads only the minimum and its own folder**
 //!   ([`permission_settings`]), no question to a person who is not there
@@ -25,7 +25,7 @@
 //!   the documents of the model and the requirement list, which is what [`Draft`] is.
 //!
 //! What it is told goes in on standard input and not on the command line; the specification itself
-//! is not in it at all, because the client reads the work through the authoring server. What it
+//! is not in it at all, because the client reads the spec through the authoring server. What it
 //! answers is read from the file `-o` names, the last message it wrote, and nothing else it prints.
 
 use std::fs;
@@ -33,7 +33,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use sce_works::Revision;
+use sce_specs::Revision;
 use serde_json::Value;
 
 use crate::auth_policy::Observed;
@@ -142,10 +142,10 @@ impl Codex {
         scratch: &Path,
         schema_file: &Path,
         last: &Path,
-        work: &str,
+        spec: &str,
     ) -> Vec<String> {
         exec_arguments(
-            &scoped_to(&self.author, work),
+            &scoped_to(&self.author, spec),
             self.support.disabled_features(),
             self.config.model.as_deref(),
             scratch,
@@ -157,7 +157,7 @@ impl Codex {
     /// Everything that must be true before the client is started, asked in one place so that a run
     /// and the reason a request waits are the same judgement: it is Codex, a version a person
     /// verified, with nothing switched on that nobody looked at, and a credential to give it.
-    /// A refusal is a sentence that names no path: it is said where the works folder is.
+    /// A refusal is a sentence that names no path: it is said where the specs folder is.
     fn preflight(&self) -> Result<Run, String> {
         let version = self
             .version
@@ -223,7 +223,7 @@ fn exec_arguments(
 const PERMISSIONS: &str = "sce_run";
 
 /// What a command the client runs may reach, as settings (`-c`): the minimum a program needs to
-/// start and the folder the run works in (empty: the client reads the work through the authoring
+/// start and the folder the run works in (empty: the client reads the spec through the authoring
 /// server), read and never written, and no network.
 ///
 /// The mode `-s read-only` is a profile that reads the whole disk (`:root`), so a command the
@@ -508,7 +508,7 @@ fn instruction_material(support: &Support) -> String {
         env: vec![("<name>".to_string(), "<value>".to_string())],
     };
     let arguments = exec_arguments(
-        &scoped_to(&author, "<work>"),
+        &scoped_to(&author, "<spec>"),
         support.disabled_features(),
         None,
         Path::new("<scratch>"),
@@ -556,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn a_command_the_client_runs_may_read_the_minimum_and_the_work_folder_and_nothing_else() {
+    fn a_command_the_client_runs_may_read_the_minimum_and_the_spec_folder_and_nothing_else() {
         let settings = permission_settings();
         let text = settings.join("\n");
 
@@ -698,7 +698,7 @@ impl Generator for Codex {
         let mut command = Command::new(&self.binary);
         command
             .current_dir(scratch.path())
-            .args(self.arguments(scratch.path(), &schema_file, &last, job.work.as_str()))
+            .args(self.arguments(scratch.path(), &schema_file, &last, job.spec.as_str()))
             .env_clear()
             .envs(kept)
             .stdin(Stdio::piped())

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! The bearer token that stands between a page in some other tab and the works
+//! The bearer token that stands between a page in some other tab and the specs
 //! folder.
 
 /// The shortest token accepted from the environment. A generated one is longer.

@@ -17,7 +17,7 @@
 //! - a connection serves one request and closes, so nothing waits for a second.
 //!
 //! The handler itself ([`Shell::handle`]) is synchronous and may wait on the
-//! works folder's file lock, so it runs on the blocking pool and never on the
+//! specs folder's file lock, so it runs on the blocking pool and never on the
 //! threads that read sockets.
 
 use std::convert::Infallible;
@@ -179,7 +179,7 @@ fn into_response(reply: Reply) -> Response<Full<Bytes>> {
     let headers = response.headers_mut();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static(reply.content_type));
     for (name, value) in [
-        // Nothing here is worth keeping: the works change under the screen.
+        // Nothing here is worth keeping: the specs change under the screen.
         ("cache-control", "no-store"),
         ("x-content-type-options", "nosniff"),
         (

@@ -32,7 +32,7 @@ import type {
   Refusal,
   RequirementOutcome,
   RequirementsReport,
-  WorkSnapshot,
+  SpecSnapshot,
 } from "../src/contract";
 
 const hex = (n: number): string => n.toString(16).padStart(64, "0");
@@ -80,9 +80,9 @@ const shown: Shown = { source: basis.source, model: basis.model, answers: null, 
 
 const record: AcceptanceRecord = { revision: hex(9), accepted_at: "t", channel: "direct", basis, open: [] };
 
-/** A work with a text, a design and a list, and nothing accepted, read as one state. */
-const snapshot = (over: Partial<WorkSnapshot> = {}): WorkSnapshot => ({
-  work: { id: "door", title: "Door lock", created_at: "t" },
+/** A spec with a text, a design and a list, and nothing accepted, read as one state. */
+const snapshot = (over: Partial<SpecSnapshot> = {}): SpecSnapshot => ({
+  spec: { id: "door", title: "Door lock", created_at: "t" },
   source: { revision: basis.source, text: "The door opens." },
   model: { revision: basis.model, written_for: basis.source, text: "<scxml/>", entry: "model.scxml", documents: [] },
   model_standing: "current",
@@ -118,7 +118,7 @@ describe("the revisions SCE is asked about", () => {
     expect(basisOf(answered)).toEqual({ ...basis, answers: hex(4) });
   });
 
-  it("are none for a work with no text, no design or no list, since there is nothing to measure", () => {
+  it("are none for a spec with no text, no design or no list, since there is nothing to measure", () => {
     expect(basisOf(snapshot({ source: null }))).toBeNull();
     expect(basisOf(snapshot({ model: null, model_standing: null }))).toBeNull();
     expect(basisOf(snapshot({ requirements: null, requirements_standing: null }))).toBeNull();
@@ -126,7 +126,7 @@ describe("the revisions SCE is asked about", () => {
 });
 
 describe("the panel beside a snapshot", () => {
-  it("has no list to accept a design against for a work with none", () => {
+  it("has no list to accept a design against for a spec with none", () => {
     expect(panelOf(snapshot({ requirements: null, requirements_standing: null }), judgment())).toEqual({
       phase: "no-list",
     });
@@ -214,7 +214,7 @@ describe("the panel beside a snapshot", () => {
 });
 
 describe("a panel when the design was kept again for another text", () => {
-  const read = (over: Partial<WorkSnapshot> = {}): AcceptanceState => {
+  const read = (over: Partial<SpecSnapshot> = {}): AcceptanceState => {
     const made = panelOf(snapshot(over), judgment());
     if (made.phase !== "read") throw new Error("a panel was expected");
     return made.state;
@@ -288,13 +288,13 @@ describe("SCE not answering", () => {
 });
 
 describe("a panel and the snapshot it is shown beside", () => {
-  const panel = (read: WorkSnapshot, said: Judgment): AcceptanceState => {
+  const panel = (read: SpecSnapshot, said: Judgment): AcceptanceState => {
     const made = panelOf(read, said);
     if (made.phase !== "read") throw new Error("a panel was expected");
     return made.state;
   };
 
-  it("are of one work when they name the same revisions and the same acceptance", () => {
+  it("are of one spec when they name the same revisions and the same acceptance", () => {
     expect(panelIsOf(panel(snapshot(), judgment()), snapshot())).toBe(true);
   });
 
@@ -306,7 +306,7 @@ describe("a panel and the snapshot it is shown beside", () => {
     expect(panelIsOf(state, snapshot({ answers: { revision: hex(4), entries: {} } }))).toBe(false);
   });
 
-  it("are not when an acceptance was made or replaced, which no revision of the work names", () => {
+  it("are not when an acceptance was made or replaced, which no revision of the spec names", () => {
     const state = panel(snapshot(), judgment());
     expect(panelIsOf(state, snapshot({ acceptance: record }))).toBe(false);
     const accepted = panel(
@@ -318,7 +318,7 @@ describe("a panel and the snapshot it is shown beside", () => {
     expect(panelIsOf(accepted, snapshot())).toBe(false);
   });
 
-  it("are not when the work has nothing to measure now", () => {
+  it("are not when the spec has nothing to measure now", () => {
     expect(panelIsOf(panel(snapshot(), judgment()), snapshot({ requirements: null, requirements_standing: null }))).toBe(
       false,
     );
@@ -382,7 +382,7 @@ describe("the accept button", () => {
     expect(gate({ ...unsaid, report: null }, false, shown)).toBe("not-measured");
   });
 
-  it("says a standing of the work on screen only when every part the screen has is the one judged", () => {
+  it("says a standing of the spec on screen only when every part the screen has is the one judged", () => {
     // The panel is of the snapshot the design was read in; what can differ is the text and the
     // answers, which the person edits and which are read apart.
     const holds = state({ accepted: record, verdict: said("holds") });
@@ -392,7 +392,7 @@ describe("the accept button", () => {
     }
     // A part still being read is not held against it; it is the gate that waits for what is unread.
     expect(standingIsOfWhatIsShown(holds, { ...shown, model: undefined })).toBe(true);
-    // Where there is no acceptance there is no standing to be of another work.
+    // Where there is no acceptance there is no standing to be of another spec.
     expect(standingIsOfWhatIsShown(state(), { ...shown, model: hex(8) })).toBe(true);
   });
 

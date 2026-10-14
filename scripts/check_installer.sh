@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 #
 # The workbench's installer, judged by installing it: built as a `.deb` that carries the generator,
-# `sce-work` and the authoring server, unpacked into a scratch directory and started under a
+# `sce-spec` and the authoring server, unpacked into a scratch directory and started under a
 # virtual display with nothing on the machine to help. The application it installs has to find what
 # the installer carried and say so. `scripts/check.sh` cannot say that: a bundle folder renamed on
 # one side only leaves every test green. CI calls this and nothing else

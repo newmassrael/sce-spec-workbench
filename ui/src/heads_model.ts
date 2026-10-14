@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-// Whether the work moved under what the screen shows, apart from how the screen
-// reads it again. Pure functions over the heads the core says (`read_work_heads`)
+// Whether the spec moved under what the screen shows, apart from how the screen
+// reads it again. Pure functions over the heads the core says (`read_spec_heads`)
 // and what the screen holds, so each way a part can differ is a test.
 //
 // The comparison is between the core and what is ON SCREEN, not between two answers of
@@ -10,14 +10,14 @@
 // own save moves a head and the screen shows the saved text a moment later, and a
 // comparison with the previous answer would call that a change from elsewhere.
 
-import type { Basis, ClaimedHead, RequestHead, Revision, WorkHeads } from "./contract";
+import type { Basis, ClaimedHead, RequestHead, Revision, SpecHeads } from "./contract";
 
-/** The parts of a work that are read apart from each other, and so are read again apart. */
+/** The parts of a spec that are read apart from each other, and so are read again apart. */
 export type Part = "source" | "model" | "answers" | "requirements" | "acceptance";
 
 /**
  * A part the screen tried to read and could not. It is not "nothing on screen" (that is
- * `null`, which says the work has none) and it is not "left out" (`undefined`): there is
+ * `null`, which says the spec has none) and it is not "left out" (`undefined`): there is
  * something to read, the screen does not have it, and so it differs from whatever the core
  * says, until a read has worked.
  */
@@ -25,7 +25,7 @@ export const UNREAD: unique symbol = Symbol("unread");
 export type Unread = typeof UNREAD;
 
 /**
- * What the screen shows of one part of the work. `undefined` means there is nothing to
+ * What the screen shows of one part of the spec. `undefined` means there is nothing to
  * compare now: the part is being read or saved, or holds what the person typed, and a part
  * that is not compared is not read again over their head. A part that could not be read is
  * `UNREAD`, which is compared: leaving it out would leave it unread for good.
@@ -39,7 +39,7 @@ export interface ClaimedOnScreen {
   readonly sourceHead: Revision | null;
 }
 
-export interface WorkOnScreen {
+export interface SpecOnScreen {
   /** The revision of the text the editor holds as saved. */
   readonly source: OnScreen<Revision>;
   readonly model: OnScreen<ClaimedOnScreen>;
@@ -49,7 +49,7 @@ export interface WorkOnScreen {
   /**
    * The revisions the acceptance panel's verdict and report are of, which SCE was asked about by
    * name. The acceptance record, which is all `acceptance` above compares, does not change when the
-   * work does, and what the panel names includes the answers, which the screen may not hold to
+   * spec does, and what the panel names includes the answers, which the screen may not hold to
    * compare (they are being typed over). `undefined` when the panel has nothing read.
    */
   readonly judged: Basis | undefined;
@@ -78,8 +78,8 @@ function claimedMoved(shown: OnScreen<ClaimedOnScreen>, head: ClaimedHead | null
   return !sameHead(shown.head, head) || shown.sourceHead !== sourceHead;
 }
 
-/** Whether `basis` names the work as the heads say it is now: its text, design, list and answers. */
-function basisIsOfTheHeads(basis: Basis, heads: WorkHeads): boolean {
+/** Whether `basis` names the spec as the heads say it is now: its text, design, list and answers. */
+function basisIsOfTheHeads(basis: Basis, heads: SpecHeads): boolean {
   return (
     basis.source === heads.source &&
     basis.model === (heads.model?.revision ?? null) &&
@@ -88,14 +88,14 @@ function basisIsOfTheHeads(basis: Basis, heads: WorkHeads): boolean {
   );
 }
 
-/** The parts of the work the core now says differently from what the screen shows, in the order they are read again. */
-export function movedParts(shown: WorkOnScreen, heads: WorkHeads): Part[] {
+/** The parts of the spec the core now says differently from what the screen shows, in the order they are read again. */
+export function movedParts(shown: SpecOnScreen, heads: SpecHeads): Part[] {
   const moved: Part[] = [];
   if (revisionMoved(shown.source, heads.source)) moved.push("source");
   if (revisionMoved(shown.answers, heads.answers)) moved.push("answers");
   if (claimedMoved(shown.model, heads.model, heads.source)) moved.push("model");
   if (claimedMoved(shown.requirements, heads.requirements, heads.source)) moved.push("requirements");
-  // The acceptance record keeps its revision while the work it is judged against moves, so what
+  // The acceptance record keeps its revision while the spec it is judged against moves, so what
   // the panel is of is compared with the heads too: against the core, and not against what is on
   // screen, which can be the part that is behind (a text being typed over cannot be read).
   const judgedOfAnother = shown.judged !== undefined && !basisIsOfTheHeads(shown.judged, heads);

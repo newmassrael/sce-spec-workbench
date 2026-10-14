@@ -27,8 +27,8 @@ use sce_spec_workbench_core::host::{start_with, HostSettings, NotHosted};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
 };
-use sce_works::requests::{Inputs, Pin, State};
-use sce_works::{ConnectionId, ManualClock, Registration, Saved, WorkId, WorkStore};
+use sce_specs::requests::{Inputs, Pin, State};
+use sce_specs::{ConnectionId, ManualClock, Registration, Saved, SpecId, SpecStore};
 
 use common::model_server::{authoring_server, chat_server, draft, says};
 use common::FakeRenderer;
@@ -37,9 +37,9 @@ fn lookup(_: &str) -> Option<OsString> {
     None
 }
 
-fn store(label: &str) -> Arc<WorkStore<Arc<ManualClock>>> {
+fn store(label: &str) -> Arc<SpecStore<Arc<ManualClock>>> {
     let clock = Arc::new(ManualClock::at(1_791_190_800));
-    Arc::new(WorkStore::with_clock(common::scratch(label), clock))
+    Arc::new(SpecStore::with_clock(common::scratch(label), clock))
 }
 
 /// The shell's settings: no Claude Code and no Codex, and a launcher for the authoring server that
@@ -76,7 +76,7 @@ fn register(settings: &ConnectionStore, connection: &Connection) -> Pin {
     connection.pin(revision)
 }
 
-fn ask_for(store: &WorkStore<Arc<ManualClock>>, id: &WorkId, pin: Pin) -> String {
+fn ask_for(store: &SpecStore<Arc<ManualClock>>, id: &SpecId, pin: Pin) -> String {
     store
         .register_request_for(
             id,
@@ -150,7 +150,7 @@ fn a_computer_with_no_client_hosts_once_a_model_server_is_registered_and_not_bef
 #[test]
 fn a_request_made_for_a_model_server_is_written_by_it_and_completes() {
     let store = store("hostl-run");
-    let id = store.create_work("Door lock").unwrap().id;
+    let id = store.create_spec("Door lock").unwrap().id;
     store.save_source(&id, "The lock opens.", None).unwrap();
     let model = chat_server(vec![says(&draft("<scxml><!-- door --></scxml>"))]);
     let connections = ConnectionStore::at(common::scratch("hostl-run-settings"));
@@ -177,7 +177,7 @@ fn a_request_made_for_a_model_server_is_written_by_it_and_completes() {
         "{}",
         asked[0].head
     );
-    // What it wrote is what the work holds.
+    // What it wrote is what the spec holds.
     let written = store.read_model(&id, None).unwrap().expect("a model");
     assert!(written.text.contains("door"), "{}", written.text);
 }

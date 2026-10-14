@@ -25,7 +25,7 @@ use sce_spec_workbench_core::claude_code::account_from_status;
 use sce_spec_workbench_core::{
     call_in, ConnectionStore, Context, Entrance, Observed, Policy, Route,
 };
-use sce_works::WorkStore;
+use sce_specs::SpecStore;
 use serde_json::{json, Value};
 
 use common::{scratch, FakeRenderer};
@@ -74,9 +74,9 @@ impl Fake {
 
 /// Ask `read_claude_status` as `entrance`, with `claude` as the program the shell was told of.
 fn ask(entrance: Entrance, claude: Option<&Path>, policy: &Policy) -> Result<Value, String> {
-    let works = WorkStore::at(scratch("claude-status-works"));
+    let specs = SpecStore::at(scratch("claude-status-specs"));
     let settings = ConnectionStore::at(scratch("claude-status-settings"));
-    let context = Context::new(&works, &FakeRenderer, policy, entrance)
+    let context = Context::new(&specs, &FakeRenderer, policy, entrance)
         .with_connections(Some(&settings))
         .with_claude(claude);
     call_in(&context, "read_claude_status", json!({}))
@@ -297,9 +297,9 @@ fn what_starts_a_program_is_only_the_desktops() {
 #[test]
 fn the_entrance_says_whether_it_may_start_a_program() {
     let policy = Policy::shipped();
-    let works = WorkStore::at(scratch("claude-status-describe"));
+    let specs = SpecStore::at(scratch("claude-status-describe"));
     let said = |entrance| {
-        let context = Context::new(&works, &FakeRenderer, &policy, entrance);
+        let context = Context::new(&specs, &FakeRenderer, &policy, entrance);
         call_in(&context, "describe", json!({})).unwrap()["starts_programs"].clone()
     };
 

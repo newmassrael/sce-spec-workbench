@@ -1,7 +1,7 @@
 name: Installer
 
 # The workbench's installer, judged by installing it: built as a `.deb` that carries the
-# generator, `sce-work` and the authoring server (all from the `sce` submodule), unpacked into a
+# generator, `sce-spec` and the authoring server (all from the `sce` submodule), unpacked into a
 # scratch directory and started under a virtual display with nothing on the machine to help. The
 # application it installs has to find what the installer carried and say so.
 #

@@ -21,9 +21,9 @@ use sce_spec_workbench_core::runner::{
     Unrunnable,
 };
 use sce_spec_workbench_core::{Limits, PinnedRun};
-use sce_works::requests::{ConnectionRef, Inputs, Pin, State};
-use sce_works::{
-    ConnectionId, ManualClock, ModelFiles, Registration, Requirements, Revision, WorkId, WorkStore,
+use sce_specs::requests::{ConnectionRef, Inputs, Pin, State};
+use sce_specs::{
+    ConnectionId, ManualClock, ModelFiles, Registration, Requirements, Revision, SpecId, SpecStore,
 };
 
 use common::FakeRenderer;
@@ -108,14 +108,14 @@ impl Directory for Shelf {
 }
 
 struct Fixture {
-    store: Arc<WorkStore<Arc<ManualClock>>>,
-    id: WorkId,
+    store: Arc<SpecStore<Arc<ManualClock>>>,
+    id: SpecId,
 }
 
 fn fixture(label: &str) -> Fixture {
     let clock = Arc::new(ManualClock::at(T0));
-    let store = Arc::new(WorkStore::with_clock(common::scratch(label), clock));
-    let id = store.create_work("Door lock").unwrap().id;
+    let store = Arc::new(SpecStore::with_clock(common::scratch(label), clock));
+    let id = store.create_spec("Door lock").unwrap().id;
     store.save_source(&id, "The lock opens.", None).unwrap();
     Fixture { store, id }
 }
@@ -239,7 +239,7 @@ fn a_request_the_runner_cannot_run_is_left_queued_and_says_why() {
     assert_eq!(f.state_of(&request), State::Queued);
     let waiting = runner.waiting();
     assert_eq!(waiting.len(), 1);
-    assert_eq!(waiting[0].work, f.id);
+    assert_eq!(waiting[0].spec, f.id);
     assert_eq!(waiting[0].request, request);
     assert_eq!(waiting[0].connection.as_str(), "elsewhere");
     assert!(waiting[0].reason.contains("nothing runs `elsewhere`"));

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-// The screen: the works on one side, the selected work's text and history on the
+// The screen: the specs on one side, the selected spec's text and history on the
 // other. It decides nothing about the text. Every rule about what a save is lives
 // in the core and the editor model; this file asks, shows the answer, and offers
 // the person the choices a refusal leaves.
@@ -71,9 +71,9 @@ import {
   type RequirementsReport,
   type SourceText,
   type Unresolved,
-  type Work,
-  type WorkHeads,
-  type WorkSnapshot,
+  type Spec,
+  type SpecHeads,
+  type SpecSnapshot,
 } from "./contract";
 import type { Desktop } from "./desktop";
 import { h, type Child } from "./dom";
@@ -102,7 +102,7 @@ import {
   whyNoAi,
   type Status,
 } from "./generation_model";
-import { movedParts, sameRequest, UNREAD, type WorkOnScreen } from "./heads_model";
+import { movedParts, sameRequest, UNREAD, type SpecOnScreen } from "./heads_model";
 import { initialLocale, languageName, LOCALES, translate, type Key, type Locale } from "./i18n";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED, type Transport } from "./ipc";
 import {
@@ -122,13 +122,13 @@ const LOCALE_KEY = "sce.locale";
 const ZOOM_KEY = "sce.zoom";
 
 /**
- * What came of reading a part of the work again because the core said it moved: it was read
+ * What came of reading a part of the spec again because the core said it moved: it was read
  * and is shown; it was left alone (the person holds something in it, or the answer is no longer
  * wanted); or the read failed and the part still differs from what the core says.
  */
 type Refreshed = "read" | "held" | "failed";
 
-/** A part of the work could not be read again. Said to `watch`, which asks again after waiting longer. */
+/** A part of the spec could not be read again. Said to `watch`, which asks again after waiting longer. */
 class ReadAgainFailed extends Error {}
 
 /** SCE's words for a requirement, each with the sentence that says what it means. A word SCE adds later is shown as spelled. */
@@ -175,7 +175,7 @@ export interface Environment {
   readonly storage: Pick<Storage, "getItem" | "setItem"> | null;
   readonly browserLanguage: string | undefined;
   /**
-   * What wakes the screen to ask whether the selected work moved under it (a save from
+   * What wakes the screen to ask whether the selected spec moved under it (a save from
    * another window, an authoring client's next model). Absent: it asks only when the
    * person does something.
    */
@@ -196,7 +196,7 @@ export class App {
   /** The AI connection settings; made when the core has said what this window may do. */
   private ai: AiSettings | null = null;
   private listing: Listing | null = null;
-  private selected: Work | null = null;
+  private selected: Spec | null = null;
   private editor: EditorModel | null = null;
   private entries: HistoryEntry[] = [];
   /** An older revision being looked at, read-only. */
@@ -204,21 +204,21 @@ export class App {
   private notice: string | null = null;
   /** Something that went well and that the person should hear of, apart from a failure. */
   private info: string | null = null;
-  /** The person pressed "remove" for the selected work and has not yet said yes or no. */
+  /** The person pressed "remove" for the selected spec and has not yet said yes or no. */
   private removing = false;
   private loading = true;
   /**
    * Which editor the screen is showing, counted. Every answer that arrives for a
    * request is applied only if this is still the number it was asked under, so a
-   * reply for a work (or an opening of it) the person has since left cannot touch
-   * the one they are in now. A rule over the editor, not over a pair of works.
+   * reply for a spec (or an opening of it) the person has since left cannot touch
+   * the one they are in now. A rule over the editor, not over a pair of specs.
    */
   private session = 0;
-  /** The newest request to open a work; an older one that answers later is dropped. */
+  /** The newest request to open a spec; an older one that answers later is dropped. */
   private opening = 0;
   /** The newest request to look at an older revision. */
   private looking = 0;
-  /** The model of the selected work, and how far its drawing has got. */
+  /** The model of the selected spec, and how far its drawing has got. */
   private model: ModelPanel | null = null;
   /** The newest request to read and draw the model; an older one that answers later is dropped. */
   private modelTicket = 0;
@@ -240,27 +240,27 @@ export class App {
   /** The newest request for the acceptance; an older one that answers later is dropped. */
   private acceptanceTicket = 0;
   /**
-   * The work the owner ticked "issue every requirement a new id" for. The tick is one press's
-   * and not a setting: it is put away when the request is made, and it is only of the work it was
-   * ticked on, so another work is never asked to retire its ids by what was ticked here.
+   * The spec the owner ticked "issue every requirement a new id" for. The tick is one press's
+   * and not a setting: it is put away when the request is made, and it is only of the spec it was
+   * ticked on, so another spec is never asked to retire its ids by what was ticked here.
    */
   private freshIdsFor: string | null = null;
   /**
-   * What the revision did since the owner accepted, beside the acceptance; `null` for a work
+   * What the revision did since the owner accepted, beside the acceptance; `null` for a spec
    * nobody accepted. It is asked with the acceptance and dropped with it (`acceptanceTicket`).
    */
   private revision: RevisionPanel | null = null;
-  /** A work the person asked for while the editor held text that is not saved. */
-  private pendingSwitch: Work | null = null;
+  /** A spec the person asked for while the editor held text that is not saved. */
+  private pendingSwitch: Spec | null = null;
   /** The window was asked to close while something was not saved, and the person has not yet said what to do. */
   private closing = false;
   /** What the desktop shell was last told is unsaved, so it is told only what changed. */
   private reportedUnsaved: boolean | null = null;
-  /** What is typed in the new-work field, kept across redraws. */
+  /** What is typed in the new-spec field, kept across redraws. */
   private draftTitle = "";
-  /** Stops the questions about whether the selected work moved, and the one waiting to be asked. */
+  /** Stops the questions about whether the selected spec moved, and the one waiting to be asked. */
   private stopWatching: (() => void) | null = null;
-  /** Where the work's latest request stands, as the core last said, and what was read of it. */
+  /** Where the spec's latest request stands, as the core last said, and what was read of it. */
   private requestHead: RequestHead | null = null;
   private requestDetail: GenerationRequest | null = null;
   /** Which AI adapters are there, and whether the shells host one and why not, as last read. */
@@ -275,7 +275,7 @@ export class App {
   private guarding = false;
   /**
    * The bundle that is the model shown, and the answers it was made about. `bundleKey` is the
-   * revision last read (`null`: the work has none, `undefined`: not asked yet), so that a bundle
+   * revision last read (`null`: the spec has none, `undefined`: not asked yet), so that a bundle
    * is read when it changes and not at every question.
    */
   private bundle: BundleRead | null = null;
@@ -303,7 +303,7 @@ export class App {
     this.render();
     await this.guard(async () => {
       this.described = await this.api.describe();
-      // Two command sets, said as one: the works' and the application's own beside it.
+      // Two command sets, said as one: the specs' and the application's own beside it.
       if (
         this.described.command_set_version !== SUPPORTED_COMMAND_SET_VERSION ||
         this.described.application_command_set_version !== SUPPORTED_APPLICATION_COMMAND_SET_VERSION
@@ -314,7 +314,7 @@ export class App {
         });
         return;
       }
-      this.listing = await this.api.listWorks();
+      this.listing = await this.api.listSpecs();
       this.ai = new AiSettings({
         api: this.api,
         described: this.described,
@@ -329,7 +329,7 @@ export class App {
     });
     this.loading = false;
     this.render();
-    // After the first drawing: asking Claude Code can take seconds, and the works are not waiting for it.
+    // After the first drawing: asking Claude Code can take seconds, and the specs are not waiting for it.
     void this.ai?.load().then(() => this.render());
   }
 
@@ -342,53 +342,53 @@ export class App {
     this.fatal = null;
     this.loading = true;
     await this.start();
-    // The questions about the work on screen stopped when the server asked for the token.
+    // The questions about the spec on screen stopped when the server asked for the token.
     if (this.selected !== null && !this.needsToken && this.fatal === null) this.watch();
   }
 
   // ---- actions ----------------------------------------------------------
 
   /**
-   * The person asked for `work`. If the editor holds text that is not saved, or a
+   * The person asked for `spec`. If the editor holds text that is not saved, or a
    * save is still in flight, nothing is replaced: they are asked what to do with
    * it first.
    */
-  private async openWork(work: Work): Promise<void> {
+  private async openSpec(spec: Spec): Promise<void> {
     if (this.hasUnsavedChanges()) {
-      this.pendingSwitch = work;
+      this.pendingSwitch = spec;
       this.render();
       return;
     }
-    await this.select(work);
+    await this.select(spec);
   }
 
-  /** Load `work` into the editor. Of several requests in flight, only the newest is applied. */
-  private async select(work: Work): Promise<void> {
+  /** Load `spec` into the editor. Of several requests in flight, only the newest is applied. */
+  private async select(spec: Spec): Promise<void> {
     const ticket = ++this.opening;
     this.pendingSwitch = null;
     this.notice = null;
     this.info = null;
     this.removing = false;
     let opened = false;
-    // What the screen held when the read began. `openWork` asked about unsaved text at
+    // What the screen held when the read began. `openSpec` asked about unsaved text at
     // that moment only, and a read takes time: whatever is typed after it is not covered
     // by that question, so it is asked again when the answer arrives.
     const editorAtAsk = this.editor;
     const answersAtAsk = this.answers;
     try {
       const [source, entries] = await Promise.all([
-        this.api.readSource(work.id),
-        this.api.history(work.id),
+        this.api.readSource(spec.id),
+        this.api.history(spec.id),
       ]);
       if (ticket !== this.opening) return;
       if (this.typedSince(editorAtAsk, answersAtAsk)) {
-        this.pendingSwitch = work;
+        this.pendingSwitch = spec;
         this.render();
         return;
       }
       this.session += 1;
-      this.selected = work;
-      this.editor = open(work.id, source);
+      this.selected = spec;
+      this.editor = open(spec.id, source);
       this.entries = entries;
       this.viewing = null;
       // The model is a separate read, and a slow drawing of it must not hold the
@@ -423,17 +423,17 @@ export class App {
     }
     this.render();
     if (opened) {
-      void this.loadWork(work.id, true);
-      void this.loadAnswers(work.id);
-      void this.loadRequest(work.id, this.session);
+      void this.loadSpec(spec.id, true);
+      void this.loadAnswers(spec.id);
+      void this.loadRequest(spec.id, this.session);
       this.watch();
     }
   }
 
-  /** Where the work's request stands, and which AIs are there, when the work opens. */
+  /** Where the spec's request stands, and which AIs are there, when the spec opens. */
   private async loadRequest(id: string, session: number): Promise<void> {
     try {
-      const heads = await this.api.readWorkHeads(id);
+      const heads = await this.api.readSpecHeads(id);
       if (session !== this.session) return;
       await this.noteRequest(id, session, heads);
     } catch (error) {
@@ -443,10 +443,10 @@ export class App {
 
   /**
    * Take what the core says of the latest request and of the adapters, and draw it again if
-   * either moved. Asked on every question about the work, so a request an executor took, or
+   * either moved. Asked on every question about the spec, so a request an executor took, or
    * let go of, or finished, is on the screen without the person pressing anything.
    */
-  private async noteRequest(id: string, session: number, heads: WorkHeads): Promise<void> {
+  private async noteRequest(id: string, session: number, heads: SpecHeads): Promise<void> {
     const head = heads.request;
     let changed = !sameRequest(this.requestHead, head);
     this.requestHead = head;
@@ -528,11 +528,11 @@ export class App {
    * The person pressed the button: the text and the answers they typed are saved first, and a
    * request is made about what is then saved. Nothing is asked of the AI that the person has
    * not seen: the request names the text and the answers THIS screen shows, and the core
-   * refuses it (`moved`) when the work is no longer at them.
+   * refuses it (`moved`) when the spec is no longer at them.
    */
   private async generate(replace: boolean): Promise<void> {
-    const work = this.selected;
-    if (work === null || this.requestBusy !== null) return;
+    const spec = this.selected;
+    if (spec === null || this.requestBusy !== null) return;
     // A request that waits for a connection is replaced by one made for a connection: with none
     // chosen there is nothing to replace it with, and asking would make the same request again.
     const current = statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts);
@@ -543,7 +543,7 @@ export class App {
       return;
     }
     const session = this.session;
-    const fresh = this.freshIdsFor === work.id;
+    const fresh = this.freshIdsFor === spec.id;
     this.requestBusy = "making";
     this.requestNotice = null;
     this.offerReplace = false;
@@ -558,7 +558,7 @@ export class App {
       if (editor === null || editor.base === null || editor.phase !== "idle" || isDirty(editor)) return;
       if (this.answers !== null && (this.answers.phase !== "idle" || isAnswersDirty(this.answers))) return;
       const registered = await this.api.requestGeneration(
-        work.id,
+        spec.id,
         pressKey(),
         { source: editor.base, answers: this.answers?.base ?? null },
         replace,
@@ -584,7 +584,7 @@ export class App {
         if (connectionMoved) await this.ai?.reload();
         // A refusal that names no part is read as the text having moved, as it always was.
         if (!connectionMoved || parts.some((part) => part !== "connection")) {
-          void this.lookAgain(work, session).catch(() => undefined);
+          void this.lookAgain(spec, session).catch(() => undefined);
         }
       } else if (error instanceof CommandFailure && error.kind === "active-request") {
         this.requestNotice = this.t("generationActive");
@@ -602,15 +602,15 @@ export class App {
 
   /** The person called the open request off. Whoever holds it is told at its next word. */
   private async cancelGeneration(): Promise<void> {
-    const work = this.selected;
+    const spec = this.selected;
     const head = this.requestHead;
-    if (work === null || head === null || this.requestBusy !== null) return;
+    if (spec === null || head === null || this.requestBusy !== null) return;
     const session = this.session;
     this.requestBusy = "cancelling";
     this.requestNotice = null;
     this.render();
     try {
-      const cancelled = await this.api.cancelRequest(work.id, head.id);
+      const cancelled = await this.api.cancelRequest(spec.id, head.id);
       if (session !== this.session) return;
       this.requestHead = { id: cancelled.id, state: cancelled.state, attempt: cancelled.attempt };
       this.requestDetail = cancelled;
@@ -619,7 +619,7 @@ export class App {
       if (this.askForToken(error)) return;
       this.requestNotice = this.t("generationRefused", { detail: this.explain(error) });
       // What it says now is on screen at the next question; a request that ended meanwhile is not one to cancel.
-      void this.lookAgain(work, session).catch(() => undefined);
+      void this.lookAgain(spec, session).catch(() => undefined);
     } finally {
       if (session === this.session) {
         this.requestBusy = null;
@@ -659,10 +659,10 @@ export class App {
     if (head !== null && savingEndsARequest(head)) this.requestHead = { ...head, state: "superseded" };
   }
 
-  // ---- the work moving under the screen ------------------------------------
+  // ---- the spec moving under the screen ------------------------------------
 
   /**
-   * Ask the core every few seconds whether the selected work moved under what is shown,
+   * Ask the core every few seconds whether the selected spec moved under what is shown,
    * and read again only what did. An authoring client's model, a save from another window
    * and an acceptance made elsewhere appear without the person pressing anything, and
    * what they are typing is not touched.
@@ -685,17 +685,17 @@ export class App {
       cancelTimer = ticker.after(delay, () => void ask());
     };
     const ask = async (): Promise<void> => {
-      const work = this.selected;
-      if (cancelled || session !== this.session || work === null) return;
+      const spec = this.selected;
+      if (cancelled || session !== this.session || spec === null) return;
       try {
-        await this.lookAgain(work, session);
+        await this.lookAgain(spec, session);
         delay = WATCH_MS;
       } catch (error) {
         if (cancelled || session !== this.session) return;
         // The sign-in form is drawn, and the questions start again when the person has signed in.
         if (this.askForToken(error)) return;
         if (error instanceof CommandFailure && error.kind === "not-found") {
-          // The work was taken away from another window: there is nothing to ask about.
+          // The spec was taken away from another window: there is nothing to ask about.
           this.notice = this.explain(error);
           this.render();
           return;
@@ -711,13 +711,13 @@ export class App {
     schedule();
   }
 
-  /** Ask the core where the work stands and read again what is shown differently. */
-  private async lookAgain(work: Work, session: number): Promise<void> {
-    const heads = await this.api.readWorkHeads(work.id);
+  /** Ask the core where the spec stands and read again what is shown differently. */
+  private async lookAgain(spec: Spec, session: number): Promise<void> {
+    const heads = await this.api.readSpecHeads(spec.id);
     if (session !== this.session) return;
     // The request and the adapters are noted whether or not a chain moved: an executor taking
     // a request, or letting go of it, moves no chain.
-    await this.noteRequest(work.id, session, heads);
+    await this.noteRequest(spec.id, session, heads);
     if (session !== this.session) return;
     const moved = movedParts(this.onScreen(), heads);
     if (moved.length === 0) return;
@@ -727,33 +727,33 @@ export class App {
     // still differs and is asked for again. One read at a time is `watch`'s: it asks again only
     // when this has finished.
     let failed = false;
-    if (moved.includes("source") && (await this.refreshSource(work.id, session)) === "failed") failed = true;
-    const answers = moved.includes("answers") ? await this.refreshAnswers(work.id, session) : "held";
+    if (moved.includes("source") && (await this.refreshSource(spec.id, session)) === "failed") failed = true;
+    const answers = moved.includes("answers") ? await this.refreshAnswers(spec.id, session) : "held";
     if (answers === "failed") failed = true;
     if (session !== this.session) return;
     // A model, a list or an acceptance that moved, or whose text moved under it (`movedParts` says
-    // so), and answers that were read again, are the work's to read again: its model and the list
+    // so), and answers that were read again, are the spec's to read again: its model and the list
     // and acceptance beside it come from one snapshot, and SCE is asked about that snapshot's
     // revisions. A model that did not change is not drawn again.
-    const rereadWork =
+    const rereadSpec =
       moved.includes("model") || moved.includes("requirements") || moved.includes("acceptance") || answers === "read";
-    if (rereadWork && !(await this.loadWork(work.id, false))) failed = true;
+    if (rereadSpec && !(await this.loadSpec(spec.id, false))) failed = true;
     if (failed) throw new ReadAgainFailed();
   }
 
   /**
-   * What is on screen of each part of the work, for comparing with the core's heads. A
+   * What is on screen of each part of the spec, for comparing with the core's heads. A
    * part is left out (`undefined`) while it is being read or saved, or holds what the person
    * typed: it is not read again over their head. A part whose read failed is `UNREAD`, which
    * is compared: left out, it would never be read again.
    */
-  private onScreen(): WorkOnScreen {
+  private onScreen(): SpecOnScreen {
     const editor = this.editor;
     const answers = this.answers;
     const model = this.model;
     const panel = this.acceptance;
     const list = panel !== null && panel.phase === "read" && !panel.state.accepting ? panel.state : null;
-    // SCE did not answer, and not because of the design: the saved work is what it was, so nothing
+    // SCE did not answer, and not because of the design: the saved spec is what it was, so nothing
     // would make the screen ask again. The panel is compared as unread, which asks it again at the
     // pace of the watch (twice as long after each failure). A design SCE refused is not asked again.
     const unanswered = list !== null && worthAskingAgain(list);
@@ -807,7 +807,7 @@ export class App {
                 ? undefined
                 : (list.accepted?.revision ?? null),
       // What the panel is of, to be compared with the core's heads: the acceptance record keeps its
-      // revision while the work moves, which the answers it was judged with are part of.
+      // revision while the spec moves, which the answers it was judged with are part of.
       judged: list === null ? undefined : list.basis,
     };
   }
@@ -845,7 +845,7 @@ export class App {
   private async refreshAnswers(id: string, session: number): Promise<Refreshed> {
     const asked = this.answers;
     if (asked === null) {
-      // Never read: either that read is on its way, or it failed and is read as when the work opened.
+      // Never read: either that read is on its way, or it failed and is read as when the spec opened.
       if (this.answersUnreadable === null) return "held";
       await this.loadAnswers(id);
       return session !== this.session ? "held" : this.answers !== null ? "read" : "failed";
@@ -868,8 +868,8 @@ export class App {
   }
 
   /**
-   * Read the owner's answers to the model's open questions. They are the work's, not
-   * the model's: they are read when the work opens and kept across models, because
+   * Read the owner's answers to the model's open questions. They are the spec's, not
+   * the model's: they are read when the spec opens and kept across models, because
    * a question the next draft still asks is answered already.
    */
   private async loadAnswers(id: string): Promise<void> {
@@ -899,15 +899,15 @@ export class App {
   /** Save the answers as the owner now has them, on top of the revision they were read as. */
   private async saveAnswers(confirmed = false): Promise<void> {
     const model = this.answers;
-    const work = this.selected;
+    const spec = this.selected;
     const request = model === null ? null : answersRequest(model);
-    if (model === null || work === null || request === null) return;
+    if (model === null || spec === null || request === null) return;
     if (!confirmed && this.holdSaveForTheRequest()) return;
     const session = this.session;
     this.answers = answersSaving(model);
     this.render();
     try {
-      await this.api.saveAnswers(work.id, request.answers, request.base);
+      await this.api.saveAnswers(spec.id, request.answers, request.base);
     } catch (error) {
       if (session !== this.session || this.answers === null) return;
       if (this.askForToken(error)) return;
@@ -915,7 +915,7 @@ export class App {
         // What is saved now is loaded and what was typed is kept: the person looks,
         // and saves again on top of it.
         try {
-          const current = await this.api.readAnswers(work.id);
+          const current = await this.api.readAnswers(spec.id);
           if (session !== this.session || this.answers === null) return;
           this.answers = answersConflicted(this.answers, current);
         } catch (again) {
@@ -934,7 +934,7 @@ export class App {
     // each answer and the stamp is its to say; if that read fails the save still
     // took, and the panel says the answers cannot be read rather than that it failed.
     try {
-      const read = await this.api.readAnswers(work.id);
+      const read = await this.api.readAnswers(spec.id);
       if (session !== this.session || this.answers === null) return;
       this.answers = answersSaved(this.answers, read, request.answers);
     } catch (error) {
@@ -946,7 +946,7 @@ export class App {
     this.render();
     // The owner's answers are part of what an acceptance is of, so what they now say
     // moves whether it holds.
-    if (session === this.session) void this.loadWork(work.id, false);
+    if (session === this.session) void this.loadSpec(spec.id, false);
   }
 
   /** The save button and its words follow every keystroke, without redrawing the field being typed in. */
@@ -971,32 +971,32 @@ export class App {
   }
 
   /**
-   * Read the work as one state, show its model, and ask SCE about the revisions that state is
+   * Read the spec as one state, show its model, and ask SCE about the revisions that state is
    * made of, and have SCE draw the model.
    *
    * The model, the requirement list and the acceptance record come from one snapshot, and what
    * SCE says (whether the acceptance holds, how the design measures against the list) is asked
    * of that snapshot's revisions by name. A verdict is therefore of the design beside it and of no
    * other, and nothing here compares one read with another to find that out. SCE is asked after
-   * the work is read, so the model is shown without waiting for it.
+   * the spec is read, so the model is shown without waiting for it.
    *
-   * Only the newest request, for the work and the editor that asked, is applied. `redraw` is
+   * Only the newest request, for the spec and the editor that asked, is applied. `redraw` is
    * false after a save of the text, which moves where the model stands but not the model: its
    * sheets are kept, and SCE is not run again for an answer it has already given. Answers
    * whether everything asked was read, which is the watch's to ask about again when it was not.
    */
-  private async loadWork(id: string, redraw: boolean): Promise<boolean> {
+  private async loadSpec(id: string, redraw: boolean): Promise<boolean> {
     const session = this.session;
     const ticket = ++this.modelTicket;
     const current = (): boolean => session === this.session && ticket === this.modelTicket;
     const prior = this.model;
-    let snapshot: WorkSnapshot;
+    let snapshot: SpecSnapshot;
     try {
-      snapshot = await this.api.readWorkSnapshot(id);
+      snapshot = await this.api.readSpecSnapshot(id);
     } catch (error) {
       if (!current()) return true;
       // A token wanted is the sign-in form's to answer; anything else is the panels' own message,
-      // so it does not look like the work has no model.
+      // so it does not look like the spec has no model.
       if (!this.askForToken(error)) {
         const message = this.explain(error);
         this.model = { phase: "failed", message };
@@ -1018,7 +1018,7 @@ export class App {
       return true;
     }
     // The text and the model are read in one state, but the editor holds the text it read when the
-    // work opened, and the work may have been saved since: the model is then of a text the editor
+    // spec opened, and the spec may have been saved since: the model is then of a text the editor
     // does not hold. When the person holds nothing in the editor it is read again before the two
     // are shown together; when it cannot be, `standingBanner` says the model was read beside
     // another text, and never "current".
@@ -1062,18 +1062,18 @@ export class App {
   }
 
   /**
-   * Ask SCE about the revisions of the work `snapshot` holds, and set the panel beside its model.
+   * Ask SCE about the revisions of the spec `snapshot` holds, and set the panel beside its model.
    * A panel already on screen stays while the answer is on its way when it is of this snapshot
    * (a reread after a save does not flash a "reading" over what the person is looking at); one
    * that is of other revisions is not shown beside this model, since a verdict of one design beside
    * another is a false statement about what the owner is looking at. A panel of the same revisions
    * takes where the design and the list stand to the text from this snapshot at once: the same
    * bytes can be kept again for another text, which SCE's words about the bytes do not say, and
-   * the accept would otherwise follow the claim of the snapshot before until SCE answered. A work
+   * the accept would otherwise follow the claim of the snapshot before until SCE answered. A spec
    * with no requirement list has nothing to accept a design against, and says so instead of
    * showing an empty table.
    */
-  private askAbout(id: string, snapshot: WorkSnapshot): Promise<boolean> {
+  private askAbout(id: string, snapshot: SpecSnapshot): Promise<boolean> {
     const ticket = ++this.acceptanceTicket;
     const basis = basisOf(snapshot);
     if (basis === null) {
@@ -1092,13 +1092,13 @@ export class App {
 
   /**
    * What the revision did since the owner accepted, asked beside the judgment and applied under
-   * the same ticket, so an answer for a work or a state that has moved on is dropped. A work
+   * the same ticket, so an answer for a spec or a state that has moved on is dropped. A spec
    * nobody accepted has nothing to report and no panel. The core says when it cannot compare yet
    * (the design or the list was written for an earlier text) and the screen shows its sentence;
    * the screen compares nothing itself. A report of other revisions than the screen is showing is
-   * not shown as this work's: it is asked about again when the work's heads move.
+   * not shown as this spec's: it is asked about again when the spec's heads move.
    */
-  private async loadRevision(id: string, snapshot: WorkSnapshot, basis: Basis, ticket: number): Promise<void> {
+  private async loadRevision(id: string, snapshot: SpecSnapshot, basis: Basis, ticket: number): Promise<void> {
     if (snapshot.acceptance === null) {
       this.revision = null;
       return;
@@ -1131,7 +1131,7 @@ export class App {
    * answered, or refused the design, which asking again would only repeat: a run that timed out or
    * failed is not an answer, and is the watch's to ask about again.
    */
-  private async loadJudgment(id: string, snapshot: WorkSnapshot, basis: Basis, ticket: number): Promise<boolean> {
+  private async loadJudgment(id: string, snapshot: SpecSnapshot, basis: Basis, ticket: number): Promise<boolean> {
     const session = this.session;
     const current = (): boolean => session === this.session && ticket === this.acceptanceTicket;
     try {
@@ -1180,7 +1180,7 @@ export class App {
   /**
    * How the model shown differs from the one it replaced, as lines of their pseudocode pages.
    * The earlier model is the one before this in the core's model history; SCE writes its page
-   * as it wrote this one's. Only the newest request, for the work that asked, is applied.
+   * as it wrote this one's. Only the newest request, for the spec that asked, is applied.
    */
   private async loadChange(id: string, revision: string, page: string | null): Promise<void> {
     const session = this.session;
@@ -1259,8 +1259,8 @@ export class App {
    */
   private async accept(): Promise<void> {
     const panel = this.acceptance;
-    const work = this.selected;
-    if (panel === null || panel.phase !== "read" || work === null) return;
+    const spec = this.selected;
+    if (panel === null || panel.phase !== "read" || spec === null) return;
     const report = panel.state.report;
     if (report === null || gate(panel.state, this.hasUnsavedChanges(), this.shown()) !== null) return;
     const session = this.session;
@@ -1268,7 +1268,7 @@ export class App {
     this.render();
     let refusal: string | null = null;
     try {
-      await this.api.accept(work.id, report.basis);
+      await this.api.accept(spec.id, report.basis);
     } catch (error) {
       if (session !== this.session) return;
       if (this.askForToken(error)) return;
@@ -1276,7 +1276,7 @@ export class App {
     }
     // What is there NOW is read, the design with the page beside it, so that what the owner is
     // looking at is what the next press would accept: `gate` holds the button until it is.
-    await this.loadWork(work.id, false);
+    await this.loadSpec(spec.id, false);
     if (session !== this.session || refusal === null) return;
     const now = this.acceptance;
     if (now !== null && now.phase === "read") {
@@ -1287,24 +1287,24 @@ export class App {
 
   private async create(title: string): Promise<void> {
     await this.guard(async () => {
-      const work = await this.api.createWork(title);
+      const spec = await this.api.createSpec(title);
       this.draftTitle = "";
-      this.listing = await this.api.listWorks();
-      await this.openWork(work);
+      this.listing = await this.api.listSpecs();
+      await this.openSpec(spec);
     });
     this.render();
   }
 
-  /** The person said yes to removing the selected work. */
+  /** The person said yes to removing the selected spec. */
   private async remove(): Promise<void> {
-    const work = this.selected;
+    const spec = this.selected;
     const editor = this.editor;
-    // A save still on its way would write into a work the person is told is gone.
-    if (work === null || editor === null || this.somethingIsSaving()) return;
+    // A save still on its way would write into a spec the person is told is gone.
+    if (spec === null || editor === null || this.somethingIsSaving()) return;
     this.removing = false;
     await this.guard(async () => {
-      const removed = await this.api.removeWork(work.id);
-      // Whatever was asked for the removed work and has not answered is dropped:
+      const removed = await this.api.removeSpec(spec.id);
+      // Whatever was asked for the removed spec and has not answered is dropped:
       // the editor it would have landed in is gone.
       this.session += 1;
       this.opening += 1;
@@ -1325,7 +1325,7 @@ export class App {
       this.model = null;
       this.pendingSwitch = null;
       this.info = this.t("removedNotice", { title: removed.title });
-      this.listing = await this.api.listWorks();
+      this.listing = await this.api.listSpecs();
     });
     this.render();
   }
@@ -1432,7 +1432,7 @@ export class App {
     this.render();
     // The text moved, so where the model stands may have: asked again, and not
     // drawn again unless the model itself changed.
-    if (session === this.session) void this.loadWork(request.id, false);
+    if (session === this.session) void this.loadSpec(request.id, false);
   }
 
   private async takeTheirs(): Promise<void> {
@@ -1442,8 +1442,8 @@ export class App {
     this.notice = null;
     try {
       const [source, entries] = await Promise.all([
-        this.api.readSource(editor.workId),
-        this.api.history(editor.workId),
+        this.api.readSource(editor.specId),
+        this.api.history(editor.specId),
       ]);
       // Only the editor that asked, still in the conflict it asked about.
       if (session !== this.session || this.editor === null || this.editor.phase !== "conflict") return;
@@ -1463,13 +1463,13 @@ export class App {
   }
 
   private async view(entry: HistoryEntry): Promise<void> {
-    const work = this.selected;
-    if (work === null) return;
+    const spec = this.selected;
+    if (spec === null) return;
     const session = this.session;
     const ticket = ++this.looking;
     this.notice = null;
     try {
-      const source = await this.api.readSource(work.id, entry.revision);
+      const source = await this.api.readSource(spec.id, entry.revision);
       if (session !== this.session || ticket !== this.looking) return;
       this.viewing = source;
     } catch (error) {
@@ -1480,13 +1480,13 @@ export class App {
   }
 
   private async restore(entry: HistoryEntry): Promise<void> {
-    const work = this.selected;
+    const spec = this.selected;
     const asked = this.editor;
-    if (work === null || asked === null || isDirty(asked) || asked.phase !== "idle") return;
+    if (spec === null || asked === null || isDirty(asked) || asked.phase !== "idle") return;
     const session = this.session;
     this.notice = null;
     try {
-      const source = await this.api.readSource(work.id, entry.revision);
+      const source = await this.api.readSource(spec.id, entry.revision);
       if (session !== this.session) return;
       const editor = this.editor;
       if (source === null || editor === null) return;
@@ -1517,7 +1517,7 @@ export class App {
     // What SCE drew was drawn in the other language: it draws again in this one.
     const model = this.model;
     if (this.selected !== null && model !== null && (model.phase === "drawn" || model.phase === "not-drawn")) {
-      void this.loadWork(this.selected.id, true);
+      void this.loadSpec(this.selected.id, true);
     }
   }
 
@@ -1533,12 +1533,12 @@ export class App {
 
   // ---- errors -----------------------------------------------------------
 
-  /** Run `work`; whatever it throws becomes the notice, or the fatal text if nothing can work. */
-  private async guard(work: () => Promise<void>): Promise<void> {
+  /** Run `job`; whatever it throws becomes the notice, or the fatal text if nothing can work. */
+  private async guard(job: () => Promise<void>): Promise<void> {
     this.notice = null;
     this.info = null;
     try {
-      await work();
+      await job();
     } catch (error) {
       this.report(error);
     }
@@ -1562,7 +1562,7 @@ export class App {
   /**
    * Whether `error` is the server wanting a token the person can type in; if so, the
    * sign-in form is drawn now. It is drawn here and not left to the caller because the
-   * reads that open a work answer in no fixed order: a refusal that came after the last
+   * reads that open a spec answer in no fixed order: a refusal that came after the last
    * redraw and only set a flag left the screen as it was, with no way to sign in.
    */
   private askForToken(error: unknown): boolean {
@@ -1616,7 +1616,7 @@ export class App {
     this.refreshAnswersChrome();
     this.restoreAnswerFocus(keepAnswer);
     this.restoreSettingsFocus(keepSettings);
-    // Whatever moved what is unsaved (a save, a removal, another work) is told to
+    // Whatever moved what is unsaved (a save, a removal, another spec) is told to
     // the desktop shell here too: the two chrome refreshes above return early when
     // there is no editor or no answers on screen.
     this.reportUnsaved();
@@ -1710,7 +1710,7 @@ export class App {
       h("h1", {}, this.t("appTitle")),
       this.described === null
         ? null
-        : h("span", { class: "muted root", title: this.t("worksFolder") }, this.described.root),
+        : h("span", { class: "muted root", title: this.t("specsFolder") }, this.described.root),
       picker,
     );
   }
@@ -1722,20 +1722,20 @@ export class App {
       this.sidebar(),
       h(
         "main",
-        { class: "work" },
+        { class: "spec" },
         this.switchBanner(),
         this.notice === null ? null : h("p", { class: "banner banner-error", role: "alert" }, this.notice),
         this.info === null ? null : h("p", { class: "banner banner-ok", role: "status" }, this.info),
         this.selected === null || this.editor === null
-          ? h("p", { class: "muted" }, this.t("pickAWork"))
-          : this.workPane(this.selected, this.editor),
+          ? h("p", { class: "muted" }, this.t("pickASpec"))
+          : this.specPane(this.selected, this.editor),
       ),
     );
   }
 
   /**
    * Shown while the person waits on what to do with what is not saved: before another
-   * work replaces it (`pendingSwitch`), or before the window closes over it (`closing`).
+   * spec replaces it (`pendingSwitch`), or before the window closes over it (`closing`).
    */
   private switchBanner(): HTMLElement | null {
     const target = this.pendingSwitch;
@@ -1773,7 +1773,7 @@ export class App {
     );
   }
 
-  /** Whether a save of the text or of the answers, or an acceptance, is on its way: a work cannot be removed under it. */
+  /** Whether a save of the text or of the answers, or an acceptance, is on its way: a spec cannot be removed under it. */
   private somethingIsSaving(): boolean {
     const acceptInFlight = this.acceptance?.phase === "read" && this.acceptance.state.accepting;
     return this.editor?.phase === "saving" || this.answers?.phase === "saving" || acceptInFlight;
@@ -1803,8 +1803,8 @@ export class App {
       name: "title",
       maxlength: "200",
       required: true,
-      "aria-label": this.t("newWorkTitle"),
-      placeholder: this.t("newWorkTitle"),
+      "aria-label": this.t("newSpecTitle"),
+      placeholder: this.t("newSpecTitle"),
       oninput: (event) => {
         this.draftTitle = (event.target as HTMLInputElement).value;
       },
@@ -1813,7 +1813,7 @@ export class App {
     const form = h(
       "form",
       {
-        class: "new-work",
+        class: "new-spec",
         onsubmit: (event) => {
           event.preventDefault();
           const title = titleInput.value.trim();
@@ -1821,30 +1821,30 @@ export class App {
         },
       },
       titleInput,
-      h("button", { type: "submit" }, this.t("newWorkCreate")),
+      h("button", { type: "submit" }, this.t("newSpecCreate")),
     );
     return h(
       "nav",
-      { class: "works", "aria-label": this.t("works") },
-      h("h2", {}, this.t("works")),
-      listing === null || listing.works.length === 0
-        ? h("p", { class: "muted" }, this.t("noWorks"))
+      { class: "specs", "aria-label": this.t("specs") },
+      h("h2", {}, this.t("specs")),
+      listing === null || listing.specs.length === 0
+        ? h("p", { class: "muted" }, this.t("noSpecs"))
         : h(
             "ul",
             {},
-            ...listing.works.map((work) =>
+            ...listing.specs.map((spec) =>
               h(
                 "li",
                 {},
                 h(
                   "button",
                   {
-                    class: "work-link",
+                    class: "spec-link",
                     type: "button",
-                    "aria-current": this.selected?.id === work.id ? "true" : undefined,
-                    onclick: () => void this.openWork(work),
+                    "aria-current": this.selected?.id === spec.id ? "true" : undefined,
+                    onclick: () => void this.openSpec(spec),
                   },
-                  work.title,
+                  spec.title,
                 ),
               ),
             ),
@@ -1857,13 +1857,13 @@ export class App {
             h("ul", {}, ...listing.unreadable.map((u) => h("li", {}, `${u.id}: ${u.reason}`))),
           )
         : null,
-      h("h3", {}, this.t("newWork")),
+      h("h3", {}, this.t("newSpec")),
       form,
       this.ai?.view() ?? null,
     );
   }
 
-  private workPane(work: Work, editor: EditorModel): HTMLElement {
+  private specPane(spec: Spec, editor: EditorModel): HTMLElement {
     const viewing = this.viewing;
     const textarea = h("textarea", {
       id: "source",
@@ -1892,7 +1892,7 @@ export class App {
       h(
         "div",
         { class: "pane-head" },
-        h("h2", {}, work.title),
+        h("h2", {}, spec.title),
         h(
           "button",
           {
@@ -1904,10 +1904,10 @@ export class App {
               this.render();
             },
           },
-          this.t("workRemove"),
+          this.t("specRemove"),
         ),
       ),
-      this.removing ? this.removeBanner(work) : null,
+      this.removing ? this.removeBanner(spec) : null,
       // Two columns where the screen is wide enough: the text on one side and what
       // SCE says of its model on the other, because the page is read AGAINST the
       // text. Narrow, they stack in the same order.
@@ -1943,17 +1943,17 @@ export class App {
           ),
           this.historyPanel(editor),
         ),
-        h("div", { class: "model-column" }, this.generationSection(), this.modelPanel(work)),
+        h("div", { class: "model-column" }, this.generationSection(), this.modelPanel(spec)),
       ),
     );
   }
 
-  /** Asked before a work leaves the list; said in terms of what stays and how to bring it back. */
-  private removeBanner(work: Work): HTMLElement {
+  /** Asked before a spec leaves the list; said in terms of what stays and how to bring it back. */
+  private removeBanner(spec: Spec): HTMLElement {
     return h(
       "section",
       { class: "banner banner-warn", role: "alert" },
-      h("strong", {}, this.t("removeTitle", { title: work.title })),
+      h("strong", {}, this.t("removeTitle", { title: spec.title })),
       h("p", {}, this.t("removeBody")),
       this.hasUnsavedChanges() ? h("p", {}, this.t("removeBodyUnsaved")) : null,
       h(
@@ -2135,8 +2135,8 @@ export class App {
     );
   }
 
-  /** The model SCE draws of this work, where it stands to the text, and the model itself as text. */
-  private modelPanel(work: Work): HTMLElement {
+  /** The model SCE draws of this spec, where it stands to the text, and the model itself as text. */
+  private modelPanel(spec: Spec): HTMLElement {
     const model = this.model;
     const busy = model === null || model.phase === "reading" || model.phase === "drawing";
     const read =
@@ -2152,7 +2152,7 @@ export class App {
         h("h3", {}, this.t("modelTitle")),
         h(
           "button",
-          { type: "button", disabled: busy, onclick: () => void this.loadWork(work.id, true) },
+          { type: "button", disabled: busy, onclick: () => void this.loadSpec(spec.id, true) },
           this.t("modelRead"),
         ),
         model !== null && model.phase === "drawn" ? this.zoomControl() : null,
@@ -2317,7 +2317,7 @@ export class App {
   /**
    * Whether the owner has accepted, whether it still holds, and what SCE listed as open when they
    * did. Whether it holds is SCE's word about the revisions it was asked about, which are those of
-   * the snapshot the model beside it was read in. It is said of the work on screen: when the text or
+   * the snapshot the model beside it was read in. It is said of the spec on screen: when the text or
    * the answers on screen (which the person edits, and are read apart) are not the ones it was asked
    * about, the acceptance is shown as not yet checked, and is neither held nor lapsed. SCE not
    * saying is said with its reason, and whether the screen asks again by itself.
@@ -2644,7 +2644,7 @@ export class App {
   /**
    * The questions the model marks as not decided, each with a field for the owner's
    * answer, and the answers to questions the model no longer asks. The answers go
-   * to the authoring client the next time it reads the work (`works_read`), which
+   * to the authoring client the next time it reads the spec (`specs_read`), which
    * applies them; nothing here writes into the model.
    */
   private questions(unresolved: readonly Unresolved[]): HTMLElement | null {
@@ -2915,24 +2915,24 @@ export class App {
   }
 
   /**
-   * "Issue every requirement a new id": offered when the work already has a requirement list, for
+   * "Issue every requirement a new id": offered when the spec already has a requirement list, for
    * there is no id to retire in a first one. It is one press's: ticking it asks the next request
-   * to retire every id the work has and number the new ones on, never from R1, and the tick is put
+   * to retire every id the spec has and number the new ones on, never from R1, and the tick is put
    * away when that request is made. What happens to a list that does not do it is the core's.
    */
   private freshIdsOption(): HTMLElement | null {
-    const work = this.selected;
+    const spec = this.selected;
     const listed = this.acceptance !== null && this.acceptance.phase === "read";
-    if (work === null || !listed) return null;
+    if (spec === null || !listed) return null;
     return h(
       "label",
       { id: "fresh-ids-option", class: "fresh-ids" },
       h("input", {
         id: "fresh-ids",
         type: "checkbox",
-        checked: this.freshIdsFor === work.id,
+        checked: this.freshIdsFor === spec.id,
         onchange: (event: Event) => {
-          this.freshIdsFor = (event.target as HTMLInputElement).checked ? work.id : null;
+          this.freshIdsFor = (event.target as HTMLInputElement).checked ? spec.id : null;
         },
       }),
       " ",

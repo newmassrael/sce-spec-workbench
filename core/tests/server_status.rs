@@ -25,7 +25,7 @@ use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use sce_spec_workbench_core::server_status::{read, Reach, ServerState};
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy};
-use sce_works::WorkStore;
+use sce_specs::SpecStore;
 use serde_json::{json, Value};
 
 use common::model_server::{chat_server, Script};
@@ -54,7 +54,7 @@ fn a_server_that_lists_models_is_listed_with_them_in_its_order_and_is_this_compu
     assert_eq!(status.address, server.address);
     assert_eq!(status.reach, Reach::ThisComputer);
     assert!(!status.tls);
-    // The request is the listing of the protocol and nothing else: no key, no work.
+    // The request is the listing of the protocol and nothing else: no key, no spec.
     let asked = &server.requests()[0];
     assert!(
         asked.head.starts_with("GET /v1/models HTTP/1.1"),
@@ -207,12 +207,12 @@ fn an_address_a_connection_could_not_keep_is_refused_as_a_connection_refuses_it(
 
 // ---- the command -----------------------------------------------------------------------------
 
-fn ask(entrance: Entrance, args: Value) -> Result<Value, sce_works::CommandError> {
-    let works = WorkStore::at(scratch("ss-works"));
+fn ask(entrance: Entrance, args: Value) -> Result<Value, sce_specs::CommandError> {
+    let specs = SpecStore::at(scratch("ss-specs"));
     let settings = ConnectionStore::at(scratch("ss-settings"));
     let policy = Policy::shipped();
     let context =
-        Context::new(&works, &FakeRenderer, &policy, entrance).with_connections(Some(&settings));
+        Context::new(&specs, &FakeRenderer, &policy, entrance).with_connections(Some(&settings));
     call_in(&context, "read_server_status", args)
 }
 

@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! A [`Generator`] that runs Claude Code, headless, to write the model of a work.
+//! A [`Generator`] that runs Claude Code, headless, to write the model of a spec.
 //!
 //! The client is started once per draft, in a folder of its own that is removed when it is
 //! done, and is given:
 //!
 //! - **no built-in tool at all** (`--tools ""`): no shell, no files, no web. What it can do is
 //!   what the SCE authoring server offers it, and of that only [`ALLOWED_TOOLS`]: it can read
-//!   the work it was started for and check what it writes, and it cannot save to any work, take
+//!   the spec it was started for and check what it writes, and it cannot save to any spec, take
 //!   or finish a request, or record an acceptance. The application saves what it answers. A
 //!   specification is text the owner may have pasted from anywhere, and a client that has read
-//!   it should not be one that can be talked into writing to the owner's other work. The server
-//!   is also told which work the run is for ([`scoped_to`]), so that what it is allowed to read
-//!   it reads of that work alone, and no document it is handed names a file;
+//!   it should not be one that can be talked into writing to the owner's other spec. The server
+//!   is also told which spec the run is for ([`scoped_to`]), so that what it is allowed to read
+//!   it reads of that spec alone, and no document it is handed names a file;
 //! - **nothing from the machine's settings** (`--setting-sources ""`, `--strict-mcp-config`,
 //!   `--disable-slash-commands`): no hook, no `CLAUDE.md`, no other server;
 //! - **an answer it must give in one form** (`--json-schema`): the documents of the model and the
@@ -21,7 +21,7 @@
 //!
 //! What it is told goes in on standard input and not on the command line, so that it is not in a
 //! process listing; the specification itself is not in it at all, because the client reads the
-//! work with `works_read`, which also gives it the owner's answers and the decision record they
+//! spec with `specs_read`, which also gives it the owner's answers and the decision record they
 //! make. Everything it says comes back as one JSON result; nothing is read from a file it wrote.
 
 use std::fs;
@@ -29,21 +29,21 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
-use sce_works::Revision;
+use sce_specs::Revision;
 use serde_json::{json, Value};
 
 use crate::auth_policy::Observed;
 use crate::client_find::find_programs;
 use crate::client_run::{
     blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise, tail, Ended,
-    Scratch, SERVER, SYSTEM_PROMPT, WORK_SCOPE,
+    Scratch, SERVER, SPEC_SCOPE, SYSTEM_PROMPT,
 };
 use crate::runner::{Cancel, Draft, GenerateError, Generator, Job};
 
-/// The tools the client may use, of the authoring server's. Reading a work and checking a draft;
+/// The tools the client may use, of the authoring server's. Reading a spec and checking a draft;
 /// not saving, not taking a request, not accepting. Everything not named here is refused.
 pub const ALLOWED_TOOLS: [&str; 9] = [
-    "mcp__sce-author__works_read",
+    "mcp__sce-author__specs_read",
     "mcp__sce-author__scxml_kinds",
     "mcp__sce-author__validate_scxml",
     "mcp__sce-author__validate_scxml_set",
@@ -60,8 +60,8 @@ pub const ALLOWED_TOOLS: [&str; 9] = [
 pub struct AuthorServer {
     pub command: PathBuf,
     pub args: Vec<String>,
-    /// What the server needs to find the works folder and the product (`SCE_WORK`,
-    /// `SCE_WORKS_DIR`, `SCE_CODEGEN`, `PYTHONPATH`).
+    /// What the server needs to find the specs folder and the product (`SCE_SPEC`,
+    /// `SCE_SPECS_DIR`, `SCE_CODEGEN`, `PYTHONPATH`).
     pub env: Vec<(String, String)>,
 }
 
@@ -184,12 +184,12 @@ impl Generator for ClaudeCode {
     }
 
     /// Named by what the client is told and allowed: the system prompt, the wording of the
-    /// task (as it reads for a work with nothing in it), the form it must answer in, the
-    /// tools it may use, and that the server it reaches is held to the work it is for. A change
+    /// task (as it reads for a spec with nothing in it), the form it must answer in, the
+    /// tools it may use, and that the server it reaches is held to the spec it is for. A change
     /// to any of them is another version, with no one to remember to say so.
     fn instructions(&self) -> Option<String> {
         let material = format!(
-            "{SYSTEM_PROMPT}\n{}\n{}\n{}\n{WORK_SCOPE}",
+            "{SYSTEM_PROMPT}\n{}\n{}\n{}\n{SPEC_SCOPE}",
             prompt(&blank_job()),
             schema(),
             ALLOWED_TOOLS.join(",")
@@ -203,7 +203,7 @@ impl Generator for ClaudeCode {
             .map_err(|e| GenerateError::Failed(format!("a folder for the client: {e}")))?;
         fs::write(
             scratch.path().join(MCP_FILE),
-            mcp_config(&scoped_to(&self.author, job.work.as_str())).to_string(),
+            mcp_config(&scoped_to(&self.author, job.spec.as_str())).to_string(),
         )
         .map_err(|e| GenerateError::Failed(format!("the client's server list: {e}")))?;
 

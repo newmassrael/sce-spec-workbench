@@ -20,7 +20,7 @@ text that binds; in short:
 |---|---|
 | Personal learning, non-commercial research | Free |
 | Evaluation by an organization | Allowed for the evaluation only, never in a production environment |
-| Internal business or development work, inclusion in a product, delivery to a customer, operation of a service | A separate commercial agreement ([LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)) |
+| Internal business or development spec, inclusion in a product, delivery to a customer, operation of a service | A separate commercial agreement ([LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md)) |
 
 - **개인 학습·비상업적 연구:** 무료.
 - **기업의 도입 평가:** 평가 범위에서만 허용하며, 운영 환경에서는 쓸 수 없습니다.
@@ -31,8 +31,8 @@ their own terms, which this license does not change.
 
 ## Getting the source
 
-SCE is a submodule at one revision, so that the works crate the application links and the
-generator, `sce-work` and authoring server an installer carries are never of two versions:
+SCE is a submodule at one revision, so that the specs crate the application links and the
+generator, `sce-spec` and authoring server an installer carries are never of two versions:
 
 ```sh
 git clone --recurse-submodules https://github.com/newmassrael/sce-spec-workbench
@@ -43,9 +43,9 @@ git submodule update --init sce
 `scripts/check.sh` is everything CI judges short of the installer, and
 `scripts/check_installer.sh` builds the Linux installer and starts what it installs.
 
-Today it does the first two parts: **works** (a titled piece of specification
+Today it does the first two parts: **specs** (a titled piece of specification
 text), **immutable revisions** of each, and a **save that refuses to overwrite**
-text the caller has not seen; and the **model** of a work, kept beside the text
+text the caller has not seen; and the **model** of a spec, kept beside the text
 and shown as the figures **SCE draws of it** and what **SCE says of it** (its check
 and the pseudocode page you read against your text): the application draws and
 judges nothing, it runs `sce-codegen` and shows what the product writes. On top of
@@ -55,25 +55,25 @@ read into, and the application says whether that acceptance still holds.
 You can **ask for a model**: the button saves what you typed and registers a request, and an
 AI executor takes it. The application hosts one when it finds Claude Code (a request is then
 taken, written for and finished with no window of the client open), and an authoring client of
-your own can take it instead (`works_begin_generation`). What the executor writes is kept
-beside the work and becomes the work's model and requirement list together, as one bundle, only
+your own can take it instead (`specs_begin_generation`). What the executor writes is kept
+beside the spec and becomes the spec's model and requirement list together, as one bundle, only
 when SCE accepts the model; the screen says where the request stands, where each answer
 stands, which sentence of your text a question is about, and what a new model changed from the
 one before.
 
-An authoring client reaches the same folder through the MCP (`works_list`,
-`works_read`, `works_save_model`, `works_save_requirements`, and the three that take,
+An authoring client reaches the same folder through the MCP (`specs_list`,
+`specs_read`, `specs_save_model`, `specs_save_requirements`, and the three that take,
 finish and give up a request, in SCE's `sce/tools/authoring`): it reads the text you saved and your
 answers, writes the model and the requirement list, and saves them back after the product's
-own check accepts them and your answers are kept to. They run `sce-work`, so the application
+own check accepts them and your answers are kept to. They run `sce-spec`, so the application
 and the MCP cannot disagree about the folder because only one thing writes it. The text and the
-answers are yours: no MCP tool writes either, none removes a work, and none accepts a design
+answers are yours: no MCP tool writes either, none removes a spec, and none accepts a design
 for you.
 
 What does not exist yet, so that nothing below is read as done:
 
 - Installers for Windows and macOS. `scripts/package_app.sh` builds the Linux one (a `.deb`)
-  and it is the only one tried: it carries the generator, `sce-work` and the authoring server
+  and it is the only one tried: it carries the generator, `sce-spec` and the authoring server
   (see "What an installer carries" below). The authoring server's launcher is a shell script
   that needs Python 3 with PyYAML and jsonschema; the `.deb` declares all three as dependencies, and a platform
   with no package manager to ask has to carry or install a Python itself, which nothing here
@@ -91,7 +91,7 @@ What does not exist yet, so that nothing below is read as done:
 
 ```
 sce/             SCE, a submodule at one revision (not part of this repository)
-  sce-works/     the works folder, revisions, requests, the JSON command layer, the `sce-work` CLI
+  sce-specs/     the specs folder, revisions, requests, the JSON command layer, the `sce-spec` CLI
   sce-build/     the generator (`sce-codegen`): the figures, the check, the pseudocode page
   tools/authoring/  the authoring MCP an AI client writes a model through
 core/            connections, the AI clients a request is run with, the application's commands
@@ -102,16 +102,16 @@ ui/              the screen (TypeScript, no framework)
 
 Everything the screen can do is one call, `call(name, args)`. The window routes
 it through Tauri's `invoke` and the browser shell through `POST /api/call`;
-`sce-work call <name>` is the same call for a process that is not Rust, which the
+`sce-spec call <name>` is the same call for a process that is not Rust, which the
 authoring MCP uses. The window and the browser shell go through
 `sce_spec_workbench_core::call_in`, which answers the application's own commands and hands
-the rest to the works; `sce-work` reaches the works directly. All of them end in
-`sce_works::commands`, so there is one definition of what a save is.
+the rest to the specs; `sce-spec` reaches the specs directly. All of them end in
+`sce_specs::commands`, so there is one definition of what a save is.
 
-The works folder is plain files:
+The specs folder is plain files:
 
 ```
-<root>/<work-id>/work.json            title, created_at
+<root>/<spec-id>/spec.json            title, created_at
                  source/<sha256>.txt  one file per revision, named by its digest
                  source.head          the current revision, and which save of
                                       source.log made it current (`log <n>`)
@@ -127,11 +127,11 @@ The works folder is plain files:
                  requirements.head, requirements.log   (and the text it was read from)
                  acceptances/<sha256>.json   what you accepted, one file per acceptance
                  acceptances.head, acceptances.log
-                 removed.json         only for a removed work (see below)
+                 removed.json         only for a removed spec (see below)
 ```
 
-`<root>` is `SCE_WORKS_DIR` if set, else the per-user data directory
-(`~/.local/share/sce-spec-workbench/works` on Linux). The person's own settings are not in it: they
+`<root>` is `SCE_SPECS_DIR` if set, else the per-user data directory
+(`~/.local/share/sce-spec-workbench/specs` on Linux). The person's own settings are not in it: they
 are in `SCE_SETTINGS_DIR` if set, else the per-user configuration directory
 (`~/.config/sce-spec-workbench/settings` on Linux), and the browser shell reads them with
 `--settings DIR` and never changes them. A revision is the SHA-256 of
@@ -155,12 +155,12 @@ the log, not something written into it, and it stays on the entry after a later 
 made the model current: the save of today does not make the one of the past knowable.
 The model's screen does not show a model history; a client that does should show the mark.
 
-### Reading a work as one state
+### Reading a spec as one state
 
-A screen that reads a work with a command for each chain (`read_work`, `read_source`,
+A screen that reads a spec with a command for each chain (`read_spec`, `read_source`,
 `read_model`, `read_answers`, `read_requirements`, `read_acceptance`) can be handed a
 text of one moment beside a model of another: a save lands between two of the reads.
-`read_work_snapshot` reads the work and its five chains as one state. The pointers of
+`read_spec_snapshot` reads the spec and its five chains as one state. The pointers of
 all five are read, then what they name, then the pointers again, and the read starts
 over when any of them moved; what is answered is the folder as the second look found it.
 
@@ -181,7 +181,7 @@ the revision of the acceptance when there is one, and answers whether that accep
 for exactly those revisions (`acceptance`, `null` when none was named) and SCE's measure of
 that design against that list (`report`: the outcomes and the page of `requirements_report`, in
 its words). A revision's file is never rewritten, so the answer is of the revisions named and of
-no other, whatever has been saved since; one the work does not keep is `not-found`.
+no other, whatever has been saved since; one the spec does not keep is `not-found`.
 
 The answer is a function of the revisions' content and carries nothing of which text the model
 and the list were written for. The same bytes can be kept again for a text that came later: the
@@ -189,35 +189,35 @@ revision is the same and so is what SCE says of it, while that claim moves, and 
 a revision with the latest claim made of it. So where the design stands to the text (`current`,
 `behind`, `unstated`) is said by the snapshot, in the state the revisions were read in, and the
 screen puts it beside SCE's measure; asked again of the same revisions after the design was kept
-for another text, the answer is the same. (`requirements_report`, which judges the work as it
+for another text, the answer is the same. (`requirements_report`, which judges the spec as it
 stands, still says it.) Each of the two is
 `{"said": ...}`, or `{"refused": ...}` when SCE did not answer: a design SCE cannot draw is
 still the design, and the screen has it from the snapshot. The core answers `basis` as it
 read it, and the screen refuses an answer that names other revisions than it asked about
 (`Api.readJudgment`), as a broken contract and not as a verdict to show.
 
-That is what keeps a verdict beside the design it is of. The screen reads the work as one
+That is what keeps a verdict beside the design it is of. The screen reads the spec as one
 snapshot and then asks SCE about that snapshot's revisions by name, so it does not need the
-core to judge the work "as it stands" (`read_acceptance`, `requirements_report`, which still
+core to judge the spec "as it stands" (`read_acceptance`, `requirements_report`, which still
 do) and then compare what came back with what it shows: those are asked a moment apart, and a
 save lands between them. The snapshot needs no SCE, so the model is shown without waiting for
 it.
 
-`read_work_heads` is the same read without the texts: the revision at the head of each
+`read_spec_heads` is the same read without the texts: the revision at the head of each
 chain and, for the model and the requirement list, the source each was written for. The
 same model kept again for a later source is the same revision with another `written_for`,
 and that is a change a screen has to see. It is read as one state too, and it is cheap
 enough to ask every few seconds.
 
-### The screen follows the work
+### The screen follows the spec
 
-The screen asks `read_work_heads` every two seconds for the work it shows, and compares
+The screen asks `read_spec_heads` every two seconds for the spec it shows, and compares
 the answer with what is ON SCREEN, not with the previous answer: its own save moves a
 head and the screen shows the saved text a moment later, and that is not a change from
 elsewhere. What differs is read again, and only that: a model or a list an authoring
 client saved, a text or answers saved from another window, an acceptance made elsewhere.
 A model that is the same revision is not drawn again. A model, a list or an acceptance that
-moved is read again as the work: the snapshot is read and SCE is asked about its revisions,
+moved is read again as the spec: the snapshot is read and SCE is asked about its revisions,
 so the design, the list and the verdict beside them are of one state. Answers that were read
 again are asked about too, since they are part of what an acceptance is of.
 
@@ -231,10 +231,10 @@ model, a list, the answers) leaves the part differing, so the next question asks
 again, and the failure reaches the wait: a question that fails is asked again after twice
 the wait, up to thirty seconds. A part that could not be read is compared as unread, not
 left out, because a part that is left out is never read again. A refusal for want of a token
-stops the questions until the person signs in. A work taken away from another window is said
+stops the questions until the person signs in. A spec taken away from another window is said
 so, and the questions stop.
 
-The text and the model are read apart, so the work can be saved between the two reads. A
+The text and the model are read apart, so the spec can be saved between the two reads. A
 model read beside a text other than the one in the editor is read again with the text when
 the editor holds nothing of the person's, and it is never called current beside a text it
 was not read for: the screen says the model was read beside another one until the two agree.
@@ -245,11 +245,11 @@ is found by the next question instead of being lost with a notice.
 
 ### Asking for a model
 
-A work can be asked for a model (`request_generation`): one **request**, kept in the work's
+A spec can be asked for a model (`request_generation`): one **request**, kept in the spec's
 folder as `requests/<id>.json`, with every change of state a line of `requests.log`. The
 request is registered against the revisions of the text and the owner's answers the caller
-read (`expect`), and refused as `moved` when the work is no longer at them, as `accept` is.
-A work has one open request at most: a second is refused as `active-request` unless it says
+read (`expect`), and refused as `moved` when the spec is no longer at them, as `accept` is.
+A spec has one open request at most: a second is refused as `active-request` unless it says
 it replaces the first (`supersede`). The same call sent again (`key`) is the request it
 already made, and a key used for other revisions is refused (`key-reused`).
 
@@ -273,21 +273,21 @@ request (`claim_request`), keeps it (`heartbeat_request`) and finishes it (`comp
 - **Nothing is taken again unasked.** A run costs something, and the next one is the owner's
   to ask for.
 
-The heads of a work (`read_work_heads`) say where its latest request stands, by the clock.
+The heads of a spec (`read_spec_heads`) say where its latest request stands, by the clock.
 
 #### What a request makes
 
 What an executor writes for a request is a **candidate** (`save_request_candidate`): a model, a
-requirement list, or both, kept with the work's other revisions (named by what they hold) and
-named in the request (`candidate`). Writing one moves no pointer: the work's model is still the
-one it was, and `read_request_candidate` reads what was written. It becomes the work's only by
+requirement list, or both, kept with the spec's other revisions (named by what they hold) and
+named in the request (`candidate`). Writing one moves no pointer: the spec's model is still the
+one it was, and `read_request_candidate` reads what was written. It becomes the spec's only by
 `complete_request`, which publishes it as one **bundle**.
 
 - **A bundle is one file and one pointer.** `bundles/<digest>.json` names the model, the
   requirement list, the text and answers they were made from, the request and attempt that made
   them, and what was checked of them. `bundles.head` moves to it in one step, so a reader that
   takes the pointer has the model and the list of one generation, never a model of one beside a
-  list of another. A work that has a bundle has its model and list from its current bundle
+  list of another. A spec that has a bundle has its model and list from its current bundle
   (`read_model`, `read_requirements`, the snapshot and the heads agree with it), and the heads
   and the snapshot say which bundle (`bundle`).
 - **The core checks the model itself.** `complete_request` runs SCE's check of the candidate
@@ -298,20 +298,20 @@ one it was, and `read_request_candidate` reads what was written. It becomes the 
   since written over is not a check of this one (`candidate-moved`). A product that does not
   answer is not a refusal: the request stays running and is said again.
 - **A request completes by publishing.** Both halves are needed (`no-candidate`), the speaker
-  is the holder of the current attempt, and the work is still at the text and answers the
+  is the holder of the current attempt, and the spec is still at the text and answers the
   request was asked about: a save that moved them ended the request in the same step. Said
   again by the same attempt, it is the same bundle. The publication and the request's
-  completion are written in one step under the work's lock, and a process that stopped between
+  completion are written in one step under the spec's lock, and a process that stopped between
   the two leaves a bundle that names its request: the next reader finds the request completed.
-- **A work that has a bundle refuses the old saves of one half** (`save_model`,
-  `save_requirements` answer `bundled-work`), because one half moved alone is the pair the
+- **A spec that has a bundle refuses the old saves of one half** (`save_model`,
+  `save_requirements` answer `bundled-spec`), because one half moved alone is the pair the
   bundle exists to keep from being read. The text and the answers are the owner's and are saved
-  as ever. A work that never asked for a generation is read and written as it always was.
-- **The bundle keeps what it took over.** The first bundle of a work that had a model or a list
+  as ever. A spec that never asked for a generation is read and written as it always was.
+- **The bundle keeps what it took over.** The first bundle of a spec that had a model or a list
   says which (`previous`), so the model's history continues where the chain stopped, and
   `bundle_history` lists the bundles. `read_bundle` reads one, or the current.
 - **The bundle says what it replaced and what its executor worked to.** `replaces` is the bundle
-  that was the work's model and list before it (none for the first), and `instructions` is the
+  that was the spec's model and list before it (none for the first), and `instructions` is the
   version of the working instructions the executor was given, in the executor's own words
   (`claude-code/<digest>` is the digest of the wording, the form of the answer and the tools the
   client may use; `sce-author-mcp/<digest>` is the digest of the instructions the authoring
@@ -322,14 +322,14 @@ one it was, and `read_request_candidate` reads what was written. It becomes the 
 #### What the screen shows of a request
 
 A section above the model (`generationSection`, with its state in `generation_model.ts`) says
-where the work's latest request stands, in the core's words and nothing it made up: no
+where the spec's latest request stands, in the core's words and nothing it made up: no
 percentage is invented for an AI that is working, and a request nobody is there to take is not
 shown as running.
 
 - **The button** (`Generate pseudocode`, then `Generate again`) saves what is typed first, then
   asks about the text and the answers THIS screen shows (`expect`): a save that conflicts is the
   person's to resolve and nothing is asked in the meantime, and a request the core refuses as
-  `moved` (the work changed under the screen) says so and shows what is saved now. A press is
+  `moved` (the spec changed under the screen) says so and shows what is saved now. A press is
   one request however many times it is sent (`key`), and a second press while the first is on
   its way is not offered.
 - **The states** are the core's: waiting for an AI (and, when none is connected, that nobody is
@@ -341,7 +341,7 @@ shown as running.
 - **Saving while a request is open asks first**, for the text and for the answers: the core ends
   the request in the same step as the save, so what the AI writes would not be published, and
   that is the person's to decide (`Save and cancel the request`, or `Do not save`).
-- **Which AIs are there** (`read_adapter_status`) is read with every question about the work,
+- **Which AIs are there** (`read_adapter_status`) is read with every question about the spec,
   so that "no AI is connected" and "connected: desktop" follow the executor coming and going.
 - **Where an answer stands** (`answer_states.ts`) is said under each answer, as four different
   facts and not one "saved": typed and not saved; saved, and not in the model shown; being
@@ -361,7 +361,7 @@ shown as running.
   names it. The sentence is shown with the question and `Show in the text` selects it in the
   editor (white space is not told apart, so a sentence the text broke across lines is found); when
   the text no longer holds it, the screen says the requirement quotes an earlier text. Nothing is
-  shown for a work with no list, or for a place no requirement carries.
+  shown for a spec with no list, or for a place no requirement carries.
 - **From a requirement to the text and the pseudocode.** Each row of the requirement table can
   select its sentence in the editor, and `Mark in the pseudocode` lights the lines of the page
   that name the states the requirement is carried by. The page is the product's rendering and
@@ -370,7 +370,7 @@ shown as running.
 
 - **What a new model changed from the one before** (`change_model.ts`, `line_diff.ts`) is the
   difference of the two models' pseudocode pages, line by line, with a few lines around each
-  change. The earlier model is the one before this in the core's model history (a work whose
+  change. The earlier model is the one before this in the core's model history (a spec whose
   models were made by requests lists them as bundles, after the ones it had before; a model
   published again unchanged replaced nothing, so the one before it is the one compared). It says
   nothing of what a change MEANS: a condition, a signal, a value or a time that moved is in the
@@ -384,7 +384,7 @@ shown as running.
 #### The executor the application hosts
 
 `runner.rs` is the host of an executor that is a process of the application: it finds the
-requests nobody has taken (`list_open_requests`, every work's open requests oldest first),
+requests nobody has taken (`list_open_requests`, every spec's open requests oldest first),
 takes the oldest one that is `queued`, and has a `Generator` (whatever writes a model from a
 specification: an AI client, a script in a test) write for it. It is the same executor an
 authoring client in a person's own terminal is, with the same words to the same folder.
@@ -409,12 +409,12 @@ authoring client in a person's own terminal is, with the same words to the same 
 in a folder of its own that is removed when the run is over, and given:
 
 - **no built-in tool at all** (`--tools ""`): no shell, no files, no web. What it can do is what
-  the SCE authoring server offers, and of that only reading the work it was started for
-  (`works_read`, which also gives the owner's answers and the decision record they make) and
+  the SCE authoring server offers, and of that only reading the spec it was started for
+  (`specs_read`, which also gives the owner's answers and the decision record they make) and
   checking what it writes (`validate_scxml`, `decisions`, `scxml_requirement_set` and the
   like). It has no tool that saves, takes a request or accepts: the application saves what it
   answers. A specification is text the owner may have pasted from anywhere, and a client that
-  has read it should not be one that can be talked into writing to the owner's other work;
+  has read it should not be one that can be talked into writing to the owner's other spec;
 - **nothing from the machine's settings**: no hook, no `CLAUDE.md`, no other server;
 - **an answer in one form** (`--json-schema`): the documents of the model and the requirement
   list exactly as it checked them. What it says of itself goes in on standard input, so it is
@@ -441,7 +441,7 @@ did. Nobody has to have Claude Code to use the workbench.
 |---|---|---|
 | Claude Code | `SCE_CLAUDE` | `claude` on the search path |
 | The authoring server's launcher | `SCE_AUTHOR_MCP` (the SCE checkout has `sce/scripts/sce_author_mcp.sh`) | the installer's `sce-author-mcp`, else beside the program or on the search path |
-| `sce-work`, for the authoring server | `SCE_WORK` | the installer's, else beside the program or on the search path |
+| `sce-spec`, for the authoring server | `SCE_SPEC` | the installer's, else beside the program or on the search path |
 | The product, for the authoring server | `SCE_CODEGEN` | the installer's, else the product's own discovery |
 
 **It asks the server before it takes a request.** Finding a launcher says nothing about whether
@@ -455,7 +455,7 @@ list of its Python modules), and nothing here copies it.
 
 **What an installer carries.** An installer cannot rely on anything being installed beside the
 application, so `scripts/package_app.sh` puts the authoring bundle
-(SCE's `sce/scripts/package_sce_author.sh`: `bin/sce-codegen`, `bin/sce-work`, `bin/sce-author-mcp`,
+(SCE's `sce/scripts/package_sce_author.sh`: `bin/sce-codegen`, `bin/sce-spec`, `bin/sce-author-mcp`,
 the templates and the Python package, all built from the `sce` submodule, the one revision the
 application itself links) in the application's resources (`sce-author/`, which
 `tauri.conf.json` names) and has Tauri build the installer around it. The desktop application
@@ -520,7 +520,7 @@ whole chain per line unless it says more, and not a claim about any other comput
 | `gpt-oss:120b` | three runs: ended by a 500 for a call whose arguments were not JSON (before that was told back to the model); not done in 25 minutes, after sixteen turns of putting a design right at a minute and a half each; accepted in 637 s |
 | `devstral:24b` | not accepted after 613 s: its first message gave the request's own ids back as if they were the draft, and its last gave a draft with no documents, and it never wrote a design |
 
-A model that does not carry out the work (it is told to call tools, write SCXML, have the product
+A model that does not carry out the spec (it is told to call tools, write SCXML, have the product
 check it, and answer with the draft) fails in the model and not in the adapter, and the run says
 what the model last said of it. Which model is large enough is the person's to find: a limit of
 minutes in the live test's environment (`SCE_LOCAL_MINUTES`) is what lets a slow one finish.
@@ -561,28 +561,28 @@ An AI adapter says it is there by reporting (`report_adapter`: its name, its kin
 can do) and is there for ninety seconds after its last report. `read_adapter_status` lists the
 adapters that ever reported with whether each is there now, so the screen can say that no AI is
 connected, and offer only what the connected one can do. These records are soft state beside the
-works (`.sce-adapters/`), not a fact about any work.
+specs (`.sce-adapters/`), not a fact about any spec.
 
-### Removing a work
+### Removing a spec
 
-`remove_work` (the screen's "Remove this work", after it asks) takes a work out
+`remove_spec` (the screen's "Remove this spec", after it asks) takes a spec out
 of the list and refuses every later read and save of it as `not-found`. It does
-not delete anything: the work's files stay, with a `removed.json` beside them,
+not delete anything: the spec's files stay, with a `removed.json` beside them,
 because a specification is a person's writing and the one command that can end
 it should not be the one that cannot be taken back. Deleting `removed.json`
-brings the work back whole, history included; deleting the folder is the removal
+brings the spec back whole, history included; deleting the folder is the removal
 that cannot be undone, done by the person who means it. The marker is written
-under the work's lock and a save re-checks for it once it holds the lock, so a
+under the spec's lock and a save re-checks for it once it holds the lock, so a
 save that was waiting when the removal came writes nothing. No MCP tool removes a
-work.
+spec.
 
 ### The ways a person reaches a model
 
 A connection is the settings of one way to reach a model: which client (Claude Code, Codex) or
 which server of the person's own, which model, and where the client finds its credentials. It is
 kept in the person's settings folder (`SCE_SETTINGS_DIR`, else the per-user configuration
-directory), **not** in the works folder: a works folder is shared and moved, and whose account a
-person reaches a model with is no part of a work. No secret is in a connection. The credential
+directory), **not** in the specs folder: a specs folder is shared and moved, and whose account a
+person reaches a model with is no part of a spec. No secret is in a connection. The credential
 is the client's own login, a variable the person chose, or a key the operating system holds, and
 a connection says only which. A server address takes no user, query or fragment, and a file
 with a field the store does not know is not read.
@@ -590,16 +590,16 @@ with a field the store does not know is not read.
 A revision is the digest of its bytes and an earlier one stays readable, so a request that
 pins a connection by id and revision can still say what it was made with after the connection
 changed or was deleted. A save names the revision it replaces (`conflict` otherwise), as a save
-of a work's text does.
+of a spec's text does.
 
 `list_connections`, `read_connection` and `read_auth_policy` read; `save_connection`,
 `delete_connection` and `set_default_connection` change. **Only the desktop entrance changes
 settings**: the browser shell is a development tool a token reaches over a network. They answer
-`not-allowed-here`, and an entrance with no settings folder answers `no-settings`. `sce-work`,
-which an AI reaches the works through, has none of these commands at all (an AI must not be able
-to change which AI it runs on): they are the application's, and the works answer
+`not-allowed-here`, and an entrance with no settings folder answers `no-settings`. `sce-spec`,
+which an AI reaches the specs through, has none of these commands at all (an AI must not be able
+to change which AI it runs on): they are the application's, and the specs answer
 `unknown-command`. `describe` says which entrance asked and whether it may change them, and whether
-it may start a program (`starts_programs`), and gives two versions: the works' command set
+it may start a program (`starts_programs`), and gives two versions: the specs' command set
 (`command_set_version`) and the application's own beside it (`application_command_set_version`).
 The screen refuses a core whose either one is not the one it was written for.
 
@@ -629,7 +629,7 @@ and the revision the screen read). The core, not the screen, copies from the per
 what a run needs to be the same run (`pin`: which client, which model, what it may spend) and
 refuses as `moved` when the connection is no longer at that revision; a later change of the
 settings moves no request already made. It copies nothing that says where or as whom: no
-server address, no name the person gave it, no path of a program, because a works folder is
+server address, no name the person gave it, no path of a program, because a specs folder is
 shared and the executor that needs those reads the connection at the pinned revision from the
 settings of whoever runs it. The connection is not an input of the request's key: the same press
 sent again is the request it made, with the pin it made it with, even if the connection changed
@@ -657,8 +657,8 @@ are not on this computer.
 
 **What the runner left, and why, is said where the screen reads it.** The shell's report
 (`.sce-hosts/<name>.json`, read by `read_host_status`) carries `waiting`: for each request the
-executor could not run, the ids of the work, the request and the connection, and one sentence. The
-works folder is shared and moved, so the sentence is the application's and holds no path and
+executor could not run, the ids of the spec, the request and the connection, and one sentence. The
+specs folder is shared and moved, so the sentence is the application's and holds no path and
 nothing a client printed (the settings screen shows that to the person who is looking; it is not
 kept). The screen says it beside the request, and offers to ask again for the connection chosen
 now, which replaces the one that waits.
@@ -759,7 +759,7 @@ appear enabled after `--disable`, so live event traces, rather than feature name
 **`unified_exec` cannot be switched off in this CLI**: with 0.159.0, `--disable unified_exec` and
 `-c features.unified_exec=false` both leave it on, so no setting makes a command impossible. What a
 command can reach is the run's permission profile (`codex::permission_settings`): the minimum a
-program needs to start and the run's own folder, which is empty because the work is read through
+program needs to start and the run's own folder, which is empty because the spec is read through
 the authoring server, read and never written, and no network. It replaces `-s read-only`, which is
 a profile that reads the whole disk (`:root`), so a command that a specification talked the model
 into could read whatever the person's account can. Codex refuses a sandbox mode beside a default
@@ -815,11 +815,11 @@ verified again.
 The reviewed metadata/UI features introduce no additional authoring server or executable tool.
 Only the listed read/check tools receive unattended approval overrides, using Codex's
 [per-tool MCP configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
-The authoring server additionally enforces `SCE_AUTHOR_WORK`, which every client that writes a draft
-(Claude Code, Codex and a model server of the person's own) starts it with, the work the run is for
-(`client_run::scoped_to`); a server not told it answers for every work of the folder, and a
+The authoring server additionally enforces `SCE_AUTHOR_SPEC`, which every client that writes a draft
+(Claude Code, Codex and a model server of the person's own) starts it with, the spec the run is for
+(`client_run::scoped_to`); a server not told it answers for every spec of the folder, and a
 specification could make a client read a file through it. It advertises only those tools,
-refuses mutations and reads of other works, and accepts draft documents and their imports only
+refuses mutations and reads of other specs, and accepts draft documents and their imports only
 as inline text under plain file names. Every document is read before it reaches the product,
 whatever its file is called, and is refused when an attribute that names a file (`src`, `href`,
 `template`, on any element; and each name in the list of an `sce:candidates`) is not the plain
@@ -831,9 +831,9 @@ such names resolve against (`xml:base`), declares a document type, or cannot be 
 
 `client_scope_live` holds this against the real server, with no model and no account: it starts
 the server with the configuration Claude Code is given for a run, and with the one a model server's
-client is given, and makes the calls a hostile specification would ask for (another work, a template
+client is given, and makes the calls a hostile specification would ask for (another spec, a template
 named by its path, a tool that saves). They are refused, and the same calls to a server not told its
-work read the other work and the file, which is how the check is shown to tell the two apart. A
+spec read the other spec and the file, which is how the check is shown to tell the two apart. A
 real Claude Code given a specification that asked for all three tried none of them
 (`claude_code_live`), which is a fact about that model and that run and not a guarantee. A model
 server of the person's own was held with a script in place of the model only: none was available to
@@ -847,7 +847,7 @@ driver header, a child document, a data source, an invoke candidate) only inside
 answers a path outside
 it, or a link that leads out of it, as a file that is not there, so the answer does not tell
 whether the file exists. The application sets it to the folder it runs the generator in, and the
-authoring server sets it to its working folder when `SCE_AUTHOR_WORK` is set. Left unset, nothing
+authoring server sets it to its working folder when `SCE_AUTHOR_SPEC` is set. Left unset, nothing
 is confined; set to a folder that cannot be used, nothing may be opened. A refused file is
 answered in the words the file system uses for one that is not there, so that a message which
 prints the error says the same of both. A test reads every source of `sce-build` and fails on a
@@ -862,7 +862,7 @@ After building `sce-codegen`, reproduce the shipped configuration with a signed-
 
 ```sh
 cargo build --manifest-path sce/Cargo.toml -p sce-build --features cli --bin sce-codegen
-cargo build --manifest-path sce/Cargo.toml -p sce-works --features cli --bin sce-work
+cargo build --manifest-path sce/Cargo.toml -p sce-specs --features cli --bin sce-spec
 SCE_LIVE_MODEL=gpt-6.1-sol cargo test -p sce-spec-workbench-core --test codex_live -- --ignored --nocapture --test-threads=1
 ```
 
@@ -877,7 +877,7 @@ For a server of the person's own (Ollama, LM Studio, llama.cpp, vLLM, anything t
 OpenAI chat protocol with tool calls) nothing is installed or signed in to, so the panel asks the
 server. The person gives it a name, an address (a button fills each of the usual ones) and a model,
 and presses check: `read_server_status`, which calls an address and so is the desktop window's, asks
-the server for its models (`GET /models`, with no key and nothing of a work) and says which of five
+the server for its models (`GET /models`, with no key and nothing of a spec) and says which of five
 things came of it: a list (offered for the model field, where an id that is not listed can still be
 typed), a server that is not there, a certificate that was refused, a server that wants a key, or an
 answer that is not a list of models (the address is usually the server's OpenAI-compatible root,
@@ -952,7 +952,7 @@ interface, a set whose schema is not staged is refused by the product
 (`import/file-not-found`), which is how the tests know the schema reached it.
 
 `figures` runs the generator: the first of `SCE_CODEGEN`, an `sce-codegen` beside
-the running program, or one on `PATH`. It stages the model under the work's own
+the running program, or one on `PATH`. It stages the model under the spec's own
 name (the product names its figures by its document's file), waits for it at most
 30 seconds, writes its output to files and not pipes, and reads back only files
 inside the folder it was given. What SCE refuses (a figure that does not fit its
@@ -1015,13 +1015,13 @@ loads what turned up.
 - An answer to a question the model no longer asks is kept apart and kept: the
   next draft may ask it again. Clear a field and save to take an answer back.
 - The map is the application's own. The decision record the product's checks
-  read is made by the authoring package from it (`works_read` hands the client
+  read is made by the authoring package from it (`specs_read` hands the client
   `decisions_text`), so the format of THAT record stays where it is read.
-  `works_save_model` holds a draft to the answers with the product's own
+  `specs_save_model` holds a draft to the answers with the product's own
   `decisions` check: one that leaves an answered question open, or guesses where
   no answer licenses it, is not saved.
 - Nothing here changes the model. Your answers reach the authoring client the next
-  time it reads the work, and it applies them.
+  time it reads the spec, and it applies them.
 
 ### Accepting a design
 
@@ -1040,12 +1040,12 @@ screen then shows what the product finds, and nothing the application worked out
   saved from another window, the client's next model, an answer saved since) nothing
   is accepted, the refusal is `moved` and names which, and the screen reads what is
   there now before you can press again. A design or a list written for an earlier
-  text is refused as `not-current`. Otherwise the core stages the work in a fixed
+  text is refused as `not-current`. Otherwise the core stages the spec in a fixed
   layout (`design/`, `spec/`), asks the product to take the record
   (`sce-codegen accept --channel direct`), and keeps it as a new entry of the
   acceptances chain. The record pins every file by path and hash.
 - `read_acceptance` asks the product whether the record still holds
-  (`acceptance-check`) for the work as it is now. It is the product that says, by the
+  (`acceptance-check`) for the spec as it is now. It is the product that says, by the
   bytes of each pinned file: a design put back to what was accepted is the design that
   was accepted. When it no longer holds the screen shows the product's own sentence of
   what moved.
@@ -1083,22 +1083,22 @@ What this does not claim, stated so nothing on the screen is read as more:
   screen has not read yet is not "no answers": the button waits for it and says so
   (`unread`), because a page measured with answers cannot be shown against none.
 - **The measure, the standing and the sentences are of the design beside them.** The screen
-  reads the work as one snapshot (`read_work_snapshot`): the design, the requirement list and
+  reads the spec as one snapshot (`read_spec_snapshot`): the design, the requirement list and
   the acceptance record are of one state. It then asks SCE (`read_judgment`) about that
   snapshot's revisions by name, so the outcomes, whether the acceptance holds and the basis an
   accept names are of the design and the list on screen, and the sentences the screen quotes
   are the list's own. Nothing is compared to find that out. What the screens before this one
-  did was read the list, the measure and the standing with a command each, each of the work as
+  did was read the list, the measure and the standing with a command each, each of the spec as
   it stood when it was asked, and compare them: a save landing between two of the reads
   handed them a sentence of one list beside the outcomes of another, then a "holds" beside a
   design that had changed, then a "lapsed" beside one that was put back, and each comparison
   closed the case before it.
-- **A panel is shown only beside the snapshot it is of.** When the work is read again the panel
+- **A panel is shown only beside the snapshot it is of.** When the spec is read again the panel
   stays while SCE is asked if it is of that snapshot (the same revisions and the same
   acceptance), so a reread after a save does not flash. When it is not, it is replaced by
   "reading" at once: the old verdict is not left beside the new design for as long as SCE takes
   to answer, and a verdict that arrives for a read that has since been replaced is dropped.
-  SCE is asked after the work is read, so the design is shown without waiting for it. A panel of
+  SCE is asked after the spec is read, so the design is shown without waiting for it. A panel of
   the same revisions takes where the design and the list stand to the text from the new snapshot
   at once, while SCE's words, which are of the bytes, stay: the same bytes kept again for another
   text move that claim without moving a revision, and the accept follows the snapshot and not the
@@ -1109,19 +1109,19 @@ What this does not claim, stated so nothing on the screen is read as more:
   `unread`), and whether the acceptance holds is not said of a text or answers that are not the
   ones it was judged of: it is shown as not known yet, neither held nor lapsed. What the panel
   is of is also compared with the core's heads on every question, because the acceptance
-  record keeps its revision while the work moves and the answers it is of may be the part the
-  screen cannot read; a panel of a work the core has left is asked for again.
+  record keeps its revision while the spec moves and the answers it is of may be the part the
+  screen cannot read; a panel of a spec the core has left is asked for again.
 - **SCE not answering is an answer, and the screen asks again only when asking again could
   change it.** `read_judgment` can answer that SCE did not measure the design, or did not say
   whether the acceptance holds (`refused`, with the kind and SCE's words). The panel keeps the
   reason and shows what it did get: a measure when only the verdict failed, and the acceptance
   as saved when only the measure failed. A run that timed out, failed, or could not be started
   (`sce-timeout`, `sce-failed`, `sce-unavailable`) is not a fact about the design and passes:
-  the saved work is what it was, so nothing else would make the screen ask, and the panel is
+  the saved spec is what it was, so nothing else would make the screen ask, and the panel is
   compared as unread and asked again at the pace of the watch (twice as long after each
   failure, up to thirty seconds), with no press of "Read again". A design SCE refused
   (`sce-refused`) says the same of the same revisions, so the reason is shown and it is not
-  asked again until the work has moved. While SCE has not said whether the acceptance holds,
+  asked again until the spec has moved. While SCE has not said whether the acceptance holds,
   whether this design is accepted already is not known and the accept button waits
   (`unjudged`).
 
@@ -1182,12 +1182,12 @@ else: it has no file-system, shell or network permission.
 | Claude Code as the generator, against a stand-in client (Unix) | `--test claude_code` of `sce-spec-workbench-core` |
 | A shell that hosts the executor: the settings, what it says when it cannot (including a server that would not start), taking a request, stopping | `--test host` of `sce-spec-workbench-core` |
 | The programs an installer carries, found in its bundle and named when missing | `--test installed` of `sce-spec-workbench-core` |
-| The real client, server and product end to end (a model runs: minutes and money) | `cargo build --manifest-path sce/Cargo.toml -p sce-works --features cli --bin sce-work` and the same for `-p sce-build --bin sce-codegen`, then `cargo test -p sce-spec-workbench-core --test claude_code_live -- --ignored --nocapture` |
+| The real client, server and product end to end (a model runs: minutes and money) | `cargo build --manifest-path sce/Cargo.toml -p sce-specs --features cli --bin sce-spec` and the same for `-p sce-build --bin sce-codegen`, then `cargo test -p sce-spec-workbench-core --test claude_code_live -- --ignored --nocapture` |
 | The installer, installed and started (Linux `.deb`) | `scripts/check_installer.sh` (`scripts/package_app.sh --debug`, then `scripts/verify_installed_app.sh <the .deb it prints>`) |
 | Browser shell: handler, sockets | `cargo test -p sce-web-shell` |
-| Screen: guards, editor model, model panel, acceptance, heads, following the work, transport, words | `npm test` (in `ui`) |
+| Screen: guards, editor model, model panel, acceptance, heads, following the spec, transport, words | `npm test` (in `ui`) |
 | Screen types and build | `npm run build` (in `ui`) |
-| The works folder, its command layer, `sce-work`, and the authoring MCP's works tools | SCE's own, in the submodule: `cargo test --manifest-path sce/Cargo.toml -p sce-works --features cli`, and the suite in `sce/tools/authoring` |
+| The specs folder, its command layer, `sce-spec`, and the authoring MCP's specs tools | SCE's own, in the submodule: `cargo test --manifest-path sce/Cargo.toml -p sce-specs --features cli`, and the suite in `sce/tools/authoring` |
 
 `core/contract/replies.json` is every command's reply, written by running
 the commands. `core/tests/contract.rs` fails when a reply changes without

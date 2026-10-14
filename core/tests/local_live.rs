@@ -35,8 +35,8 @@ use sce_spec_workbench_core::http_client::Endpoint;
 use sce_spec_workbench_core::local::{list_models, Local, LocalConfig, Step};
 use sce_spec_workbench_core::runner::{Generator, Outcome, Runner, RunnerConfig};
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy};
-use sce_works::requests::{Inputs, State};
-use sce_works::{Product, Registration, Requirements, SceCodegen, SystemClock, WorkId, WorkStore};
+use sce_specs::requests::{Inputs, State};
+use sce_specs::{Product, Registration, Requirements, SceCodegen, SpecId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
 const SPECIFICATION: &str = "\
@@ -131,18 +131,18 @@ impl Setup {
         Endpoint::parse(&self.address).expect("an address the application can reach")
     }
 
-    /// A model on the real server, the real authoring server over the works in `works`, and every
+    /// A model on the real server, the real authoring server over the specs in `specs`, and every
     /// step it takes on standard output.
-    fn generator(&self, works: &Path) -> Local {
+    fn generator(&self, specs: &Path) -> Local {
         let author = AuthorServer {
             command: PathBuf::from("python3"),
             args: vec!["-m".to_string(), "sce_author.mcp".to_string()],
             env: vec![
                 (
-                    "SCE_WORK".to_string(),
-                    common::sce_work().display().to_string(),
+                    "SCE_SPEC".to_string(),
+                    common::sce_spec().display().to_string(),
                 ),
-                ("SCE_WORKS_DIR".to_string(), works.display().to_string()),
+                ("SCE_SPECS_DIR".to_string(), specs.display().to_string()),
                 (
                     "SCE_CODEGEN".to_string(),
                     self.codegen.display().to_string(),
@@ -220,8 +220,8 @@ impl Setup {
     /// `repairs` more tries.
     fn runner(
         &self,
-        store: &Arc<WorkStore<SystemClock>>,
-        works: &Path,
+        store: &Arc<SpecStore<SystemClock>>,
+        specs: &Path,
         repairs: u32,
     ) -> Runner<SystemClock, Local> {
         let mut config = RunnerConfig::named("live");
@@ -229,7 +229,7 @@ impl Setup {
         Runner::new(
             Arc::clone(store),
             Arc::new(SceCodegen::at(&self.codegen)),
-            Arc::new(self.generator(works)),
+            Arc::new(self.generator(specs)),
             config,
         )
     }
@@ -240,18 +240,18 @@ impl Setup {
 fn a_model_on_a_real_server_writes_a_model_the_core_accepts_and_publishes() {
     let setup = Setup::from_environment();
 
-    let works = common::scratch("local-live").join("works");
-    let store = Arc::new(WorkStore::with_clock(&works, SystemClock));
-    let work = store.create_work("Storage room door").unwrap().id;
-    let source = store.save_source(&work, SPECIFICATION, None).unwrap();
+    let specs = common::scratch("local-live").join("specs");
+    let store = Arc::new(SpecStore::with_clock(&specs, SystemClock));
+    let spec = store.create_spec("Storage room door").unwrap().id;
+    let source = store.save_source(&spec, SPECIFICATION, None).unwrap();
     let head = match source {
-        sce_works::Saved::Saved { revision, .. } | sce_works::Saved::Unchanged { revision } => {
+        sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
             revision
         }
     };
     let request = store
         .register_request(
-            &work,
+            &spec,
             Registration {
                 key: "press-1",
                 origin: "gui",
@@ -267,23 +267,23 @@ fn a_model_on_a_real_server_writes_a_model_the_core_accepts_and_publishes() {
         .id;
 
     let began = Instant::now();
-    let runner = setup.runner(&store, &works, 1);
+    let runner = setup.runner(&store, &specs, 1);
     let outcome = runner.run_once().unwrap();
     println!("outcome after {:?}: {outcome:?}", began.elapsed());
 
     let Outcome::Completed { bundle, .. } = outcome else {
-        let seen = store.read_request(&work, &request).unwrap();
+        let seen = store.read_request(&spec, &request).unwrap();
         panic!(
             "the model did not write a model the core accepts: {outcome:?}; the request is {:?}",
             seen.request
         );
     };
-    let published = store.read_bundle(&work, None).unwrap().expect("a bundle");
+    let published = store.read_bundle(&spec, None).unwrap().expect("a bundle");
     assert_eq!(published.revision, bundle);
-    let model = store.read_model(&work, None).unwrap().expect("a model");
+    let model = store.read_model(&spec, None).unwrap().expect("a model");
     println!("--- model ---\n{}\n--- end ---", model.text);
     let list = store
-        .read_requirements(&work, None)
+        .read_requirements(&spec, None)
         .unwrap()
         .expect("a requirement list");
     println!("--- requirements ---\n{}\n--- end ---", list.text);
@@ -309,7 +309,7 @@ fn a_server_registered_through_the_commands_is_written_for_by_a_host_with_no_cli
     } = Setup::from_environment();
 
     let folder = common::scratch("local-live-host");
-    let store = Arc::new(WorkStore::with_clock(folder.join("works"), SystemClock));
+    let store = Arc::new(SpecStore::with_clock(folder.join("specs"), SystemClock));
     let settings_store = ConnectionStore::at(folder.join("settings"));
     let product: Arc<dyn Product> = Arc::new(SceCodegen::at(&codegen));
     let policy = Policy::shipped();
@@ -349,29 +349,29 @@ fn a_server_registered_through_the_commands_is_written_for_by_a_host_with_no_cli
     .expect("made the default");
 
     // Asks for a model with it.
-    let work = store.create_work("Storage room door").unwrap().id;
-    let head = match store.save_source(&work, SPECIFICATION, None).unwrap() {
-        sce_works::Saved::Saved { revision, .. } | sce_works::Saved::Unchanged { revision } => {
+    let spec = store.create_spec("Storage room door").unwrap().id;
+    let head = match store.save_source(&spec, SPECIFICATION, None).unwrap() {
+        sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
             revision
         }
     };
     ask(
         "request_generation",
         json!({
-            "id": work.as_str(), "key": "press-1", "origin": "gui",
+            "id": spec.as_str(), "key": "press-1", "origin": "gui",
             "expect": { "source": head, "answers": null }, "supersede": false,
             "connection": { "id": "server", "revision": revision },
         }),
     )
     .expect("a request");
-    let request = store.list_requests(&work).unwrap()[0].request.id.clone();
+    let request = store.list_requests(&spec).unwrap()[0].request.id.clone();
 
     // A host that has no Claude Code and no Codex, only the server that was just registered.
     let mut shell = HostSettings::from_lookup("desktop", |_| None);
     shell.claude = Some(PathBuf::from("/nowhere/claude"));
     shell.codex = Some(PathBuf::from("/nowhere/codex"));
     shell.author = Some(repo.join("scripts/sce_author_mcp.sh"));
-    shell.work = Some(common::sce_work());
+    shell.spec = Some(common::sce_spec());
     shell.codegen = Some(codegen.clone());
     let host = start_with(
         Arc::clone(&store),
@@ -386,7 +386,7 @@ fn a_server_registered_through_the_commands_is_written_for_by_a_host_with_no_cli
     let limit = began + allowed();
     let mut last = None;
     let state = loop {
-        let seen = store.read_request(&work, &request).unwrap();
+        let seen = store.read_request(&spec, &request).unwrap();
         if last != Some(seen.request.state) {
             println!(
                 "[{:>4}s] request is {:?}",
@@ -416,16 +416,16 @@ fn a_server_registered_through_the_commands_is_written_for_by_a_host_with_no_cli
     );
     assert_eq!(state.request.state, State::Completed, "{:?}", state.request);
 
-    let published = store.read_bundle(&work, None).unwrap().expect("a bundle");
-    let model_text = store.read_model(&work, None).unwrap().expect("a model");
+    let published = store.read_bundle(&spec, None).unwrap().expect("a bundle");
+    let model_text = store.read_model(&spec, None).unwrap().expect("a model");
     println!("--- model ---\n{}\n--- end ---", model_text.text);
     assert_eq!(published.bundle.checks[0].verdict, "accepted");
 }
 
-/// The ids of the requirement list a work holds, in the order the list has them.
-fn ids_held(store: &WorkStore<SystemClock>, work: &WorkId) -> Vec<String> {
+/// The ids of the requirement list a spec holds, in the order the list has them.
+fn ids_held(store: &SpecStore<SystemClock>, spec: &SpecId) -> Vec<String> {
     let list = store
-        .read_requirements(work, None)
+        .read_requirements(spec, None)
         .unwrap()
         .expect("a requirement list");
     let manifest: Value = serde_json::from_str(&Requirements::parse(&list.text).unwrap().manifest)
@@ -438,19 +438,19 @@ fn ids_held(store: &WorkStore<SystemClock>, work: &WorkId) -> Vec<String> {
         .collect()
 }
 
-/// A request for a model of the work as it is now, `fresh` asking for every id to be issued
+/// A request for a model of the spec as it is now, `fresh` asking for every id to be issued
 /// afresh, written for by `runner`; the draft the core accepted, or the end of the request.
 fn write_for(
-    store: &WorkStore<SystemClock>,
+    store: &SpecStore<SystemClock>,
     runner: &Runner<SystemClock, Local>,
-    work: &WorkId,
+    spec: &SpecId,
     key: &str,
     fresh: bool,
 ) {
-    let source = store.head(work).unwrap().expect("a text");
+    let source = store.head(spec).unwrap().expect("a text");
     let request = store
         .register_request_with(
-            work,
+            spec,
             Registration {
                 key,
                 origin: "gui",
@@ -473,7 +473,7 @@ fn write_for(
         began.elapsed()
     );
     if !matches!(outcome, Outcome::Completed { .. }) {
-        let seen = store.read_request(work, &request).unwrap();
+        let seen = store.read_request(spec, &request).unwrap();
         panic!(
             "the model did not write a model the core accepts: {outcome:?}; the request is {:?}",
             seen.request
@@ -481,7 +481,7 @@ fn write_for(
     }
 }
 
-/// Three requests on one work, once, for real. The first writes the model and the requirement list
+/// Three requests on one spec, once, for real. The first writes the model and the requirement list
 /// with its lineage. The second, after the owner added a sentence, is a revision: a model that
 /// reads `requirements.lineage_text` and builds against it keeps the id of every requirement that
 /// stayed. The third asks for every id to be issued afresh, on the same text: a model that reads
@@ -494,27 +494,27 @@ fn write_for(
 #[ignore = "runs a model on a real server: minutes of its time"]
 fn a_model_on_a_real_server_keeps_the_ids_of_a_revision_and_issues_them_afresh_when_asked() {
     let setup = Setup::from_environment();
-    let works = common::scratch("local-live-revisions").join("works");
-    let store = Arc::new(WorkStore::with_clock(&works, SystemClock));
-    let work = store.create_work("Storage room door").unwrap().id;
-    let runner = setup.runner(&store, &works, 2);
+    let specs = common::scratch("local-live-revisions").join("specs");
+    let store = Arc::new(SpecStore::with_clock(&specs, SystemClock));
+    let spec = store.create_spec("Storage room door").unwrap().id;
+    let runner = setup.runner(&store, &specs, 2);
 
-    let head = match store.save_source(&work, SPECIFICATION, None).unwrap() {
-        sce_works::Saved::Saved { revision, .. } | sce_works::Saved::Unchanged { revision } => {
+    let head = match store.save_source(&spec, SPECIFICATION, None).unwrap() {
+        sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
             revision
         }
     };
-    write_for(&store, &runner, &work, "press-1", false);
-    let first = ids_held(&store, &work);
+    write_for(&store, &runner, &spec, "press-1", false);
+    let first = ids_held(&store, &spec);
     println!("the first list: {first:?}");
 
     let revised = format!(
         "{SPECIFICATION}\nAn open door that has not closed after thirty seconds sounds an alarm \
          until it is closed.\n"
     );
-    store.save_source(&work, &revised, Some(&head)).unwrap();
-    write_for(&store, &runner, &work, "press-2", false);
-    let second = ids_held(&store, &work);
+    store.save_source(&spec, &revised, Some(&head)).unwrap();
+    write_for(&store, &runner, &spec, "press-2", false);
+    let second = ids_held(&store, &spec);
     println!("the revised list: {second:?}");
     let kept: Vec<&String> = second.iter().filter(|id| first.contains(id)).collect();
     println!("ids the revision kept: {kept:?}");
@@ -523,8 +523,8 @@ fn a_model_on_a_real_server_keeps_the_ids_of_a_revision_and_issues_them_afresh_w
         "the revision kept no id of the first list: {first:?} -> {second:?}"
     );
 
-    write_for(&store, &runner, &work, "press-3", true);
-    let third = ids_held(&store, &work);
+    write_for(&store, &runner, &spec, "press-3", true);
+    let third = ids_held(&store, &spec);
     println!("the list with every id issued afresh: {third:?}");
     let carried: Vec<&String> = third.iter().filter(|id| second.contains(id)).collect();
     assert!(

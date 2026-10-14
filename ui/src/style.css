@@ -88,15 +88,15 @@ body {
   min-height: 0;
 }
 
-.works {
+.specs {
   padding: 12px 16px;
   border-right: 1px solid var(--line);
   background: var(--surface);
   overflow-y: auto;
 }
 
-.works h2,
-.works h3 {
+.specs h2,
+.specs h3 {
   margin: 12px 0 6px;
   font-size: 0.85rem;
   color: var(--muted);
@@ -104,13 +104,13 @@ body {
   letter-spacing: 0.04em;
 }
 
-.works ul {
+.specs ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.work-link {
+.spec-link {
   width: 100%;
   text-align: left;
   border: 1px solid transparent;
@@ -121,27 +121,27 @@ body {
   cursor: pointer;
 }
 
-.work-link:hover {
+.spec-link:hover {
   background: var(--bg);
 }
 
-.work-link[aria-current="true"] {
+.spec-link[aria-current="true"] {
   border-color: var(--accent);
   background: var(--bg);
   font-weight: 600;
 }
 
-.new-work {
+.new-spec {
   display: flex;
   gap: 6px;
 }
 
-.new-work input {
+.new-spec input {
   flex: 1;
   min-width: 0;
 }
 
-.work {
+.spec {
   padding: 12px 16px;
   min-width: 0;
 }
@@ -651,13 +651,13 @@ textarea:focus-visible {
   color: var(--error-line);
 }
 
-/* A phone: the works fold above the text instead of beside it. */
+/* A phone: the specs fold above the text instead of beside it. */
 @media (max-width: 720px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .works {
+  .specs {
     border-right: 0;
     border-bottom: 1px solid var(--line);
     max-height: 38vh;

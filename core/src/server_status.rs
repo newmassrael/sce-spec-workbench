@@ -5,7 +5,7 @@
 //! it speaks the protocol this build speaks, and which models it lists to choose among.
 //!
 //! The only question asked is the one of the protocol that is not a model working (`GET /models`):
-//! nothing is run, nothing of a work is sent, and no key is given, because this build has no place
+//! nothing is run, nothing of a spec is sent, and no key is given, because this build has no place
 //! to keep one. A server that wants one says so, in a state of its own, and a screen tells the
 //! person what that comes to and does not offer to save the server as one that is ready.
 //!
@@ -14,7 +14,7 @@
 //! What the address says of it is all that is known. A tunnel to another computer is `127.0.0.1`,
 //! which is why a connection also carries the name a person gave it.
 
-use sce_works::StoreError;
+use sce_specs::StoreError;
 use serde::Serialize;
 
 use crate::connection::check_server_address;

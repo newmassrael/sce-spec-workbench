@@ -40,7 +40,7 @@ describe("answers as opened", () => {
     expect(model.base).toBe(hex(1));
   });
 
-  it("are nothing for a work the owner answered nothing of, and the first save names no base", () => {
+  it("are nothing for a spec the owner answered nothing of, and the first save names no base", () => {
     const model = editAnswer(openAnswers(null), "a", "yes");
     expect(model.base).toBeNull();
     expect(answersRequest(model)).toEqual({ answers: { a: "yes" }, base: null });

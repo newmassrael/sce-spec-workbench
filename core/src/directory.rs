@@ -8,13 +8,13 @@
 //!
 //! 1. **The adapter.** This build can run Claude Code, Codex and a model server of the person's
 //!    (`local`). A request is written by the kind of connection it was made for and by no other,
-//!    so that it is not taken by a client that is not the one the person chose. The works keep
+//!    so that it is not taken by a client that is not the one the person chose. The specs keep
 //!    what a request asks of its run without reading it (`connection::PinnedRun`), so it is read
 //!    here, and a request that asks for more than this build reads (one made by a newer build)
 //!    is said to be so and not run on the part of it this build does read.
 //! 2. **The settings, at the revision the request pinned.** A connection changes after a request
 //!    is made, and the request is about what it was when it was made. Settings the request was
-//!    made with and this computer does not have (a works folder that came from another computer)
+//!    made with and this computer does not have (a specs folder that came from another computer)
 //!    are said to be missing, not guessed at.
 //! 3. **Who is signed in**, asked the way a generation is run, so that what the screen shows and
 //!    what a generation uses are the same login (`claude_code::observe_auth`,
@@ -34,7 +34,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use sce_works::{Pin, StoreError};
+use sce_specs::{Pin, StoreError};
 
 use crate::auth_policy::{Decision, Observed, Policy, Reason, Route};
 use crate::claude_code::{
@@ -186,7 +186,7 @@ impl Connections {
                     pin.connection
                 )))
             }
-            // What failed is for a log: a reason is said where the works folder is, which is
+            // What failed is for a log: a reason is said where the specs folder is, which is
             // shared, and a store's error names a path of this computer.
             Err(_) => {
                 return Err(Unrunnable::new(format!(
@@ -239,7 +239,7 @@ impl Connections {
             None => launch.binary.clone(),
         };
         // What the client printed is for the settings screen, which shows it to the person who
-        // is looking: a reason is said where the works folder is, and is a sentence of ours.
+        // is looking: a reason is said where the specs folder is, and is a sentence of ours.
         let observed = self.observe(&binary).map_err(|_| {
             Unrunnable::new(
                 "Claude Code could not be asked who is signed in: check it under AI connection, \
@@ -274,7 +274,7 @@ impl Connections {
     }
 
     /// The Codex that runs for `pin`, or why it cannot. Every sentence of a reason names no path and
-    /// nothing Codex printed: it is kept in the works folder, which is shared.
+    /// nothing Codex printed: it is kept in the specs folder, which is shared.
     pub fn codex_for(&self, pin: &Pin) -> Result<Codex, Unrunnable> {
         self.codex(pin, &run_of(pin)?)
     }
@@ -306,7 +306,7 @@ impl Connections {
     }
 
     /// The model server that runs for `pin`, or why it cannot. Every sentence of a reason names the
-    /// connection by what the person called it and nothing of where it is: it is kept in the works
+    /// connection by what the person called it and nothing of where it is: it is kept in the specs
     /// folder, which is shared, and an address can be a name on a network that is not the reader's.
     pub fn local_for(&self, pin: &Pin) -> Result<Local, Unrunnable> {
         self.local(pin, &run_of(pin)?)
@@ -483,7 +483,7 @@ impl Directory for Connections {
 }
 
 /// What `pin` asks of its run, or why this build does not read it, in a sentence of ours: a reason
-/// is kept in the works folder, which is shared.
+/// is kept in the specs folder, which is shared.
 fn run_of(pin: &Pin) -> Result<PinnedRun, Unrunnable> {
     PinnedRun::read(pin).map_err(|_| {
         Unrunnable::new(format!(

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-// Whether the work moved under what the screen shows: each way a part can differ, and
+// Whether the spec moved under what the screen shows: each way a part can differ, and
 // the parts that are not compared at all.
 
 import { describe, expect, it } from "vitest";
 
-import type { Basis, WorkHeads } from "../src/contract";
-import { movedParts, sameRequest, UNREAD, type WorkOnScreen } from "../src/heads_model";
+import type { Basis, SpecHeads } from "../src/contract";
+import { movedParts, sameRequest, UNREAD, type SpecOnScreen } from "../src/heads_model";
 import { nextDelay, WATCH_MAX_MS, WATCH_MS } from "../src/watch";
 
 const hex = (n: number): string => n.toString(16).padStart(64, "0");
@@ -22,8 +22,8 @@ const [T1, T2, M1, M2, A1, R1, R2, C1] = [1, 2, 3, 4, 5, 6, 7, 8].map(hex) as [
   string,
 ];
 
-/** A work with every chain filled, the text at T2 and the model and list written for T2. */
-const heads: WorkHeads = {
+/** A spec with every chain filled, the text at T2 and the model and list written for T2. */
+const heads: SpecHeads = {
   source: T2,
   model: { revision: M1, written_for: T2 },
   answers: A1,
@@ -33,11 +33,11 @@ const heads: WorkHeads = {
   request: null,
 };
 
-/** The work those heads say, as a basis names it: what the acceptance panel is of when it is current. */
+/** The spec those heads say, as a basis names it: what the acceptance panel is of when it is current. */
 const basisNow: Basis = { source: T2, model: M1, requirements: R1, answers: A1 };
 
 /** The screen showing exactly that. */
-const shown: WorkOnScreen = {
+const shown: SpecOnScreen = {
   source: T2,
   model: { head: { revision: M1, written_for: T2 }, sourceHead: T2 },
   answers: A1,
@@ -46,13 +46,13 @@ const shown: WorkOnScreen = {
   judged: basisNow,
 };
 
-describe("a work that moved under the screen", () => {
+describe("a spec that moved under the screen", () => {
   it("is nothing when the screen shows what the core says", () => {
     expect(movedParts(shown, heads)).toEqual([]);
   });
 
   it("is each part whose revision the core says differently, in the order they are read again", () => {
-    const moved: WorkHeads = {
+    const moved: SpecHeads = {
       source: T1,
       model: { revision: M2, written_for: T2 },
       answers: null,
@@ -67,33 +67,33 @@ describe("a work that moved under the screen", () => {
   it("includes a model that is the same revision but was written for another text", () => {
     // The authoring client kept the model for the text that came after it: nothing about
     // the model changed but where it stands, and that is what the screen says.
-    const kept: WorkHeads = { ...heads, model: { revision: M1, written_for: T1 } };
+    const kept: SpecHeads = { ...heads, model: { revision: M1, written_for: T1 } };
     expect(movedParts(shown, kept)).toEqual(["model"]);
   });
 
   it("includes a model whose text moved on beside it", () => {
     // Another window saved the text: the model on screen was read beside T2 and is now
     // behind, though neither the model nor what it was written for changed.
-    // The acceptance panel is of the work as it was (T2), so it is read again too.
-    const moved: WorkHeads = { ...heads, source: T1 };
+    // The acceptance panel is of the spec as it was (T2), so it is read again too.
+    const moved: SpecHeads = { ...heads, source: T1 };
     expect(movedParts({ ...shown, source: T1 }, moved)).toEqual(["model", "requirements", "acceptance"]);
   });
 
-  it("includes the acceptance when what the panel is of is not the work as the core says it is", () => {
+  it("includes the acceptance when what the panel is of is not the spec as the core says it is", () => {
     // The acceptance record keeps its revision while the model changes: only what the panel is of
-    // can say that its verdict is of a design the work has left.
-    const newer: WorkHeads = { ...heads, model: { revision: M2, written_for: T2 } };
-    const modelRead: WorkOnScreen = {
+    // can say that its verdict is of a design the spec has left.
+    const newer: SpecHeads = { ...heads, model: { revision: M2, written_for: T2 } };
+    const modelRead: SpecOnScreen = {
       ...shown,
       model: { head: { revision: M2, written_for: T2 }, sourceHead: T2 },
     };
     expect(movedParts(modelRead, newer)).toEqual(["acceptance"]);
-    // Any revision it names that the work has left is enough, the answers among them.
+    // Any revision it names that the spec has left is enough, the answers among them.
     expect(movedParts({ ...shown, judged: { ...basisNow, answers: null } }, heads)).toEqual(["acceptance"]);
     expect(movedParts({ ...shown, judged: { ...basisNow, requirements: R2 } }, heads)).toEqual(["acceptance"]);
   });
 
-  it("is nothing for a panel of the work as it is, or when the panel has nothing read", () => {
+  it("is nothing for a panel of the spec as it is, or when the panel has nothing read", () => {
     expect(movedParts(shown, heads)).toEqual([]);
     expect(movedParts({ ...shown, judged: undefined }, { ...heads, model: { revision: M2, written_for: T2 } })).toEqual(
       ["model"],
@@ -101,16 +101,16 @@ describe("a work that moved under the screen", () => {
   });
 
   it("includes a part that appeared, and one that went", () => {
-    const none: WorkOnScreen = { ...shown, model: null, answers: null, acceptance: null };
+    const none: SpecOnScreen = { ...shown, model: null, answers: null, acceptance: null };
     expect(movedParts(none, heads)).toEqual(["answers", "model", "acceptance"]);
-    const gone: WorkHeads = { ...heads, requirements: null, acceptance: null };
+    const gone: SpecHeads = { ...heads, requirements: null, acceptance: null };
     expect(movedParts(shown, gone)).toEqual(["requirements", "acceptance"]);
   });
 
   it("is every part the screen could not read, whatever the core says", () => {
     // A read that failed leaves nothing on screen to compare, and "nothing to compare" would
-    // mean the part is never read again. It is not the same as a work that has none (`null`).
-    const unread: WorkOnScreen = {
+    // mean the part is never read again. It is not the same as a spec that has none (`null`).
+    const unread: SpecOnScreen = {
       source: shown.source,
       model: UNREAD,
       answers: UNREAD,
@@ -119,14 +119,14 @@ describe("a work that moved under the screen", () => {
       judged: undefined,
     };
     expect(movedParts(unread, heads)).toEqual(["answers", "model", "requirements", "acceptance"]);
-    const empty: WorkHeads = { ...heads, model: null, answers: null, requirements: null, acceptance: null };
+    const empty: SpecHeads = { ...heads, model: null, answers: null, requirements: null, acceptance: null };
     expect(movedParts(unread, empty)).toEqual(["answers", "model", "requirements", "acceptance"]);
   });
 
   it("is nothing for a part the screen cannot compare now", () => {
     // Being read, being saved, or holding what the person typed: the screen does not read
     // such a part again over their head, whatever the core says.
-    const uncompared: WorkOnScreen = {
+    const uncompared: SpecOnScreen = {
       source: undefined,
       model: undefined,
       answers: undefined,
@@ -134,7 +134,7 @@ describe("a work that moved under the screen", () => {
       acceptance: undefined,
       judged: undefined,
     };
-    const moved: WorkHeads = {
+    const moved: SpecHeads = {
       source: T1,
       model: null,
       answers: null,
@@ -152,8 +152,8 @@ describe("a work that moved under the screen", () => {
     ]);
   });
 
-  it("is nothing for a work with nothing in it, shown as nothing", () => {
-    const empty: WorkHeads = {
+  it("is nothing for a spec with nothing in it, shown as nothing", () => {
+    const empty: SpecHeads = {
       source: null,
       model: null,
       answers: null,
@@ -162,7 +162,7 @@ describe("a work that moved under the screen", () => {
       bundle: null,
       request: null,
     };
-    const blank: WorkOnScreen = {
+    const blank: SpecOnScreen = {
       source: null,
       model: null,
       answers: null,

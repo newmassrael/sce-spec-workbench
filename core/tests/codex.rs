@@ -28,7 +28,7 @@ use sce_spec_workbench_core::codex::{Codex, CodexConfig, AUTHOR_TOOLS};
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
 use sce_spec_workbench_core::AuthSource;
-use sce_works::{Revision, WorkId};
+use sce_specs::{Revision, SpecId};
 use serde_json::{json, Value};
 
 const VERSION: &str = "0.159.0";
@@ -130,15 +130,15 @@ fn author() -> AuthorServer {
         command: PathBuf::from("/opt/sce/bin/sce-author-mcp"),
         args: vec!["--stdio".to_string()],
         env: vec![
-            ("SCE_WORKS_DIR".to_string(), "/works".to_string()),
-            ("SCE_WORK".to_string(), "/opt/sce/bin/sce-work".to_string()),
+            ("SCE_SPECS_DIR".to_string(), "/specs".to_string()),
+            ("SCE_SPEC".to_string(), "/opt/sce/bin/sce-spec".to_string()),
         ],
     }
 }
 
 fn job() -> Job {
     Job {
-        work: WorkId::parse("door-lock").unwrap(),
+        spec: SpecId::parse("door-lock").unwrap(),
         title: "Door lock".to_string(),
         request: "req-7".to_string(),
         attempt: 1,
@@ -433,14 +433,14 @@ fn what_it_is_told_goes_in_on_standard_input_and_not_on_the_command_line() {
 
     let told = fs::read_to_string(fake.record.join("stdin")).unwrap();
     assert!(told.contains("`door-lock`"), "{told}");
-    assert!(told.contains("works_read"), "{told}");
+    assert!(told.contains("specs_read"), "{told}");
     // Not the specification: the client reads it through the server.
     assert!(
         !told.contains("The lock opens when the code matches."),
         "{told}"
     );
     let args = fake.argv();
-    // Only the work id also reaches the server's scope configuration. Neither the task nor
+    // Only the spec id also reaches the server's scope configuration. Neither the task nor
     // the specification belongs on the command line.
     assert!(args
         .iter()
@@ -499,8 +499,8 @@ fn only_the_authoring_server_is_reachable_and_only_by_the_tools_the_task_needs()
         .iter()
         .find(|o| o.starts_with("mcp_servers.sce-author.env="))
         .unwrap();
-    assert!(env.contains("\"SCE_WORKS_DIR\"=\"/works\""), "{env}");
-    assert!(env.contains("\"SCE_AUTHOR_WORK\"=\"door-lock\""), "{env}");
+    assert!(env.contains("\"SCE_SPECS_DIR\"=\"/specs\""), "{env}");
+    assert!(env.contains("\"SCE_AUTHOR_SPEC\"=\"door-lock\""), "{env}");
     for name in AUTHOR_TOOLS {
         assert!(overrides.contains(
             &format!("mcp_servers.sce-author.tools.{name}.approval_mode=\"approve\"").as_str()

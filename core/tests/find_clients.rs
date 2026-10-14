@@ -22,7 +22,7 @@ use std::time::Duration;
 use sce_spec_workbench_core::claude_code::{AuthorServer, Search};
 use sce_spec_workbench_core::directory::{ClaudeLaunch, Connections};
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, PinnedRun, Policy};
-use sce_works::{CommandError, ConnectionId, Pin, Revision, WorkStore};
+use sce_specs::{CommandError, ConnectionId, Pin, Revision, SpecStore};
 use serde_json::{json, Value};
 
 use common::{scratch, write_program, FakeRenderer};
@@ -49,7 +49,7 @@ fn dir_of(program: &Path) -> &Path {
 }
 
 struct Rig {
-    works: WorkStore,
+    specs: SpecStore,
     settings: ConnectionStore,
     policy: Policy,
     search: Search,
@@ -58,7 +58,7 @@ struct Rig {
 impl Rig {
     fn new(label: &str, found_in: &[&Path]) -> Rig {
         Rig {
-            works: WorkStore::at(scratch(&format!("{label}-works"))),
+            specs: SpecStore::at(scratch(&format!("{label}-specs"))),
             settings: ConnectionStore::at(scratch(&format!("{label}-settings"))),
             policy: Policy::shipped(),
             search: Search {
@@ -70,7 +70,7 @@ impl Rig {
     }
 
     fn ask(&self, entrance: Entrance, name: &str, args: Value) -> Result<Value, CommandError> {
-        let context = Context::new(&self.works, &FakeRenderer, &self.policy, entrance)
+        let context = Context::new(&self.specs, &FakeRenderer, &self.policy, entrance)
             .with_connections(Some(&self.settings))
             .with_search(Some(&self.search));
         call_in(&context, name, args)
@@ -648,6 +648,6 @@ fn a_program_a_connection_names_that_is_gone_is_said_to_be_gone_and_not_run_as_a
         .reason;
 
     assert!(why.contains("choose it again"), "{why}");
-    // A reason is said in the works folder: it carries no path of this computer.
+    // A reason is said in the specs folder: it carries no path of this computer.
     assert!(!why.contains(chosen.to_str().unwrap()), "{why}");
 }

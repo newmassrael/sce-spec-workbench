@@ -3,7 +3,7 @@
 
 // What the screen says of asking for a model, and what it lets the person do about it.
 //
-// The core says where the work's latest request stands (`RequestHead`, by the clock: a lease
+// The core says where the spec's latest request stands (`RequestHead`, by the clock: a lease
 // that ran out is `interrupted` with nothing written) and which AI adapters are there. This
 // turns that into one state a sentence can be chosen from, and the buttons that state allows.
 // It decides nothing about a request: whether one may be made, replaced or cancelled is the
@@ -17,7 +17,7 @@ import {
   type RequestHead,
 } from "./contract";
 
-/** Where the work's latest request stands, in the terms the person acts on. */
+/** Where the spec's latest request stands, in the terms the person acts on. */
 export type Status =
   /** Never asked, or the last request is not something to say anything about. */
   | { readonly kind: "idle" }

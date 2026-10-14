@@ -4,10 +4,10 @@
 //! Hosting an executor: find the requests nobody has taken, take one, keep it while a
 //! generator writes, and say how it came out.
 //!
-//! The works folder keeps requests and what comes of them (`requests.rs`, `bundle.rs`); a
+//! The specs folder keeps requests and what comes of them (`requests.rs`, `bundle.rs`); a
 //! [`Generator`] is whatever writes a model from a specification (an AI client, a script in a
 //! test); this is what stands between the two. It is the same executor an authoring client in
-//! a person's own terminal is (`tools/authoring`, `works_begin_generation`), with the same
+//! a person's own terminal is (`tools/authoring`, `specs_begin_generation`), with the same
 //! words to the same folder, and it differs in what it is: a process of the application, that
 //! the owner asked to be there, rather than a client the owner is typing to.
 //!
@@ -35,11 +35,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sce_works::commands::complete_generation;
-use sce_works::requests::State;
-use sce_works::{
+use sce_specs::commands::complete_generation;
+use sce_specs::requests::State;
+use sce_specs::{
     AdapterReport, Answers, CandidateWrite, Clock, CommandError, ConnectionId, ConnectionRef,
-    ModelFiles, Pin, Product, RequestView, Requirements, Revision, StoreError, WorkId, WorkStore,
+    ModelFiles, Pin, Product, RequestView, Requirements, Revision, SpecId, SpecStore, StoreError,
 };
 
 /// What a refusal of the request's own state is called when the request is no longer the
@@ -69,10 +69,10 @@ impl Cancel {
 /// What a generator is asked to write a model from.
 #[derive(Debug, Clone)]
 pub struct Job {
-    pub work: WorkId,
+    pub spec: SpecId,
     pub title: String,
     pub request: String,
-    /// Which attempt of the request this is the work of.
+    /// Which attempt of the request this is the spec of.
     pub attempt: u32,
     /// The text the request is about, as it was when the request was made.
     pub source: String,
@@ -80,7 +80,7 @@ pub struct Job {
     /// The owner's answers to what an earlier model left open, by question id. What the
     /// request was made about: an answer given later makes another request.
     pub answers: BTreeMap<String, String>,
-    /// The model and the list the work has now, to be written from again and not from nothing.
+    /// The model and the list the spec has now, to be written from again and not from nothing.
     pub previous: Option<Previous>,
     /// What the core said of the last draft it refused, in the product's words: set from the
     /// second try, and what the draft has to answer.
@@ -90,7 +90,7 @@ pub struct Job {
     pub fresh_ids: bool,
 }
 
-/// The model and the requirement list a work had before the request.
+/// The model and the requirement list a spec had before the request.
 #[derive(Debug, Clone)]
 pub struct Previous {
     pub model: ModelFiles,
@@ -173,12 +173,12 @@ pub trait Directory: Send + Sync {
 }
 
 /// A request the runner took, with the generator that writes for it.
-type Taken = (WorkId, RequestView, Arc<dyn Generator>);
+type Taken = (SpecId, RequestView, Arc<dyn Generator>);
 
 /// A request the runner left queued at its last look, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Waiting {
-    pub work: WorkId,
+    pub spec: SpecId,
     pub request: String,
     pub connection: ConnectionId,
     pub reason: String,
@@ -222,31 +222,31 @@ pub enum Outcome {
     NothingToDo,
     /// The core accepted the model and published it with the list.
     Completed {
-        work: WorkId,
+        spec: SpecId,
         request: String,
         bundle: Revision,
     },
     /// The request could not be done, and the owner was told why.
     Failed {
-        work: WorkId,
+        spec: SpecId,
         request: String,
         reason: String,
     },
     /// The request stopped being the runner's: the owner called it off, or the text it was
     /// asked about was saved. Nothing was failed.
     Lost {
-        work: WorkId,
+        spec: SpecId,
         request: String,
         kind: String,
     },
     /// The runner was told to stop while it worked. The request is left to run out its lease,
     /// which is how the owner reads that its executor went away.
-    Stopped { work: WorkId, request: String },
+    Stopped { spec: SpecId, request: String },
 }
 
 /// Finds requests, takes them, and has a [`Generator`] write for them.
 pub struct Runner<C: Clock, G> {
-    store: Arc<WorkStore<C>>,
+    store: Arc<SpecStore<C>>,
     product: Arc<dyn Product>,
     /// What writes for a request nobody chose a connection for.
     generator: Arc<G>,
@@ -270,7 +270,7 @@ where
     G: Generator + 'static,
 {
     pub fn new(
-        store: Arc<WorkStore<C>>,
+        store: Arc<SpecStore<C>>,
         product: Arc<dyn Product>,
         generator: Arc<G>,
         config: RunnerConfig,
@@ -333,7 +333,7 @@ where
         let taken = self.take_one(&mut waiting);
         *self.waiting.lock().unwrap_or_else(|e| e.into_inner()) = waiting;
         match taken? {
-            Some((work, claimed, generator)) => self.work_on(&work, claimed, generator.as_ref()),
+            Some((spec, claimed, generator)) => self.spec_on(&spec, claimed, generator.as_ref()),
             None => Ok(Outcome::NothingToDo),
         }
     }
@@ -343,7 +343,7 @@ where
     /// and only when the directory has a generator for it; the rest are left, and said in
     /// `waiting`.
     fn take_one(&self, waiting: &mut Vec<Waiting>) -> Result<Option<Taken>, StoreError> {
-        for (work, view) in self.store.open_requests()? {
+        for (spec, view) in self.store.open_requests()? {
             if view.state != State::Queued {
                 continue;
             }
@@ -363,7 +363,7 @@ where
                             Ok(generator) => (Some(pin.reference()), generator),
                             Err(why) => {
                                 waiting.push(Waiting {
-                                    work: work.clone(),
+                                    spec: spec.clone(),
                                     request: view.request.id.clone(),
                                     connection: pin.connection.clone(),
                                     reason: why.reason,
@@ -374,14 +374,14 @@ where
                     }
                 };
             match self.store.claim_request_for(
-                &work,
+                &spec,
                 &view.request.id,
                 &self.config.name,
                 Some(self.config.lease_seconds),
                 false,
                 offered.as_ref(),
             ) {
-                Ok(claimed) => return Ok(Some((work, claimed, generator))),
+                Ok(claimed) => return Ok(Some((spec, claimed, generator))),
                 // Somebody else took it, or the owner called it off, between looking and
                 // taking: it is not this runner's, and the next one may be.
                 Err(StoreError::Refused { .. }) => continue,
@@ -419,9 +419,9 @@ where
 
     /// The request is this runner's: renew it from a thread of its own while the generator
     /// writes, and see it to its end.
-    fn work_on(
+    fn spec_on(
         &self,
-        work: &WorkId,
+        spec: &SpecId,
         claimed: RequestView,
         generator: &dyn Generator,
     ) -> Result<Outcome, StoreError> {
@@ -435,11 +435,11 @@ where
         thread::scope(|scope| {
             // The receiver is the beating thread's own: it is not shared, so it moves.
             scope.spawn(move || {
-                self.beat_until_told(&beating, work, request_ref, attempt, cancel_ref, lost_ref);
+                self.beat_until_told(&beating, spec, request_ref, attempt, cancel_ref, lost_ref);
             });
             let outcome =
-                self.write_for(work, request_ref, attempt, cancel_ref, lost_ref, generator);
-            // The renewing stops with the work, before the scope waits for it.
+                self.write_for(spec, request_ref, attempt, cancel_ref, lost_ref, generator);
+            // The renewing stops with the spec, before the scope waits for it.
             let _ = stop_beating.send(());
             outcome
         })
@@ -450,7 +450,7 @@ where
     fn beat_until_told(
         &self,
         told: &mpsc::Receiver<()>,
-        work: &WorkId,
+        spec: &SpecId,
         request: &str,
         attempt: u32,
         cancel: &Cancel,
@@ -471,7 +471,7 @@ where
             }
             last = Instant::now();
             match self.store.heartbeat_request(
-                work,
+                spec,
                 request,
                 &self.config.name,
                 attempt,
@@ -495,7 +495,7 @@ where
     /// What the generator is asked, and what is done with what it writes.
     fn write_for(
         &self,
-        work: &WorkId,
+        spec: &SpecId,
         request: &str,
         attempt: u32,
         cancel: &Cancel,
@@ -503,18 +503,18 @@ where
         generator: &dyn Generator,
     ) -> Result<Outcome, StoreError> {
         let holder = self.config.name.as_str();
-        let mut job = match self.job_for(work, request, attempt) {
+        let mut job = match self.job_for(spec, request, attempt) {
             Ok(job) => job,
-            Err(reason) => return self.fail(work, request, attempt, reason),
+            Err(reason) => return self.fail(spec, request, attempt, reason),
         };
         let mut last_refusal = String::new();
         for _ in 0..=self.config.repairs {
             let draft = match generator.generate(&job, cancel) {
                 Ok(draft) => draft,
                 Err(GenerateError::Failed(reason)) => {
-                    return self.fail(work, request, attempt, reason)
+                    return self.fail(spec, request, attempt, reason)
                 }
-                Err(GenerateError::Cancelled) => return Ok(self.ended(work, request, lost)),
+                Err(GenerateError::Cancelled) => return Ok(self.ended(spec, request, lost)),
                 Err(GenerateError::Unusable(wrong)) => {
                     last_refusal = wrong.clone();
                     job.refusal = Some(wrong);
@@ -522,10 +522,10 @@ where
                 }
             };
             if cancel.is_cancelled() {
-                return Ok(self.ended(work, request, lost));
+                return Ok(self.ended(spec, request, lost));
             }
             let written = self.store.save_candidate(
-                work,
+                spec,
                 request,
                 holder,
                 attempt,
@@ -539,7 +539,7 @@ where
                 Ok(_) => {}
                 Err(StoreError::Refused { kind, .. }) if ENDED_KINDS.contains(&kind) => {
                     return Ok(Outcome::Lost {
-                        work: work.clone(),
+                        spec: spec.clone(),
                         request: request.to_string(),
                         kind: kind.to_string(),
                     })
@@ -549,7 +549,7 @@ where
             match complete_generation(
                 &self.store,
                 &*self.product,
-                work,
+                spec,
                 request,
                 holder,
                 attempt,
@@ -558,14 +558,14 @@ where
             ) {
                 Ok(published) => {
                     return Ok(Outcome::Completed {
-                        work: work.clone(),
+                        spec: spec.clone(),
                         request: request.to_string(),
                         bundle: published.bundle,
                     })
                 }
                 // What the core refused the draft for, and the draft can be written again from:
                 // a model SCE refused, and a list that carries an id the owner asked to retire.
-                // Any other refusal is the work's, not the draft's, and fails the request.
+                // Any other refusal is the spec's, not the draft's, and fails the request.
                 Err(refused)
                     if refused.kind == "check-refused"
                         || refused.kind == "fresh-ids-not-issued" =>
@@ -575,16 +575,16 @@ where
                 }
                 Err(refused) if ENDED_KINDS.contains(&refused.kind.as_str()) => {
                     return Ok(Outcome::Lost {
-                        work: work.clone(),
+                        spec: spec.clone(),
                         request: request.to_string(),
                         kind: refused.kind,
                     })
                 }
-                Err(other) => return self.fail(work, request, attempt, other.message),
+                Err(other) => return self.fail(spec, request, attempt, other.message),
             }
         }
         self.fail(
-            work,
+            spec,
             request,
             attempt,
             format!(
@@ -595,14 +595,14 @@ where
     }
 
     /// What the generator is asked, from the request: the text and the answers it was made
-    /// about, and the model the work had.
-    fn job_for(&self, work: &WorkId, request: &str, attempt: u32) -> Result<Job, String> {
+    /// about, and the model the spec had.
+    fn job_for(&self, spec: &SpecId, request: &str, attempt: u32) -> Result<Job, String> {
         let said = |e: StoreError| e.to_string();
-        let view = self.store.read_request(work, request).map_err(said)?;
+        let view = self.store.read_request(spec, request).map_err(said)?;
         let inputs = &view.request.inputs;
         let source = self
             .store
-            .read_source(work, Some(&inputs.source))
+            .read_source(spec, Some(&inputs.source))
             .map_err(said)?
             .ok_or_else(|| "the text the request is about is not there".to_string())?;
         let answers = match &inputs.answers {
@@ -610,7 +610,7 @@ where
             Some(revision) => {
                 let saved = self
                     .store
-                    .read_answers(work, Some(revision))
+                    .read_answers(spec, Some(revision))
                     .map_err(said)?
                     .ok_or_else(|| "the answers the request is about are not there".to_string())?;
                 Answers::parse(&saved.text)
@@ -621,12 +621,12 @@ where
                     .collect()
             }
         };
-        let previous = match self.store.read_model(work, None).map_err(said)? {
+        let previous = match self.store.read_model(spec, None).map_err(said)? {
             Some(model) => ModelFiles::parse(&model.text).ok().map(|files| Previous {
                 model: files,
                 requirements: self
                     .store
-                    .read_requirements(work, None)
+                    .read_requirements(spec, None)
                     .ok()
                     .flatten()
                     .and_then(|list| Requirements::parse(&list.text).ok()),
@@ -634,12 +634,12 @@ where
             None => None,
         };
         Ok(Job {
-            work: work.clone(),
+            spec: spec.clone(),
             title: self
                 .store
-                .read_work_snapshot(work)
+                .read_spec_snapshot(spec)
                 .map_err(said)?
-                .work
+                .spec
                 .title,
             request: request.to_string(),
             attempt,
@@ -656,23 +656,23 @@ where
     /// what ended it is not the generator's failure.
     fn fail(
         &self,
-        work: &WorkId,
+        spec: &SpecId,
         request: &str,
         attempt: u32,
         reason: String,
     ) -> Result<Outcome, StoreError> {
         match self
             .store
-            .fail_request(work, request, &self.config.name, attempt, &reason)
+            .fail_request(spec, request, &self.config.name, attempt, &reason)
         {
             Ok(_) => Ok(Outcome::Failed {
-                work: work.clone(),
+                spec: spec.clone(),
                 request: request.to_string(),
                 reason,
             }),
             Err(StoreError::Refused { kind, .. }) if ENDED_KINDS.contains(&kind) => {
                 Ok(Outcome::Lost {
-                    work: work.clone(),
+                    spec: spec.clone(),
                     request: request.to_string(),
                     kind: kind.to_string(),
                 })
@@ -683,15 +683,15 @@ where
 
     /// The generator stopped because it was told to: by the request ending, or by the runner
     /// being stopped.
-    fn ended(&self, work: &WorkId, request: &str, lost: &Mutex<Option<String>>) -> Outcome {
+    fn ended(&self, spec: &SpecId, request: &str, lost: &Mutex<Option<String>>) -> Outcome {
         match lost.lock().unwrap_or_else(|e| e.into_inner()).clone() {
             Some(kind) => Outcome::Lost {
-                work: work.clone(),
+                spec: spec.clone(),
                 request: request.to_string(),
                 kind,
             },
             None => Outcome::Stopped {
-                work: work.clone(),
+                spec: spec.clone(),
                 request: request.to_string(),
             },
         }
@@ -699,7 +699,7 @@ where
 }
 
 fn report_adapter<C: Clock, G: Generator + ?Sized>(
-    store: &WorkStore<C>,
+    store: &SpecStore<C>,
     generator: &G,
     config: &RunnerConfig,
 ) -> Result<(), StoreError> {

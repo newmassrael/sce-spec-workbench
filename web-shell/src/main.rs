@@ -23,11 +23,11 @@ use sce_spec_workbench_core::{
     default_settings_root, AdapterKind, AuthSource, Connection, ConnectionStore,
     Limits as RunLimits, Policy,
 };
+use sce_specs::{default_renderer, default_root, ConnectionId, SceCodegen, SpecStore};
 use sce_web_shell::address::check_bind;
 use sce_web_shell::assets::Assets;
 use sce_web_shell::server::{serve, Limits};
 use sce_web_shell::{token, Shell};
-use sce_works::{default_renderer, default_root, ConnectionId, SceCodegen, WorkStore};
 
 const DEFAULT_LISTEN: &str = "127.0.0.1:5174";
 
@@ -80,7 +80,7 @@ fn run() -> Result<(), String> {
     let root = options
         .root
         .or_else(default_root)
-        .ok_or("no works folder: pass --root or set SCE_WORKS_DIR")?;
+        .ok_or("no specs folder: pass --root or set SCE_SPECS_DIR")?;
     // Read for a browser, never changed by one. A shell with no settings folder says so to a screen
     // that asks.
     let settings = options.settings.or_else(default_settings_root);
@@ -141,7 +141,7 @@ fn run() -> Result<(), String> {
         .map_err(|e| format!("the listener has no address: {e}"))?;
 
     let figures = default_renderer();
-    eprintln!("works folder: {}", root.display());
+    eprintln!("specs folder: {}", root.display());
     match &settings {
         Some(dir) => eprintln!("settings:     {} (read only here)", dir.display()),
         None => eprintln!("settings:     none (pass --settings, or set SCE_SETTINGS_DIR)"),
@@ -163,7 +163,7 @@ fn run() -> Result<(), String> {
     // can be pressed "generate" on and be answered. Held to the end of the program: it stops
     // a client at work when the server stops, and `SCE_EXECUTOR=off` hosts nothing.
     let _executor = host::start_with(
-        Arc::new(WorkStore::at(root.clone())),
+        Arc::new(SpecStore::at(root.clone())),
         Arc::from(default_renderer()),
         HostSettings::from_environment("web-shell"),
         // It runs the requests made for a connection too, when there is a settings folder to
@@ -180,7 +180,7 @@ fn run() -> Result<(), String> {
         Some(why) => eprintln!("executor:     none ({why})"),
     }
 
-    let mut shell = Shell::new(WorkStore::at(root), figures, token, assets);
+    let mut shell = Shell::new(SpecStore::at(root), figures, token, assets);
     if let Some(dir) = settings {
         shell = shell.with_settings(ConnectionStore::at(dir));
     }

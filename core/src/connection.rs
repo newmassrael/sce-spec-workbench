@@ -11,10 +11,10 @@
 //! accident, a server's address, takes no user, no query and no fragment, and a stored
 //! connection with a field this type does not have is not read.
 //!
-//! The connection is kept apart from the works (see [`crate::connection_store`]) and a request
+//! The connection is kept apart from the specs (see [`crate::connection_store`]) and a request
 //! pins it by its [`ConnectionId`] and the revision it had when the request was made.
 
-use sce_works::{ConnectionId, Pin, Revision, StoreError};
+use sce_specs::{ConnectionId, Pin, Revision, StoreError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -269,7 +269,7 @@ impl Connection {
 /// What a request made for a connection carries for the executor that runs it: which client,
 /// which model, what it may spend, copied from the settings when the request was made.
 ///
-/// The works keep it inside the request's [`Pin`] and do not read it: which clients there are is
+/// The specs keep it inside the request's [`Pin`] and do not read it: which clients there are is
 /// this application's to say. This is where it is read, and a pin that says more than this knows
 /// is not read, so that a run is never made on half of what its request asked for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

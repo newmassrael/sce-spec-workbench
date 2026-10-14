@@ -16,13 +16,13 @@ use sce_spec_workbench_core::{
     call_in, Connection, ConnectionStore, Context, Entrance, Policy, Route,
     APPLICATION_COMMAND_SET_VERSION, COMMANDS,
 };
-use sce_works::{CommandError, WorkStore, COMMAND_SET_VERSION};
+use sce_specs::{CommandError, SpecStore, COMMAND_SET_VERSION};
 use serde_json::{json, Value};
 
 use common::FakeRenderer;
 
 struct Rig {
-    works: WorkStore,
+    specs: SpecStore,
     connections: ConnectionStore,
     policy: Policy,
 }
@@ -30,14 +30,14 @@ struct Rig {
 impl Rig {
     fn new(label: &str) -> Rig {
         Rig {
-            works: WorkStore::at(common::scratch(&format!("{label}-works"))),
+            specs: SpecStore::at(common::scratch(&format!("{label}-specs"))),
             connections: ConnectionStore::at(common::scratch(&format!("{label}-settings"))),
             policy: Policy::shipped(),
         }
     }
 
-    fn context(&self, entrance: Entrance) -> Context<'_, sce_works::SystemClock> {
-        Context::new(&self.works, &FakeRenderer, &self.policy, entrance)
+    fn context(&self, entrance: Entrance) -> Context<'_, sce_specs::SystemClock> {
+        Context::new(&self.specs, &FakeRenderer, &self.policy, entrance)
             .with_connections(Some(&self.connections))
     }
 
@@ -53,7 +53,7 @@ impl Rig {
     /// `name`, taking no arguments, asked by `entrance` with no settings folder.
     fn bare(&self, entrance: Entrance, name: &str) -> Result<Value, CommandError> {
         call_in(
-            &Context::new(&self.works, &FakeRenderer, &self.policy, entrance),
+            &Context::new(&self.specs, &FakeRenderer, &self.policy, entrance),
             name,
             json!({}),
         )
@@ -82,7 +82,7 @@ fn describe_says_which_entrance_it_is_and_what_it_may_do() {
     let desktop = rig.desktop("describe", json!({}));
     let browser = rig.ask(Entrance::Browser, "describe", json!({})).unwrap();
 
-    // The works' version and the application's, each where it is kept.
+    // The specs' version and the application's, each where it is kept.
     assert_eq!(desktop["command_set_version"], json!(COMMAND_SET_VERSION));
     assert_eq!(
         desktop["application_command_set_version"],
@@ -115,14 +115,14 @@ fn describe_says_which_entrance_it_is_and_what_it_may_do() {
 }
 
 #[test]
-fn the_works_describe_their_own_commands_and_not_who_asked() {
-    // `sce-work` reaches the works with no application in front of them: the same version of
+fn the_specs_describe_their_own_commands_and_not_who_asked() {
+    // `sce-spec` reaches the specs with no application in front of them: the same version of
     // the same commands, none of the application's, and nothing of an entrance it does not have.
-    let rig = Rig::new("cc-works-describe");
+    let rig = Rig::new("cc-specs-describe");
 
-    let works = sce_works::call(&rig.works, &FakeRenderer, "describe", json!({})).unwrap();
+    let specs = sce_specs::call(&rig.specs, &FakeRenderer, "describe", json!({})).unwrap();
 
-    assert_eq!(works["command_set_version"], json!(COMMAND_SET_VERSION));
+    assert_eq!(specs["command_set_version"], json!(COMMAND_SET_VERSION));
     for absent in [
         "application_command_set_version",
         "entrance",
@@ -130,11 +130,11 @@ fn the_works_describe_their_own_commands_and_not_who_asked() {
         "writes_settings",
         "starts_programs",
     ] {
-        assert!(works.get(absent).is_none(), "{absent}: {works}");
+        assert!(specs.get(absent).is_none(), "{absent}: {specs}");
     }
-    assert_eq!(works["commands"], json!(sce_works::COMMANDS));
+    assert_eq!(specs["commands"], json!(sce_specs::COMMANDS));
     let refused =
-        sce_works::call(&rig.works, &FakeRenderer, "list_connections", json!({})).unwrap_err();
+        sce_specs::call(&rig.specs, &FakeRenderer, "list_connections", json!({})).unwrap_err();
     assert_eq!(refused.kind, "unknown-command");
 }
 

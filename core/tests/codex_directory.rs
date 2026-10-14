@@ -7,7 +7,7 @@
 //! A request pinned to a Codex connection waits, with a reason, until three things are true: the
 //! Codex this computer has is one a person verified, the credential the connection chose is
 //! there (a key in the environment, or a login that Codex reports), and that way of signing in is
-//! one the build uses. What is said of a request that waits is kept in the works folder, which is
+//! one the build uses. What is said of a request that waits is kept in the specs folder, which is
 //! shared, so it names no path and nothing Codex printed. The client here is a script: it
 //! answers `--version`, `features list` and `login status`, and records what it was asked and in
 //! what environment.
@@ -32,7 +32,7 @@ use sce_spec_workbench_core::runner::{
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Observed, Policy, Route,
 };
-use sce_works::{ConnectionId, Pin, Revision, WorkId};
+use sce_specs::{ConnectionId, Pin, Revision, SpecId};
 
 const VERSION: &str = "0.159.0";
 const APP_HOME: &str = "/app/data/codex-home";
@@ -113,7 +113,7 @@ impl Fake {
 
 fn job() -> Job {
     Job {
-        work: WorkId::parse("door-lock").unwrap(),
+        spec: SpecId::parse("door-lock").unwrap(),
         title: "Door lock".to_string(),
         request: "req-7".to_string(),
         attempt: 1,
@@ -194,7 +194,7 @@ impl Rig {
     fn pin(&self, connection: &Connection) -> Pin {
         let saved = self.settings.save(connection, None).unwrap();
         let revision = match saved {
-            sce_works::Saved::Saved { revision, .. } | sce_works::Saved::Unchanged { revision } => {
+            sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
                 revision
             }
         };

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! A [`Generator`] that asks a model server the person runs to write the model of a work.
+//! A [`Generator`] that asks a model server the person runs to write the model of a spec.
 //!
 //! Claude Code and Codex are programs that bring their own tool loop: the application starts one,
 //! tells it which tools it may use, and takes its last message. A model server is only a service
@@ -32,13 +32,13 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use sce_works::{Document, Revision};
+use sce_specs::{Document, Revision};
 use serde_json::{json, Value};
 
 use crate::claude_code::AuthorServer;
 use crate::client_run::{
-    blank_job, draft_from, prompt, scoped_to, span_words, tail, Scratch, AUTHOR_TOOLS,
-    SYSTEM_PROMPT, WORK_SCOPE,
+    blank_job, draft_from, prompt, scoped_to, span_words, tail, Scratch, AUTHOR_TOOLS, SPEC_SCOPE,
+    SYSTEM_PROMPT,
 };
 use crate::http_client::{self, Endpoint, HttpError, Request};
 use crate::mcp_client::{McpClient, McpError, Tool};
@@ -77,7 +77,7 @@ to that check.";
 
 /// What a model is told of its tools: the authoring instructions it is also given describe tools
 /// that save and that take a request, which are for the clients that do those things themselves,
-/// and a model that reads of a tool tries it (one was seen calling `works_begin_generation`).
+/// and a model that reads of a tool tries it (one was seen calling `specs_begin_generation`).
 fn tools_words(names: &[&str]) -> String {
     format!(
         "You have exactly these tools and no others: {}. The authoring instructions below also \
@@ -87,11 +87,11 @@ fn tools_words(names: &[&str]) -> String {
     )
 }
 
-/// Everything a run says to the model that does not depend on the work: what [`Local::instructions`]
+/// Everything a run says to the model that does not depend on the spec: what [`Local::instructions`]
 /// is the name of.
 fn told() -> String {
     format!(
-        "{SYSTEM_PROMPT}\n{}\n{ANSWER_FORM}\n{}\n{}\n{REPAIRS}\n{}\n{SCHEMA_ECHO}\n{}\n{}\n{WORK_SCOPE}",
+        "{SYSTEM_PROMPT}\n{}\n{ANSWER_FORM}\n{}\n{}\n{REPAIRS}\n{}\n{SCHEMA_ECHO}\n{}\n{}\n{SPEC_SCOPE}",
         tools_words(&AUTHOR_TOOLS),
         prompt(&blank_job()),
         AUTHOR_TOOLS.join(","),
@@ -659,7 +659,7 @@ impl Generator for Local {
         let deadline = Instant::now() + self.config.timeout;
         let scratch = Scratch::new("sce-local")
             .map_err(|e| GenerateError::Failed(format!("a folder for the run: {e}")))?;
-        let author = scoped_to(&self.author, job.work.as_str());
+        let author = scoped_to(&self.author, job.spec.as_str());
         let mut mcp = McpClient::start(&author, scratch.path(), deadline, cancel)
             .map_err(|e| self.mcp_failure(e))?;
         let tools = self.offered(&mut mcp, deadline, cancel)?;
@@ -1267,7 +1267,7 @@ pub fn list_models(endpoint: &Endpoint, bearer: Option<&str>) -> Result<Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sce_works::ModelFiles;
+    use sce_specs::ModelFiles;
 
     /// A message read as the draft with no check behind it: what most of these say is of the
     /// message alone.
@@ -1584,9 +1584,9 @@ mod tests {
 
     #[test]
     fn the_model_is_told_the_tools_it_has_and_that_the_instructions_name_more() {
-        let words = tools_words(&["works_read", "validate_scxml"]);
+        let words = tools_words(&["specs_read", "validate_scxml"]);
 
-        assert!(words.contains("works_read, validate_scxml"), "{words}");
+        assert!(words.contains("specs_read, validate_scxml"), "{words}");
         assert!(words.contains("You have none of them"), "{words}");
     }
 
@@ -1699,7 +1699,7 @@ mod tests {
     #[test]
     fn calls_are_read_with_their_arguments_as_the_model_wrote_them_and_an_id_when_it_gave_none() {
         let message = json!({"tool_calls": [
-            {"id": "call_a", "function": {"name": "works_read", "arguments": "{\"work\":\"w\"}"}},
+            {"id": "call_a", "function": {"name": "specs_read", "arguments": "{\"spec\":\"w\"}"}},
             {"function": {"name": "decisions", "arguments": ""}},
             {"id": "call_c", "function": {"name": "x", "arguments": "{not json"}},
             {"id": "call_d", "function": {"name": "y", "arguments": {"already": "an object"}}},
@@ -1708,7 +1708,7 @@ mod tests {
         let calls = calls_of(&message, 4);
 
         assert_eq!(calls[0].id, "call_a");
-        assert_eq!(calls[0].arguments, Ok(json!({"work": "w"})));
+        assert_eq!(calls[0].arguments, Ok(json!({"spec": "w"})));
         // No id: one is made, and it is the same one the result is answered under.
         assert_eq!(calls[1].id, "call_4_1");
         assert_eq!(calls[1].arguments, Ok(Value::Null));
@@ -1723,7 +1723,7 @@ mod tests {
             "role": "assistant",
             "content": null,
             "reasoning": "private",
-            "tool_calls": [{"id": "c1", "function": {"name": "works_read", "arguments": "{}"}}],
+            "tool_calls": [{"id": "c1", "function": {"name": "specs_read", "arguments": "{}"}}],
         });
         let calls = calls_of(&message, 0);
 

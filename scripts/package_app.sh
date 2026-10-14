@@ -7,19 +7,19 @@
 #   scripts/package_app.sh [--debug] [--bundles LIST]
 #
 # The application hosts an AI executor that writes models through the SCE authoring server, which
-# checks them with the product's generator and reads and saves a work through `sce-work`. An
+# checks them with the product's generator and reads and saves a spec through `sce-spec`. An
 # installer cannot count on any of them being installed beside the application, so it carries
 # them: this script makes the authoring bundle (SCE's sce/scripts/package_sce_author.sh:
-# bin/sce-author-mcp, bin/sce-codegen, bin/sce-work, the templates and the Python package), puts it
+# bin/sce-author-mcp, bin/sce-codegen, bin/sce-spec, the templates and the Python package), puts it
 # in the folder tauri.conf.json names as a resource (src-tauri/resources/sce-author), and has Tauri
 # build the installer around it. The installed application finds it there
 # (`installed::in_bundle`) with no environment naming anything.
 #
 # All three come from the `sce` submodule, the one revision of SCE the application itself links
-# (`sce/sce-works`): what the installer carries and what the application was built against cannot
+# (`sce/sce-specs`): what the installer carries and what the application was built against cannot
 # be of two versions.
 #
-#   --debug         use the debug builds of the generator and `sce-work`, and build the application
+#   --debug         use the debug builds of the generator and `sce-spec`, and build the application
 #                   in debug too: for trying the installer on this machine without waiting for a
 #                   release build of everything
 #   --bundles LIST  what Tauri builds, comma separated (default: deb)
@@ -53,13 +53,13 @@ sce="$repo_root/sce"
     exit 1
 }
 cargo build "${cargo_profile[@]}" --manifest-path "$sce/Cargo.toml" -p sce-build --features cli --bin sce-codegen
-cargo build "${cargo_profile[@]}" --manifest-path "$sce/Cargo.toml" -p sce-works --features cli --bin sce-work
+cargo build "${cargo_profile[@]}" --manifest-path "$sce/Cargo.toml" -p sce-specs --features cli --bin sce-spec
 codegen="$sce/target/$profile/sce-codegen"
-work="$sce/target/$profile/sce-work"
+spec="$sce/target/$profile/sce-spec"
 
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
-"$sce/scripts/package_sce_author.sh" "$staging" --codegen "$codegen" --work "$work" >/dev/null
+"$sce/scripts/package_sce_author.sh" "$staging" --codegen "$codegen" --spec "$spec" >/dev/null
 
 resources="$repo_root/src-tauri/resources/sce-author"
 mkdir -p "$resources"

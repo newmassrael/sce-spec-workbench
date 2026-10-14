@@ -4,7 +4,7 @@
 //! The programs an installed application carries, found where an installer puts them.
 //!
 //! An installer cannot rely on anything being installed beside the application: not the
-//! generator, not `sce-work`, not the authoring server. It carries them in a folder of its own
+//! generator, not `sce-spec`, not the authoring server. It carries them in a folder of its own
 //! (`sce-author/bin`, the layout `scripts/package_sce_author.sh` makes), and the application has
 //! to find them there without the environment naming them and without a source tree. What is
 //! found is what the shell uses; what is missing is said, program by program, so that a broken
@@ -29,7 +29,7 @@ fn exe(name: &str) -> String {
 #[test]
 fn a_bundle_that_carries_everything_is_found_program_by_program() {
     let root = common::scratch("installed-all");
-    for name in ["sce-author-mcp", "sce-work", "sce-codegen"] {
+    for name in ["sce-author-mcp", "sce-spec", "sce-codegen"] {
         touch(&root.join("bin").join(exe(name)));
     }
 
@@ -39,7 +39,7 @@ fn a_bundle_that_carries_everything_is_found_program_by_program() {
         found,
         Installed {
             author: Some(root.join("bin").join(exe("sce-author-mcp"))),
-            work: Some(root.join("bin").join(exe("sce-work"))),
+            spec: Some(root.join("bin").join(exe("sce-spec"))),
             codegen: Some(root.join("bin").join(exe("sce-codegen"))),
         }
     );
@@ -59,9 +59,9 @@ fn what_the_bundle_lacks_is_named() {
         Some(root.join("bin").join(exe("sce-codegen")))
     );
     assert_eq!(found.author, None);
-    assert_eq!(found.work, None);
+    assert_eq!(found.spec, None);
     assert!(!found.is_complete());
-    assert_eq!(found.missing(), vec!["sce-author-mcp", "sce-work"]);
+    assert_eq!(found.missing(), vec!["sce-author-mcp", "sce-spec"]);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn a_folder_with_no_bundle_in_it_has_nothing() {
     assert_eq!(found, Installed::default());
     assert_eq!(
         found.missing(),
-        vec!["sce-author-mcp", "sce-work", "sce-codegen"]
+        vec!["sce-author-mcp", "sce-spec", "sce-codegen"]
     );
     assert_eq!(
         in_bundle(&PathBuf::from("/nowhere/at/all")),
@@ -84,7 +84,7 @@ fn a_folder_with_no_bundle_in_it_has_nothing() {
 #[test]
 fn a_directory_of_the_same_name_is_not_a_program() {
     let root = common::scratch("installed-dir");
-    fs::create_dir_all(root.join("bin").join(exe("sce-work"))).unwrap();
+    fs::create_dir_all(root.join("bin").join(exe("sce-spec"))).unwrap();
 
-    assert_eq!(in_bundle(&root).work, None);
+    assert_eq!(in_bundle(&root).spec, None);
 }

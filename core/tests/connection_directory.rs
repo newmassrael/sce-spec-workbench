@@ -30,7 +30,7 @@ use sce_spec_workbench_core::runner::{Directory, Unrunnable};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Observed, Policy, Route,
 };
-use sce_works::{ConnectionId, Pin};
+use sce_specs::{ConnectionId, Pin};
 
 /// A stand-in for `claude` that answers `--version` and `auth status`, and records what it was
 /// asked.
@@ -187,7 +187,7 @@ impl Rig {
     fn pin(&self, connection: &Connection) -> Pin {
         let saved = self.settings.save(connection, None).unwrap();
         let revision = match saved {
-            sce_works::Saved::Saved { revision, .. } | sce_works::Saved::Unchanged { revision } => {
+            sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
                 revision
             }
         };
@@ -327,7 +327,7 @@ fn nobody_signed_in_says_how_to_sign_in() {
 
 #[test]
 fn what_a_person_is_told_of_a_request_that_waits_carries_nothing_the_client_printed() {
-    // A reason is said where the works folder is, which is shared and moved: it is a sentence of
+    // A reason is said where the specs folder is, which is shared and moved: it is a sentence of
     // the application's, and not a path or a line the client wrote.
     let rig = Rig::new(
         "dir-printed",
@@ -545,8 +545,8 @@ fn a_request_is_written_by_the_adapter_of_its_own_connection_and_by_no_other() {
 fn settings_that_are_not_on_this_computer_are_said_to_be_missing() {
     let rig = Rig::new("dir-missing-settings", SUBSCRIPTION);
     let mut pin = rig.pin(&claude());
-    // The request came with the works folder from another computer, and its revision is not here.
-    pin.revision = sce_works::Revision::of(b"another computer");
+    // The request came with the specs folder from another computer, and its revision is not here.
+    pin.revision = sce_specs::Revision::of(b"another computer");
 
     let said = refused(rig.directory(Policy::shipped()).claude_for(&pin));
 
@@ -566,7 +566,7 @@ fn no_client_to_run_is_said_so() {
 
 #[test]
 fn a_request_that_asks_for_a_run_this_build_does_not_read_is_said_so_and_not_run() {
-    // The works keep what a request asks of its run without reading it, so a request a newer
+    // The specs keep what a request asks of its run without reading it, so a request a newer
     // build made reaches this one as it was written: a client this build has never heard of, or
     // one it has with something more asked of it. Neither is run on the part this build reads.
     let rig = Rig::new("dir-unread-run", SUBSCRIPTION);

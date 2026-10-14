@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! The application's commands, as JSON in and JSON out, in front of the works'.
+//! The application's commands, as JSON in and JSON out, in front of the specs'.
 //!
-//! The desktop shell and the browser shell reach the works through [`call_in`], which answers
+//! The desktop shell and the browser shell reach the specs through [`call_in`], which answers
 //! the commands that are the application's (the ways a person reaches a model, kept in their
-//! settings folder, and the programs of theirs it asks) and hands every other one to the works
-//! ([`sce_works::commands`]), the layer the `sce-work` command reaches them through too. A request
-//! made for a connection is the works' command, and the connection is read here: the works hold a
+//! settings folder, and the programs of theirs it asks) and hands every other one to the specs
+//! ([`sce_specs::commands`]), the layer the `sce-spec` command reaches them through too. A request
+//! made for a connection is the specs' command, and the connection is read here: the specs hold a
 //! request to the connection it names, and what a run of it needs is copied from the settings
 //! ([`SettingsPins`]).
 //!
@@ -19,9 +19,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use sce_works::commands::{answer, arguments, call_with, unknown_command, Empty, Pins};
-use sce_works::{
-    Clock, CommandError, ConnectionId, ConnectionRef, Pin, Product, Revision, StoreError, WorkStore,
+use sce_specs::commands::{answer, arguments, call_with, unknown_command, Empty, Pins};
+use sce_specs::{
+    Clock, CommandError, ConnectionId, ConnectionRef, Pin, Product, Revision, SpecStore, StoreError,
 };
 
 use crate::auth_policy::{Policy, Route};
@@ -34,7 +34,7 @@ use crate::connection::{AdapterKind, Connection};
 use crate::connection_store::ConnectionStore;
 use crate::server_status;
 
-/// The application's own commands, in the order a person would meet them. The works' come first
+/// The application's own commands, in the order a person would meet them. The specs' come first
 /// in what `describe` lists ([`all_commands`]).
 pub const COMMANDS: &[&str] = &[
     "list_connections",
@@ -49,27 +49,27 @@ pub const COMMANDS: &[&str] = &[
     "set_default_connection",
 ];
 
-/// The version of the application's own commands and of what `describe` adds to the works'
-/// answer, said as `application_command_set_version` beside the works' `command_set_version`
-/// ([`sce_works::COMMAND_SET_VERSION`]). It moves as that one does: when a command's arguments or
+/// The version of the application's own commands and of what `describe` adds to the specs'
+/// answer, said as `application_command_set_version` beside the specs' `command_set_version`
+/// ([`sce_specs::COMMAND_SET_VERSION`]). It moves as that one does: when a command's arguments or
 /// answer change in a way a caller written against the last one would misread.
 ///
-/// 1: the commands above, which were the workbench's one command set 14 to 24 until the works
-/// were versioned apart (works 25), and `describe`'s `entrance` (`desktop` or `browser`; the
-/// `tool` an `sce-work` of that set said is the works' to answer now, and says nothing of who
+/// 1: the commands above, which were the workbench's one command set 14 to 24 until the specs
+/// were versioned apart (specs 25), and `describe`'s `entrance` (`desktop` or `browser`; the
+/// `tool` an `sce-spec` of that set said is the specs' to answer now, and says nothing of who
 /// asked), `settings`, `writes_settings` and `starts_programs`.
 pub const APPLICATION_COMMAND_SET_VERSION: u32 = 1;
 
-/// Every command an entrance of the application answers: the works', then its own.
+/// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
-    sce_works::COMMANDS
+    sce_specs::COMMANDS
         .iter()
         .chain(COMMANDS)
         .copied()
         .collect()
 }
 
-/// The commands that read the settings a person keeps apart from the works.
+/// The commands that read the settings a person keeps apart from the specs.
 const SETTINGS_READ: &[&str] = &["list_connections", "read_connection", "read_auth_policy"];
 
 /// The commands that start a program of the person's, or reach a server they named, to ask it
@@ -120,7 +120,7 @@ impl Entrance {
 /// Made with [`Context::new`] and what the entrance has added to it, so that a new thing a
 /// command needs is one more `with_` and not an edit to every place a context is made.
 pub struct Context<'a, C: Clock> {
-    pub works: &'a WorkStore<C>,
+    pub specs: &'a SpecStore<C>,
     /// The product: it draws a model for `figures` and reads one for `review`.
     pub product: &'a dyn Product,
     /// The settings folder, when the entrance has one.
@@ -139,15 +139,15 @@ pub struct Context<'a, C: Clock> {
 }
 
 impl<'a, C: Clock> Context<'a, C> {
-    /// A context with a works folder and nothing the person keeps of their own.
+    /// A context with a specs folder and nothing the person keeps of their own.
     pub fn new(
-        works: &'a WorkStore<C>,
+        specs: &'a SpecStore<C>,
         product: &'a dyn Product,
         policy: &'a Policy,
         entrance: Entrance,
     ) -> Self {
         Context {
-            works,
+            specs,
             product,
             connections: None,
             policy,
@@ -196,7 +196,7 @@ pub fn call_in<C: Clock>(
     name: &str,
     args: Value,
 ) -> Result<Value, CommandError> {
-    // Said here, of every command an entrance of the application answers, and not by the works,
+    // Said here, of every command an entrance of the application answers, and not by the specs,
     // which know only theirs.
     let commands = all_commands();
     if !commands.contains(&name) {
@@ -211,7 +211,7 @@ pub fn call_in<C: Clock>(
     let pins = SettingsPins {
         connections: context.connections,
     };
-    let mut answered = call_with(context.works, context.product, &pins, name, args)?;
+    let mut answered = call_with(context.specs, context.product, &pins, name, args)?;
     if name == "describe" {
         if let Some(fields) = answered.as_object_mut() {
             fields.insert("commands".to_string(), json!(all_commands()));
@@ -248,7 +248,7 @@ pub struct SettingsPins<'a> {
 impl Pins for SettingsPins<'_> {
     fn pin_for(&self, wanted: &ConnectionRef) -> Result<Pin, CommandError> {
         let Some(connections) = self.connections else {
-            return sce_works::NoPins.pin_for(wanted);
+            return sce_specs::NoPins.pin_for(wanted);
         };
         let Some(current) = connections.read(&wanted.id, None)? else {
             return Err(CommandError::from(StoreError::NotFound {

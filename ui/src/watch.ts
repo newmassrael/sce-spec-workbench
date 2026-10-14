@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-// How the screen is woken to ask whether the work moved under it.
+// How the screen is woken to ask whether the spec moved under it.
 //
-// The screen asks the core (`read_work_heads`) and does not wait to be told: the same
+// The screen asks the core (`read_spec_heads`) and does not wait to be told: the same
 // question goes through the desktop shell and the browser shell, so neither needs a
 // permission, a stream or a file watcher the other does not, and a change that was missed
 // is found by the next question instead of being lost with a notice.

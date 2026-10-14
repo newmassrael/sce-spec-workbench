@@ -35,7 +35,7 @@ describe("the model a model replaced", () => {
   });
 
   it("is the one the first entry says it followed, when the history begins there", () => {
-    // The first bundle of a work that had a model before: the earlier chain is not listed here.
+    // The first bundle of a spec that had a model before: the earlier chain is not listed here.
     expect(previousOf([entry(5, 4)], rev(5))).toBe(rev(4));
     expect(previousOf([entry(5, 5)], rev(5))).toBeNull();
   });

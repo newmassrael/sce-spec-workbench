@@ -6,15 +6,15 @@
 
 const en = {
   appTitle: "SCE Spec Workbench",
-  worksFolder: "Works folder",
-  works: "Works",
-  noWorks: "No works yet. Name one below to start.",
-  newWork: "New work",
-  newWorkTitle: "Title",
-  newWorkCreate: "Create",
+  specsFolder: "Specs folder",
+  specs: "Specs",
+  noSpecs: "No specs yet. Name one below to start.",
+  newSpec: "New spec",
+  newSpecTitle: "Title",
+  newSpecCreate: "Create",
   unreadableHeading: "Folders that could not be read",
-  pickAWork: "Pick a work, or create one.",
-  noTextYet: "This work has no text yet. Write the specification below and save.",
+  pickASpec: "Pick a spec, or create one.",
+  noTextYet: "This spec has no text yet. Write the specification below and save.",
   editorLabel: "Specification text",
   save: "Save",
   saving: "Saving...",
@@ -32,7 +32,7 @@ const en = {
   backToCurrent: "Back to the current text",
   conflictTitle: "The text changed while you were editing",
   conflictBody:
-    "Another entrance saved revision {current} after you opened this work. Nothing of yours has been lost, and the version saved elsewhere has not been overwritten.",
+    "Another entrance saved revision {current} after you opened this spec. Nothing of yours has been lost, and the version saved elsewhere has not been overwritten.",
   conflictTakeTheirs: "Load the version saved elsewhere (discard my edits)",
   conflictKeepMine: "Keep mine and save on top of it",
   conflictKeepMineHint: "The version saved elsewhere stays in the history as its own revision.",
@@ -63,7 +63,7 @@ const en = {
   loading: "Loading...",
   modelTitle: "Model, as SCE draws it",
   modelNone:
-    "No model yet. When an authoring client saves a model for this work, the figures SCE draws of it appear here.",
+    "No model yet. When an authoring client saves a model for this spec, the figures SCE draws of it appear here.",
   modelReading: "Reading the model...",
   modelDrawing: "SCE is drawing the model...",
   modelRead: "Read again",
@@ -84,10 +84,10 @@ const en = {
   modelNotDrawn: "SCE did not draw this model.",
   modelNotDrawnHint:
     "The model is saved and is shown below as text. What SCE refused is its own answer, not a fault of this screen.",
-  workRemove: "Remove this work",
+  specRemove: "Remove this spec",
   removeTitle: "Remove \"{title}\" from the list?",
   removeBody:
-    "The work leaves the list and cannot be opened here. Its files stay in the works folder, so it can be brought back by deleting the file removed.json in its folder.",
+    "The spec leaves the list and cannot be opened here. Its files stay in the specs folder, so it can be brought back by deleting the file removed.json in its folder.",
   removeBodyUnsaved: "Anything that is not saved is lost with it: the editor's text, and answers you typed.",
   closeTitle: "There are changes that are not saved",
   closeBody:
@@ -95,7 +95,7 @@ const en = {
   saveAndClose: "Save, then close",
   discardAndClose: "Discard my changes and close",
   removeConfirm: "Remove",
-  removeCancel: "Keep the work",
+  removeCancel: "Keep the spec",
   removedNotice: "\"{title}\" was removed from the list.",
   reviewTitle: "What SCE says of the model",
   reviewReading: "Reading what SCE says of the model...",
@@ -115,7 +115,7 @@ const en = {
   reviewPageRefused: "SCE accepted the model and did not write its pseudocode page: {detail}",
   answersTitle: "Your answers",
   answersHint:
-    "Each question is something your text does not say. Your answer goes to the authoring client the next time it reads this work, and it applies it in the model. Nothing here changes the model.",
+    "Each question is something your text does not say. Your answer goes to the authoring client the next time it reads this spec, and it applies it in the model. Nothing here changes the model.",
   answersReading: "Reading your answers...",
   answersFailed: "Your answers could not be read: {detail}",
   answerLabel: "Your answer to {id}",
@@ -152,7 +152,7 @@ const en = {
   requirementsCountUnstated: "SCE measured the design against {count} requirements.",
   measureFailed: "SCE did not measure the design against the list: {detail}",
   sceAsksAgain: "The screen asks SCE again by itself.",
-  sceRefusedTheDesign: "SCE refused the design, so it is not asked again until the work changes.",
+  sceRefusedTheDesign: "SCE refused the design, so it is not asked again until the spec changes.",
   requirementsTable: "The requirements",
   requirementId: "Requirement",
   requirementOutcome: "SCE finds it",
@@ -187,7 +187,7 @@ const en = {
   withheldUnread:
     "The text, the design or your saved answers are still being read onto the screen, or could not be read: you have not been shown all of what you would accept.",
   withheldDiffers:
-    "What is on screen is not the one the design was measured against. Open the work again to read what is saved.",
+    "What is on screen is not the one the design was measured against. Open the spec again to read what is saved.",
   withheldAlready: "This design is accepted as it is.",
   withheldUnjudged: "SCE has not said whether the acceptance holds, so whether this design is accepted already is not known.",
   acceptRefused: "Nothing was accepted: {detail}",
@@ -197,7 +197,7 @@ const en = {
   acceptedLapsed: "Accepted {time}, and it no longer holds. SCE says: {lapse}",
   acceptedUnsaid: "Accepted {time}. SCE could not say whether it still holds: {detail}",
   acceptedUnchecked:
-    "Accepted {time}. Whether it holds for the design shown is not known yet: the work changed while it was being read. The screen reads it again.",
+    "Accepted {time}. Whether it holds for the design shown is not known yet: the spec changed while it was being read. The screen reads it again.",
   channelDirect: "Accepted here, in this application.",
   channelRelayed: "Relayed by an authoring client: it was not accepted in this application.",
   channelUnknown: "Accepted through: {channel}",
@@ -211,12 +211,12 @@ const en = {
   generateCancelling: "Cancelling...",
   generationIdle: "There is no pseudocode yet. Press the button to have the AI write it from the text.",
   generationNoAi:
-    "No AI is connected. A request waits for an authoring client of your own: ask it to write the model for this work.",
+    "No AI is connected. A request waits for an authoring client of your own: ask it to write the model for this spec.",
   generationAiHere: "Connected: {names}",
   generationNoAiBecause: "No AI is connected. {reasons}",
   generationQueued: "The request is registered. Waiting for the AI to take it.",
   generationQueuedNoAi:
-    "The request is waiting, but no AI is connected to take it. Start your authoring client and ask it to write the model for this work, or cancel the request.",
+    "The request is waiting, but no AI is connected to take it. Start your authoring client and ask it to write the model for this spec, or cancel the request.",
   generationRunning: "The AI is writing the model (attempt {attempt}, {holder}).",
   generationRunningUnnamed: "The AI is writing the model (attempt {attempt}).",
   generationInterrupted:
@@ -229,7 +229,7 @@ const en = {
   generationCompleted: "The last request finished.",
   generationMoved:
     "The text or the answers changed while the request was being made, so nothing was asked. What is saved now is shown; press the button again.",
-  generationActive: "A request is already open for this work. Replace it with a new one?",
+  generationActive: "A request is already open for this spec. Replace it with a new one?",
   generationRefused: "The request was refused: {detail}",
   generationConnectionMoved:
     "The AI connection was changed after this screen read it, so nothing was asked. What is kept now is shown; press the button again.",
@@ -391,7 +391,7 @@ const en = {
   answersRegenerate: "Generate again from these answers",
   freshIdsLabel: "Issue every requirement a new id",
   freshIdsHint:
-    "Every id the work has is retired and the new ones number on from where it left off, never from R1. The design will cite the new ids.",
+    "Every id the spec has is retired and the new ones number on from where it left off, never from R1. The design will cite the new ids.",
   groundRelated: "The text this is about (requirement {id}):",
   groundShow: "Show in the text",
   groundNotInText:
@@ -418,15 +418,15 @@ export type Key = keyof typeof en;
 
 const ko: Record<Key, string> = {
   appTitle: "SCE 워크벤치",
-  worksFolder: "작업 폴더",
-  works: "작업",
-  noWorks: "아직 작업이 없습니다. 아래에 이름을 적어 시작하세요.",
-  newWork: "새 작업",
-  newWorkTitle: "제목",
-  newWorkCreate: "만들기",
+  specsFolder: "사양 폴더",
+  specs: "사양",
+  noSpecs: "아직 사양이 없습니다. 아래에 이름을 적어 시작하세요.",
+  newSpec: "새 사양",
+  newSpecTitle: "제목",
+  newSpecCreate: "만들기",
   unreadableHeading: "읽지 못한 폴더",
-  pickAWork: "작업을 고르거나 새로 만드세요.",
-  noTextYet: "이 작업에는 아직 글이 없습니다. 아래에 사양을 적고 저장하세요.",
+  pickASpec: "사양을 고르거나 새로 만드세요.",
+  noTextYet: "이 사양에는 아직 글이 없습니다. 아래에 사양을 적고 저장하세요.",
   editorLabel: "사양 본문",
   save: "저장",
   saving: "저장 중...",
@@ -444,7 +444,7 @@ const ko: Record<Key, string> = {
   backToCurrent: "현재 글로 돌아가기",
   conflictTitle: "편집하는 동안 글이 바뀌었습니다",
   conflictBody:
-    "이 작업을 연 뒤에 다른 곳에서 리비전 {current}을(를) 저장했습니다. 내 글은 잃지 않았고, 다른 곳에서 저장된 사양도 덮어쓰지 않았습니다.",
+    "이 사양을 연 뒤에 다른 곳에서 리비전 {current}을(를) 저장했습니다. 내 글은 잃지 않았고, 다른 곳에서 저장된 사양도 덮어쓰지 않았습니다.",
   conflictTakeTheirs: "다른 곳에서 저장된 사양 불러오기 (내 수정 버리기)",
   conflictKeepMine: "내 글을 그 위에 저장",
   conflictKeepMineHint: "다른 곳에서 저장된 사양은 이력에 별도 리비전으로 남습니다.",
@@ -474,7 +474,7 @@ const ko: Record<Key, string> = {
   loading: "불러오는 중...",
   modelTitle: "모델 (SCE가 그린 그림)",
   modelNone:
-    "아직 모델이 없습니다. AI 클라이언트가 이 작업의 모델을 저장하면 SCE가 그린 그림이 여기에 나타납니다.",
+    "아직 모델이 없습니다. AI 클라이언트가 이 사양의 모델을 저장하면 SCE가 그린 그림이 여기에 나타납니다.",
   modelReading: "모델을 읽는 중...",
   modelDrawing: "SCE가 모델을 그리는 중...",
   modelRead: "다시 읽기",
@@ -495,10 +495,10 @@ const ko: Record<Key, string> = {
   modelNotDrawn: "SCE가 이 모델을 그리지 않았습니다.",
   modelNotDrawnHint:
     "모델은 저장되어 있고 아래에 글로 보입니다. SCE가 거절한 것은 SCE 자신의 답이며 이 화면의 결함이 아닙니다.",
-  workRemove: "이 작업 지우기",
+  specRemove: "이 사양 지우기",
   removeTitle: "\"{title}\"을(를) 목록에서 지울까요?",
   removeBody:
-    "작업이 목록에서 사라지고 여기서는 열 수 없습니다. 파일은 작업 폴더에 그대로 있으므로, 그 폴더의 removed.json 파일을 지우면 되살릴 수 있습니다.",
+    "사양이 목록에서 사라지고 여기서는 열 수 없습니다. 파일은 사양 폴더에 그대로 있으므로, 그 폴더의 removed.json 파일을 지우면 되살릴 수 있습니다.",
   removeBodyUnsaved: "저장하지 않은 것(편집기의 글, 적어 둔 답)은 함께 사라집니다.",
   closeTitle: "저장하지 않은 변경이 있습니다",
   closeBody:
@@ -526,7 +526,7 @@ const ko: Record<Key, string> = {
   reviewPageRefused: "SCE가 모델을 받아들였지만 의사코드 페이지는 쓰지 않았습니다: {detail}",
   answersTitle: "내 답",
   answersHint:
-    "각 질문은 내 글이 말하지 않은 것입니다. 내 답은 AI 클라이언트가 이 작업을 다음에 읽을 때 전달되고, 클라이언트가 모델에 반영합니다. 여기서 모델이 바뀌지는 않습니다.",
+    "각 질문은 내 글이 말하지 않은 것입니다. 내 답은 AI 클라이언트가 이 사양을 다음에 읽을 때 전달되고, 클라이언트가 모델에 반영합니다. 여기서 모델이 바뀌지는 않습니다.",
   answersReading: "내 답을 읽는 중...",
   answersFailed: "내 답을 읽지 못했습니다: {detail}",
   answerLabel: "{id}에 대한 내 답",
@@ -563,7 +563,7 @@ const ko: Record<Key, string> = {
   requirementsCountUnstated: "SCE가 설계를 요구사항 {count}개에 대해 쟀습니다.",
   measureFailed: "SCE가 설계를 목록에 대해 재지 못했습니다: {detail}",
   sceAsksAgain: "화면이 SCE에 저절로 다시 묻습니다.",
-  sceRefusedTheDesign: "SCE가 설계를 거절해서, 작업이 바뀌기 전에는 다시 묻지 않습니다.",
+  sceRefusedTheDesign: "SCE가 설계를 거절해서, 사양이 바뀌기 전에는 다시 묻지 않습니다.",
   requirementsTable: "요구사항",
   requirementId: "요구사항",
   requirementOutcome: "SCE의 판정",
@@ -597,7 +597,7 @@ const ko: Record<Key, string> = {
   withheldUnread:
     "글, 설계, 저장된 답을 아직 화면에 읽는 중이거나 읽지 못해서, 수락할 것을 모두 보지 못했습니다.",
   withheldDiffers:
-    "화면에 있는 것이 설계를 잰 기준과 다릅니다. 작업을 다시 열어 저장된 것을 읽으세요.",
+    "화면에 있는 것이 설계를 잰 기준과 다릅니다. 사양을 다시 열어 저장된 것을 읽으세요.",
   withheldAlready: "이 설계는 이미 지금 그대로 수락되어 있습니다.",
   withheldUnjudged: "SCE가 수락이 유효한지 말하지 않아서, 이 설계가 이미 수락되었는지 알 수 없습니다.",
   acceptRefused: "아무것도 수락되지 않았습니다: {detail}",
@@ -606,7 +606,7 @@ const ko: Record<Key, string> = {
   acceptedLapsed: "{time}에 수락했지만 더는 유효하지 않습니다. SCE의 말: {lapse}",
   acceptedUnsaid: "{time}에 수락했습니다. SCE가 아직 유효한지 말하지 못했습니다: {detail}",
   acceptedUnchecked:
-    "{time}에 수락했습니다. 지금 보이는 설계에 대해 유효한지는 아직 알 수 없습니다. 읽는 동안 작업이 바뀌었습니다. 화면이 다시 읽는 중입니다.",
+    "{time}에 수락했습니다. 지금 보이는 설계에 대해 유효한지는 아직 알 수 없습니다. 읽는 동안 사양이 바뀌었습니다. 화면이 다시 읽는 중입니다.",
   channelDirect: "이 애플리케이션에서 직접 수락했습니다.",
   channelRelayed: "AI 클라이언트가 전한 것으로, 이 애플리케이션에서 직접 수락한 것이 아닙니다.",
   channelUnknown: "수락 경로: {channel}",
@@ -620,12 +620,12 @@ const ko: Record<Key, string> = {
   generateCancelling: "취소하는 중...",
   generationIdle: "아직 의사코드가 없습니다. 버튼을 누르면 AI가 이 글로 작성합니다.",
   generationNoAi:
-    "AI가 연결되지 않았습니다. 요청은 직접 쓰는 작성 도구가 가져갈 때까지 기다립니다. 그 도구에게 이 작업의 모델을 쓰라고 하세요.",
+    "AI가 연결되지 않았습니다. 요청은 직접 쓰는 작성 도구가 가져갈 때까지 기다립니다. 그 도구에게 이 사양의 모델을 쓰라고 하세요.",
   generationAiHere: "연결됨: {names}",
   generationNoAiBecause: "AI가 연결되지 않았습니다. {reasons}",
   generationQueued: "생성 요청을 등록했습니다. AI가 가져가기를 기다리는 중입니다.",
   generationQueuedNoAi:
-    "요청이 대기 중이지만 실행할 AI 연결이 없습니다. 작성 도구를 시작해 이 작업의 모델을 쓰라고 하거나, 요청을 취소하세요.",
+    "요청이 대기 중이지만 실행할 AI 연결이 없습니다. 작성 도구를 시작해 이 사양의 모델을 쓰라고 하거나, 요청을 취소하세요.",
   generationRunning: "AI가 모델을 작성하고 있습니다 ({attempt}번째 시도, {holder}).",
   generationRunningUnnamed: "AI가 모델을 작성하고 있습니다 ({attempt}번째 시도).",
   generationInterrupted:
@@ -638,7 +638,7 @@ const ko: Record<Key, string> = {
   generationCompleted: "마지막 요청이 끝났습니다.",
   generationMoved:
     "요청하는 동안 사양이나 답변이 바뀌어 아무것도 요청하지 않았습니다. 지금 저장된 내용을 보여 드렸으니 버튼을 다시 누르세요.",
-  generationActive: "이 작업에는 이미 열린 요청이 있습니다. 새 요청으로 대체할까요?",
+  generationActive: "이 사양에는 이미 열린 요청이 있습니다. 새 요청으로 대체할까요?",
   generationRefused: "요청이 거절되었습니다: {detail}",
   generationConnectionMoved:
     "화면이 AI 연결을 읽은 뒤에 연결이 바뀌어 아무것도 요청하지 않았습니다. 지금 저장된 연결을 보여 드렸으니 버튼을 다시 누르세요.",
@@ -799,7 +799,7 @@ const ko: Record<Key, string> = {
   answersRegenerate: "이 답으로 다시 생성",
   freshIdsLabel: "모든 요구사항에 새 번호 발급",
   freshIdsHint:
-    "작업이 가진 번호를 전부 은퇴시키고, 새 번호는 이어서 매깁니다(R1부터 다시 시작하지 않습니다). 설계는 새 번호를 인용하게 됩니다.",
+    "사양이 가진 번호를 전부 은퇴시키고, 새 번호는 이어서 매깁니다(R1부터 다시 시작하지 않습니다). 설계는 새 번호를 인용하게 됩니다.",
   groundRelated: "이 질문이 다루는 원문 (요구사항 {id}):",
   groundShow: "원문에서 보기",
   groundNotInText:

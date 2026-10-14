@@ -4,14 +4,14 @@
 // What the command layer answers, and the guards that check an answer is that.
 //
 // The Rust side is the authority (`core/src/commands.rs`, in front of the
-// works' `sce-works/src/commands.rs`). An answer is not
+// specs' `sce-specs/src/commands.rs`). An answer is not
 // trusted because the screen was written against it: it is checked as it comes in,
 // so a screen and a core of different versions fail with a sentence that says so
 // instead of with `undefined` somewhere in a view. Extra fields are tolerated (a
 // later core may add some); missing or mistyped ones are not.
 
-/** The works' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-works`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 25;
+/** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
+export const SUPPORTED_COMMAND_SET_VERSION = 26;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -22,7 +22,7 @@ export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 1;
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
 
-export interface Work {
+export interface Spec {
   readonly id: string;
   readonly title: string;
   readonly created_at: string;
@@ -34,7 +34,7 @@ export interface Unreadable {
 }
 
 export interface Listing {
-  readonly works: readonly Work[];
+  readonly specs: readonly Spec[];
   readonly unreadable: readonly Unreadable[];
 }
 
@@ -81,7 +81,7 @@ export interface ModelText {
   readonly documents: readonly ModelDocument[];
 }
 
-/** `read_model`: the model, or `null` for a work with none yet. */
+/** `read_model`: the model, or `null` for a spec with none yet. */
 export interface ReadModel {
   readonly model: ModelText | null;
   readonly source_head: Revision | null;
@@ -187,7 +187,7 @@ export interface RequirementsList {
   readonly sidecar: string | null;
 }
 
-/** `read_requirements`: the work's list, or `null` for a work with none yet. */
+/** `read_requirements`: the spec's list, or `null` for a spec with none yet. */
 export interface ReadRequirements {
   readonly requirements: RequirementsList | null;
   readonly source_head: Revision | null;
@@ -221,7 +221,7 @@ export interface Measure {
 }
 
 /**
- * `requirements_report`: the measure of the work as it stands, with the revisions it was made
+ * `requirements_report`: the measure of the spec as it stands, with the revisions it was made
  * against and where the design and the list stand to the text. The screen puts one together from
  * the snapshot it read and the measure SCE gave of that snapshot's revisions (`panelOf`).
  */
@@ -232,7 +232,7 @@ export interface RequirementsReport extends Measure {
   readonly requirements_standing: Standing;
 }
 
-/** Whether the owner's acceptance still holds for the work as it is now: SCE's answer. */
+/** Whether the owner's acceptance still holds for the spec as it is now: SCE's answer. */
 export type AcceptanceStanding = "none" | "holds" | "lapsed";
 
 /** What the owner accepted, and when, and on which surface it was stated. */
@@ -258,8 +258,8 @@ export interface ReadAcceptanceDelta {
 }
 
 /**
- * `read_revision_report`: what a revision of a work did, requirement by requirement. The words
- * of each requirement (from the work's own lineages) beside what the design's evidence did, the
+ * `read_revision_report`: what a revision of a spec did, requirement by requirement. The words
+ * of each requirement (from the spec's own lineages) beside what the design's evidence did, the
  * verdict, and the page an owner reads.
  */
 export interface ReadRevisionReport {
@@ -275,7 +275,7 @@ export interface RevisionReport {
   /** One row per requirement: its words, its evidence, the kind and the severity. */
   readonly requirements: readonly Readonly<Record<string, unknown>>[];
   readonly unclaimed: Readonly<Record<string, unknown>>;
-  /** The revisions of the accepted list and of the list the work has now. */
+  /** The revisions of the accepted list and of the list the spec has now. */
   readonly of: { readonly accepted: Basis; readonly now: Basis };
   /** The page, in the product's words. */
   readonly page: string;
@@ -287,7 +287,7 @@ export interface ReadAcceptance {
   readonly standing: AcceptanceStanding;
   /** SCE's one sentence of what moved, when the acceptance lapsed. */
   readonly lapse: string | null;
-  /** The revisions of the work as it is now, when there is an acceptance to compare them with. */
+  /** The revisions of the spec as it is now, when there is an acceptance to compare them with. */
   readonly now: Basis | null;
 }
 
@@ -295,7 +295,7 @@ export interface ReadAcceptance {
 export type Entrance = "desktop" | "browser";
 
 export interface Described {
-  /** The works' command set. */
+  /** The specs' command set. */
   readonly command_set_version: number;
   /** The application's own, beside it. */
   readonly application_command_set_version: number;
@@ -501,19 +501,19 @@ export type ServerStatus = {
   readonly tls: boolean;
 } & ServerState;
 
-export interface WorkAndHead {
-  readonly work: Work;
+export interface SpecAndHead {
+  readonly spec: Spec;
   readonly head: Revision | null;
 }
 
 /**
- * `read_work_snapshot`: the work and its five chains as they stood together. Each part
+ * `read_spec_snapshot`: the spec and its five chains as they stood together. Each part
  * is what the command that reads that chain answers, in the same words, taken from one
- * state of the work and not from six reads a save can land between. Whether the
+ * state of the spec and not from six reads a save can land between. Whether the
  * acceptance still holds is not here: that is SCE's to say (`read_acceptance`).
  */
-export interface WorkSnapshot {
-  readonly work: Work;
+export interface SpecSnapshot {
+  readonly spec: Spec;
   readonly source: SourceText | null;
   readonly model: ModelText | null;
   /** `null` exactly when there is no model. */
@@ -524,7 +524,7 @@ export interface WorkSnapshot {
   readonly requirements_standing: Standing | null;
   readonly acceptance: AcceptanceRecord | null;
   /**
-   * The bundle the model and the list are the ones of, for a work that keeps bundles; `null`
+   * The bundle the model and the list are the ones of, for a spec that keeps bundles; `null`
    * for one whose model and list were saved by hand. A bundle is one pointer, so a model of
    * one generation is never shown beside a list of another.
    */
@@ -553,7 +553,7 @@ export interface AcceptanceVerdict {
 /**
  * `read_judgment`: what SCE says of the revisions it was asked about, and of no other. A
  * revision is never rewritten, so the answer is of the design that was read, whatever has been
- * saved since; a screen that shows a work and then asks about the revisions it shows has a verdict
+ * saved since; a screen that shows a spec and then asks about the revisions it shows has a verdict
  * that is of what it shows, and nothing to compare. `basis` is what was asked, echoed. It is a
  * function of the revisions' content alone: where the design stands to the text is a claim made
  * about it, which a later save can change without changing the design, and it is said by the
@@ -577,19 +577,19 @@ export interface ClaimedHead {
 }
 
 /**
- * `read_work_heads`: where each chain of the work stands, and nothing it holds. A screen
- * compares it with what it shows to know whether the work moved under it, and reads the
- * work only when it did.
+ * `read_spec_heads`: where each chain of the spec stands, and nothing it holds. A screen
+ * compares it with what it shows to know whether the spec moved under it, and reads the
+ * spec only when it did.
  */
-export interface WorkHeads {
+export interface SpecHeads {
   readonly source: Revision | null;
   readonly model: ClaimedHead | null;
   readonly answers: Revision | null;
   readonly requirements: ClaimedHead | null;
   readonly acceptance: Revision | null;
-  /** The bundle the model and the list are the ones of; `null` for a work that keeps none. */
+  /** The bundle the model and the list are the ones of; `null` for a spec that keeps none. */
   readonly bundle: Revision | null;
-  /** Where the work's latest request stands as the clock says it now; `null` for a work never asked for a model. */
+  /** Where the spec's latest request stands as the clock says it now; `null` for a spec never asked for a model. */
   readonly request: RequestHead | null;
 }
 
@@ -607,12 +607,12 @@ export type RequestState =
   | "interrupted"
   | "superseded";
 
-/** The states in which a request can still produce a result. At most one request of a work is in one. */
+/** The states in which a request can still produce a result. At most one request of a spec is in one. */
 export function isOpenRequest(state: RequestState): boolean {
   return state === "queued" || state === "running" || state === "interrupted";
 }
 
-/** The latest request of a work, as the heads say it. */
+/** The latest request of a spec, as the heads say it. */
 export interface RequestHead {
   readonly id: string;
   readonly state: RequestState;
@@ -627,11 +627,11 @@ export interface RequestLease {
   readonly expires_at: string;
 }
 
-/** One ask of an AI to write a model from the work's text. */
+/** One ask of an AI to write a model from the spec's text. */
 export interface GenerationRequest {
   readonly id: string;
-  readonly work: string;
-  /** The order the work's requests were made in, from 1. */
+  readonly spec: string;
+  /** The order the spec's requests were made in, from 1. */
   readonly seq: number;
   readonly key: string;
   /** Where it was asked from: `gui`, or the name of a client. */
@@ -648,7 +648,7 @@ export interface GenerationRequest {
   readonly lease: RequestLease | null;
   /**
    * What the executor has written for it, by revision. It is the request's and not the
-   * work's: the work's model is the one it was until the request completes. `null` until
+   * spec's: the spec's model is the one it was until the request completes. `null` until
    * the executor writes something.
    */
   readonly candidate: RequestCandidate | null;
@@ -695,7 +695,7 @@ export interface RequestCandidateTexts {
   readonly requirements: { readonly revision: Revision; readonly text: string } | null;
 }
 
-/** `complete_request`: the request, completed, and the bundle it made the work's. */
+/** `complete_request`: the request, completed, and the bundle it made the spec's. */
 export interface CompletedRequest {
   readonly request: GenerationRequest;
   readonly bundle: Revision;
@@ -728,9 +728,9 @@ export interface Bundle {
   readonly answers: Revision | null;
   readonly model: Revision;
   readonly requirements: Revision;
-  /** Set on a work's first bundle, when it had a model or a list before. */
+  /** Set on a spec's first bundle, when it had a model or a list before. */
   readonly previous: { readonly model: Revision | null; readonly requirements: Revision | null } | null;
-  /** The bundle this one replaced as the work's model and list; `null` for a work's first. */
+  /** The bundle this one replaced as the spec's model and list; `null` for a spec's first. */
   readonly replaces: Revision | null;
   /** The version of the working instructions its executor was given; `null` when it did not say. */
   readonly instructions: string | null;
@@ -738,7 +738,7 @@ export interface Bundle {
   readonly published_at: string;
 }
 
-/** `read_bundle`: the bundle and the revision it is, or `null` for a work that keeps none. */
+/** `read_bundle`: the bundle and the revision it is, or `null` for a spec that keeps none. */
 export interface BundleRead {
   readonly revision: Revision;
   readonly bundle: Bundle;
@@ -763,7 +763,7 @@ export interface AdapterStatus {
 
 /** A request an executor could not run, which it left queued, and why. */
 export interface HostWaiting {
-  readonly work: string;
+  readonly spec: string;
   readonly request: string;
   readonly connection: string;
   readonly reason: string;
@@ -781,7 +781,7 @@ export interface HostStatus {
   readonly client_version: string | null;
   /**
    * The requests its executor left queued because it could not run them, and why, each in one
-   * sentence. Ids and words only: the works folder is shared, so nothing of the computer is in it.
+   * sentence. Ids and words only: the specs folder is shared, so nothing of the computer is in it.
    */
   readonly waiting: readonly HostWaiting[];
   readonly seen_at: string;
@@ -850,7 +850,7 @@ function list(value: Obj, key: string, where: string): unknown[] {
   return field;
 }
 
-export function parseWork(value: unknown, where = "work"): Work {
+export function parseSpec(value: unknown, where = "spec"): Spec {
   const r = record(value, where);
   return {
     id: text(r, "id", where),
@@ -859,15 +859,15 @@ export function parseWork(value: unknown, where = "work"): Work {
   };
 }
 
-/** `remove_work`: the work that was taken out of the list. */
-export function parseRemoved(value: unknown): Work {
-  return parseWork(record(value, "remove_work")["removed"], "remove_work.removed");
+/** `remove_spec`: the spec that was taken out of the list. */
+export function parseRemoved(value: unknown): Spec {
+  return parseSpec(record(value, "remove_spec")["removed"], "remove_spec.removed");
 }
 
 export function parseListing(value: unknown): Listing {
   const r = record(value, "listing");
   return {
-    works: list(r, "works", "listing").map((w, i) => parseWork(w, `listing.works[${i}]`)),
+    specs: list(r, "specs", "listing").map((w, i) => parseSpec(w, `listing.specs[${i}]`)),
     unreadable: list(r, "unreadable", "listing").map((u, i) => {
       const where = `listing.unreadable[${i}]`;
       const entry = record(u, where);
@@ -876,9 +876,9 @@ export function parseListing(value: unknown): Listing {
   };
 }
 
-export function parseWorkAndHead(value: unknown): WorkAndHead {
-  const r = record(value, "read_work");
-  return { work: parseWork(r["work"], "read_work.work"), head: nullableRevision(r["head"], "read_work.head") };
+export function parseSpecAndHead(value: unknown): SpecAndHead {
+  const r = record(value, "read_spec");
+  return { spec: parseSpec(r["spec"], "read_spec.spec"), head: nullableRevision(r["head"], "read_spec.head") };
 }
 
 export function parseSourceText(value: unknown, where = "source"): SourceText {
@@ -886,7 +886,7 @@ export function parseSourceText(value: unknown, where = "source"): SourceText {
   return { revision: revision(r["revision"], `${where}.revision`), text: text(r, "text", where) };
 }
 
-/** `read_source`: the work's text, or `null` for a work that has none yet. */
+/** `read_source`: the spec's text, or `null` for a spec that has none yet. */
 export function parseReadSource(value: unknown): SourceText | null {
   const r = record(value, "read_source");
   return r["source"] === null ? null : parseSourceText(r["source"], "read_source.source");
@@ -935,7 +935,7 @@ function partStanding(value: unknown, absent: boolean, where: string): Standing 
   return standing(value, where);
 }
 
-/** A saved model as `read_model` and `read_work_snapshot` both give it. */
+/** A saved model as `read_model` and `read_spec_snapshot` both give it. */
 function parseModelText(value: unknown, where: string): ModelText {
   const m = record(value, where);
   const documents = list(m, "documents", where).map((d, i) => {
@@ -1076,7 +1076,7 @@ function parsePageRefusal(value: unknown, where: string): PageRefusal | null {
   return { code: text(entry, "code", where), message: text(entry, "message", where) };
 }
 
-/** The owner's answers as `read_answers` and `read_work_snapshot` both give them. */
+/** The owner's answers as `read_answers` and `read_spec_snapshot` both give them. */
 function parseAnswers(value: unknown, where: string): Answers {
   const a = record(value, where);
   const entries = record(a["entries"], `${where}.entries`);
@@ -1114,7 +1114,7 @@ function stringList(value: Obj, key: string, where: string): string[] {
   });
 }
 
-/** A requirement list as `read_requirements` and `read_work_snapshot` both give it. */
+/** A requirement list as `read_requirements` and `read_spec_snapshot` both give it. */
 function parseRequirementsList(value: unknown, where: string): RequirementsList {
   const entry = record(value, where);
   return {
@@ -1180,7 +1180,7 @@ export function parseRequirementsReport(value: unknown): RequirementsReport {
   };
 }
 
-/** An acceptance as `read_acceptance` and `read_work_snapshot` both give it. */
+/** An acceptance as `read_acceptance` and `read_spec_snapshot` both give it. */
 function parseAcceptanceRecord(value: unknown, where: string): AcceptanceRecord {
   const entry = record(value, where);
   return {
@@ -1222,7 +1222,7 @@ export function parseReadAcceptance(value: unknown): ReadAcceptance {
  * `read_acceptance_delta`. The screen does not show these lines: what it shows of a revision is
  * `read_revision_report`, which joins them with the words of each requirement. This holds the
  * shape and nothing is read out of the lines: all four parts are there together or none is, which
- * is what a work nobody accepted says.
+ * is what a spec nobody accepted says.
  */
 export function parseReadAcceptanceDelta(value: unknown): ReadAcceptanceDelta {
   const where = "read_acceptance_delta";
@@ -1250,7 +1250,7 @@ export function parseReadAcceptanceDelta(value: unknown): ReadAcceptanceDelta {
 
 /**
  * `read_revision_report`. The acceptance and the report are both there or both null, which is
- * what a work nobody accepted says; the screen shows the page and the verdict, and holds the
+ * what a spec nobody accepted says; the screen shows the page and the verdict, and holds the
  * rows as the product wrote them.
  */
 export function parseReadRevisionReport(value: unknown): ReadRevisionReport {
@@ -1322,9 +1322,9 @@ function parseRequestHead(value: unknown, where: string): RequestHead {
   };
 }
 
-/** `read_work_heads`. */
-export function parseWorkHeads(value: unknown): WorkHeads {
-  const where = "read_work_heads";
+/** `read_spec_heads`. */
+export function parseSpecHeads(value: unknown): SpecHeads {
+  const where = "read_spec_heads";
   const r = record(value, where);
   const model = r["model"];
   const requirements = r["requirements"];
@@ -1359,7 +1359,7 @@ export function parseGenerationRequest(value: unknown, where = "request"): Gener
   const outcome = r["outcome"];
   return {
     id: text(r, "id", where),
-    work: text(r, "work", where),
+    spec: text(r, "spec", where),
     seq: count(r, "seq", where),
     key: text(r, "key", where),
     origin: text(r, "origin", where),
@@ -1501,7 +1501,7 @@ function parseBundle(value: unknown, where: string): Bundle {
   };
 }
 
-/** `read_bundle`: `null` for a work that keeps no bundle. */
+/** `read_bundle`: `null` for a spec that keeps no bundle. */
 export function parseBundleRead(value: unknown): BundleRead | null {
   const where = "read_bundle";
   const found = record(value, where)["bundle"];
@@ -1521,7 +1521,7 @@ export function parseRegisteredRequest(value: unknown): RegisteredRequest {
   return { request: parseGenerationRequest(r["request"], `${where}.request`), created: r["created"] };
 }
 
-/** `list_requests`: the work's requests, the newest first. */
+/** `list_requests`: the spec's requests, the newest first. */
 export function parseRequestList(value: unknown): GenerationRequest[] {
   const where = "list_requests";
   const r = record(value, where);
@@ -1565,7 +1565,7 @@ export function parseHostListing(value: unknown): HostListing {
           const place = `${at}.waiting[${k}]`;
           const waiting = record(entry, place);
           return {
-            work: text(waiting, "work", place),
+            spec: text(waiting, "spec", place),
             request: text(waiting, "request", place),
             connection: text(waiting, "connection", place),
             reason: text(waiting, "reason", place),
@@ -1597,9 +1597,9 @@ export function parseAdapterListing(value: unknown): AdapterListing {
   };
 }
 
-/** `read_work_snapshot`. */
-export function parseWorkSnapshot(value: unknown): WorkSnapshot {
-  const where = "read_work_snapshot";
+/** `read_spec_snapshot`. */
+export function parseSpecSnapshot(value: unknown): SpecSnapshot {
+  const where = "read_spec_snapshot";
   const r = record(value, where);
   const source = r["source"];
   const model = r["model"];
@@ -1607,7 +1607,7 @@ export function parseWorkSnapshot(value: unknown): WorkSnapshot {
   const requirements = r["requirements"];
   const acceptance = r["acceptance"];
   return {
-    work: parseWork(r["work"], `${where}.work`),
+    spec: parseSpec(r["spec"], `${where}.spec`),
     source: source === null ? null : parseSourceText(source, `${where}.source`),
     model: model === null ? null : parseModelText(model, `${where}.model`),
     model_standing: partStanding(r["model_standing"], model === null, `${where}.model_standing`),

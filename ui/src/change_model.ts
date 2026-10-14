@@ -5,8 +5,8 @@
 //
 // The comparison is of the two models' pseudocode pages, which SCE writes and the owner reads, and
 // not of their SCXML: a change in a condition, a signal, a value or a time shows up as the lines
-// of the page that hold it. Which model it is compared with is the one before it in the work's
-// model history, which belongs to the core (a work whose models were made by requests lists them
+// of the page that hold it. Which model it is compared with is the one before it in the spec's
+// model history, which belongs to the core (a spec whose models were made by requests lists them
 // as bundles, after the ones it had before).
 
 import type { HistoryEntry, Revision } from "./contract";

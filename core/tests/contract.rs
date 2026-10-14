@@ -4,7 +4,7 @@
 //! The command layer's replies, written down once.
 //!
 //! `contract/replies.json` is every command's answer and every refusal's shape,
-//! produced by running the commands against a real works folder with a fixed
+//! produced by running the commands against a real specs folder with a fixed
 //! clock. Two readers hold it to account:
 //!
 //! - this test, which runs the commands again and fails if the replies differ from
@@ -31,7 +31,7 @@ use sce_spec_workbench_core::{
     all_commands, call_in, AuthSource, ConnectionStore, Context, Entrance, Policy, Route,
     APPLICATION_COMMAND_SET_VERSION,
 };
-use sce_works::{CommandError, FixedClock, NoRenderer, Product, WorkStore, COMMAND_SET_VERSION};
+use sce_specs::{CommandError, FixedClock, NoRenderer, Product, SpecStore, COMMAND_SET_VERSION};
 use serde_json::{json, Map, Value};
 
 use common::{FakeRenderer, RefusingRenderer};
@@ -39,7 +39,7 @@ use common::{FakeRenderer, RefusingRenderer};
 const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/contract/replies.json");
 
 /// Replace `from` by `to` in every string of `value`: what varies between runs
-/// (the scratch folder, the generated work id) becomes a name.
+/// (the scratch folder, the generated spec id) becomes a name.
 fn name_the_unstable(value: &mut Value, from: &str, to: &str) {
     match value {
         Value::String(s) => {
@@ -59,7 +59,7 @@ fn name_the_unstable(value: &mut Value, from: &str, to: &str) {
 
 /// The command `name`, asked of the application by its browser shell with no settings folder.
 fn call(
-    store: &WorkStore<FixedClock>,
+    store: &SpecStore<FixedClock>,
     renderer: &dyn Product,
     name: &str,
     args: Value,
@@ -72,12 +72,12 @@ fn call(
     )
 }
 
-fn answer(store: &WorkStore<FixedClock>, name: &str, args: Value) -> Value {
+fn answer(store: &SpecStore<FixedClock>, name: &str, args: Value) -> Value {
     call(store, &FakeRenderer, name, args).unwrap_or_else(|e| panic!("{name} was refused: {e:?}"))
 }
 
 fn answer_by(
-    store: &WorkStore<FixedClock>,
+    store: &SpecStore<FixedClock>,
     renderer: &dyn Product,
     name: &str,
     args: Value,
@@ -85,12 +85,12 @@ fn answer_by(
     call(store, renderer, name, args).unwrap_or_else(|e| panic!("{name} was refused: {e:?}"))
 }
 
-fn refusal(store: &WorkStore<FixedClock>, name: &str, args: Value) -> Value {
+fn refusal(store: &SpecStore<FixedClock>, name: &str, args: Value) -> Value {
     refusal_by(store, &FakeRenderer, name, args)
 }
 
 fn refusal_by(
-    store: &WorkStore<FixedClock>,
+    store: &SpecStore<FixedClock>,
     renderer: &dyn Product,
     name: &str,
     args: Value,
@@ -102,30 +102,30 @@ fn refusal_by(
 
 fn replies() -> Value {
     let root = common::scratch("contract");
-    let store = WorkStore::with_clock(&root, FixedClock("2026-10-03T09:00:00Z".to_string()));
+    let store = SpecStore::with_clock(&root, FixedClock("2026-10-03T09:00:00Z".to_string()));
     let mut answers = Map::new();
     let mut refusals = Map::new();
 
     answers.insert("describe".into(), answer(&store, "describe", json!({})));
     answers.insert(
-        "list_works_empty".into(),
-        answer(&store, "list_works", json!({})),
+        "list_specs_empty".into(),
+        answer(&store, "list_specs", json!({})),
     );
-    let work = answer(&store, "create_work", json!({"title": "Door lock"}));
-    let id = work["id"].as_str().expect("a work id").to_string();
-    answers.insert("create_work".into(), work);
-    answers.insert("list_works".into(), answer(&store, "list_works", json!({})));
+    let spec = answer(&store, "create_spec", json!({"title": "Door lock"}));
+    let id = spec["id"].as_str().expect("a spec id").to_string();
+    answers.insert("create_spec".into(), spec);
+    answers.insert("list_specs".into(), answer(&store, "list_specs", json!({})));
     answers.insert(
-        "read_work_no_text".into(),
-        answer(&store, "read_work", json!({"id": id})),
-    );
-    answers.insert(
-        "read_work_snapshot_empty".into(),
-        answer(&store, "read_work_snapshot", json!({"id": id})),
+        "read_spec_no_text".into(),
+        answer(&store, "read_spec", json!({"id": id})),
     );
     answers.insert(
-        "read_work_heads_empty".into(),
-        answer(&store, "read_work_heads", json!({"id": id})),
+        "read_spec_snapshot_empty".into(),
+        answer(&store, "read_spec_snapshot", json!({"id": id})),
+    );
+    answers.insert(
+        "read_spec_heads_empty".into(),
+        answer(&store, "read_spec_heads", json!({"id": id})),
     );
     answers.insert(
         "read_source_none".into(),
@@ -156,8 +156,8 @@ fn replies() -> Value {
         ),
     );
     answers.insert(
-        "read_work".into(),
-        answer(&store, "read_work", json!({"id": id})),
+        "read_spec".into(),
+        answer(&store, "read_spec", json!({"id": id})),
     );
     answers.insert(
         "read_source".into(),
@@ -210,7 +210,7 @@ fn replies() -> Value {
             json!({"id": id, "page": "a4-portrait", "lexicon": "en", "min_pt": 7}),
         ),
     );
-    let source_head = answer(&store, "read_work", json!({"id": id}))["head"]
+    let source_head = answer(&store, "read_spec", json!({"id": id}))["head"]
         .as_str()
         .unwrap()
         .to_string();
@@ -260,15 +260,15 @@ fn replies() -> Value {
         "read_answers".into(),
         answer(&store, "read_answers", json!({"id": id})),
     );
-    // The work as one state: this one has a text, a model and answers, and no
+    // The spec as one state: this one has a text, a model and answers, and no
     // requirement list and no acceptance.
     answers.insert(
-        "read_work_snapshot".into(),
-        answer(&store, "read_work_snapshot", json!({"id": id})),
+        "read_spec_snapshot".into(),
+        answer(&store, "read_spec_snapshot", json!({"id": id})),
     );
     answers.insert(
-        "read_work_heads".into(),
-        answer(&store, "read_work_heads", json!({"id": id})),
+        "read_spec_heads".into(),
+        answer(&store, "read_spec_heads", json!({"id": id})),
     );
     refusals.insert(
         "invalid-answers".into(),
@@ -279,12 +279,12 @@ fn replies() -> Value {
         ),
     );
 
-    // A removal, on a work of its own so the one above keeps its place in every
+    // A removal, on a spec of its own so the one above keeps its place in every
     // reply that follows.
-    let other = answer(&store, "create_work", json!({"title": "Window blind"}));
-    let other_id = other["id"].as_str().expect("a work id").to_string();
+    let other = answer(&store, "create_spec", json!({"title": "Window blind"}));
+    let other_id = other["id"].as_str().expect("a spec id").to_string();
     // What SCE says of a model it refuses, and of one it accepts and cannot write
-    // the page of, each on this work before it is removed.
+    // the page of, each on this spec before it is removed.
     let refused_model = answer(
         &store,
         "save_model",
@@ -321,16 +321,16 @@ fn replies() -> Value {
         answer(&store, "read_model", json!({"id": other_id})),
     );
     answers.insert(
-        "remove_work".into(),
-        answer(&store, "remove_work", json!({"id": other_id})),
+        "remove_spec".into(),
+        answer(&store, "remove_spec", json!({"id": other_id})),
     );
     answers.insert(
-        "list_works_after_removal".into(),
-        answer(&store, "list_works", json!({})),
+        "list_specs_after_removal".into(),
+        answer(&store, "list_specs", json!({})),
     );
     refusals.insert(
-        "removed-work".into(),
-        refusal(&store, "read_work", json!({"id": other_id})),
+        "removed-spec".into(),
+        refusal(&store, "read_spec", json!({"id": other_id})),
     );
 
     refusals.insert(
@@ -378,27 +378,27 @@ fn replies() -> Value {
     );
     refusals.insert(
         "not-found".into(),
-        refusal(&store, "read_work", json!({"id": "absent"})),
+        refusal(&store, "read_spec", json!({"id": "absent"})),
     );
     refusals.insert(
         "invalid-id".into(),
-        refusal(&store, "read_work", json!({"id": "../x"})),
+        refusal(&store, "read_spec", json!({"id": "../x"})),
     );
     refusals.insert(
         "invalid-title".into(),
-        refusal(&store, "create_work", json!({"title": ""})),
+        refusal(&store, "create_spec", json!({"title": ""})),
     );
     refusals.insert(
         "bad-request".into(),
-        refusal(&store, "list_works", json!({"extra": 1})),
+        refusal(&store, "list_specs", json!({"extra": 1})),
     );
     refusals.insert("unknown-command".into(), refusal(&store, "nope", json!({})));
 
-    // What the owner accepts: a work of its own (a text, a design that leaves a question
+    // What the owner accepts: a spec of its own (a text, a design that leaves a question
     // open, the requirement list the text was read into), measured, accepted, and then
     // moved under the acceptance. Its replies carry the revisions the owner was shown.
-    let accepted_work = answer(&store, "create_work", json!({"title": "Garage door"}));
-    let accepted_id = accepted_work["id"].as_str().expect("a work id").to_string();
+    let accepted_spec = answer(&store, "create_spec", json!({"title": "Garage door"}));
+    let accepted_id = accepted_spec["id"].as_str().expect("a spec id").to_string();
     let accepted_text = answer(
         &store,
         "save_source",
@@ -467,7 +467,7 @@ fn replies() -> Value {
     let acceptance_revision = held["acceptance"]["revision"].clone();
     answers.insert("read_acceptance".into(), held);
     // A list that keeps no lineage and no sidecar of its words says nothing of its words. Asked
-    // while the work is as it was accepted: a work moved under its acceptance is held back
+    // while the spec is as it was accepted: a spec moved under its acceptance is held back
     // first (`revision-not-current`, below).
     refusals.insert(
         "revision-not-judged".into(),
@@ -504,12 +504,12 @@ fn replies() -> Value {
     );
     // This one has a text, a model, a requirement list and an acceptance, and no answers.
     answers.insert(
-        "read_work_snapshot_accepted".into(),
-        answer(&store, "read_work_snapshot", json!({"id": accepted_id})),
+        "read_spec_snapshot_accepted".into(),
+        answer(&store, "read_spec_snapshot", json!({"id": accepted_id})),
     );
     answers.insert(
-        "read_work_heads_accepted".into(),
-        answer(&store, "read_work_heads", json!({"id": accepted_id})),
+        "read_spec_heads_accepted".into(),
+        answer(&store, "read_spec_heads", json!({"id": accepted_id})),
     );
     refusals.insert(
         "invalid-requirements".into(),
@@ -537,7 +537,7 @@ fn replies() -> Value {
     );
     // Asked of the design as it is now, the acceptance has lapsed; asked of the design it was
     // read as, it still holds, because the verdict is of the revisions named and not of the
-    // work as it stands.
+    // spec as it stands.
     answers.insert(
         "read_judgment_lapsed".into(),
         answer(
@@ -590,7 +590,7 @@ fn replies() -> Value {
         ),
     );
 
-    // Requests, on the first work: its text and the owner's answers are what a request is
+    // Requests, on the first spec: its text and the owner's answers are what a request is
     // asked about. The clock does not move here, so no lease runs out.
     let about = json!({"source": source_head, "answers": answers_revision});
     let asked = json!({"id": id, "key": "press-1", "origin": "gui", "expect": about});
@@ -609,7 +609,7 @@ fn replies() -> Value {
             json!({"id": id, "request": request_id}),
         ),
     );
-    // What an executor looks at to find something to do: every work's open requests.
+    // What an executor looks at to find something to do: every spec's open requests.
     answers.insert(
         "list_open_requests".into(),
         answer(&store, "list_open_requests", json!({})),
@@ -673,10 +673,10 @@ fn replies() -> Value {
         ),
     );
     answers.insert(
-        "read_work_heads_requested".into(),
-        answer(&store, "read_work_heads", json!({"id": id})),
+        "read_spec_heads_requested".into(),
+        answer(&store, "read_spec_heads", json!({"id": id})),
     );
-    // What the executor writes is the request's and not yet the work's; completing
+    // What the executor writes is the request's and not yet the spec's; completing
     // publishes it as one bundle.
     let list = "{\"doc_id\":\"door\",\"rev\":\"2\",\"requirements\":[{\"id\":\"R1\"}]}\n";
     refusals.insert(
@@ -724,11 +724,11 @@ fn replies() -> Value {
         answer(&store, "bundle_history", json!({"id": id})),
     );
     answers.insert(
-        "read_work_heads_bundled".into(),
-        answer(&store, "read_work_heads", json!({"id": id})),
+        "read_spec_heads_bundled".into(),
+        answer(&store, "read_spec_heads", json!({"id": id})),
     );
     refusals.insert(
-        "bundled-work".into(),
+        "bundled-spec".into(),
         refusal(
             &store,
             "save_model",
@@ -822,7 +822,7 @@ fn replies() -> Value {
         answer(&store, "read_host_status", json!({})),
     );
     store
-        .report_host(sce_works::HostReport {
+        .report_host(sce_specs::HostReport {
             name: "desktop",
             hosting: false,
             reason: Some("no Claude Code to write models with: install it, or set SCE_CLAUDE"),
@@ -836,13 +836,13 @@ fn replies() -> Value {
     );
     // A shell that hosts, and the request it left queued because it could not run it.
     store
-        .report_host(sce_works::HostReport {
+        .report_host(sce_specs::HostReport {
             name: "web-shell",
             hosting: true,
             reason: None,
             client_version: Some("2.1.291"),
-            waiting: &[sce_works::HostWaiting {
-                work: id.clone(),
+            waiting: &[sce_specs::HostWaiting {
+                spec: id.clone(),
                 request: request_id.clone(),
                 connection: "claude".to_string(),
                 reason: "nobody is signed in to Claude Code: run `claude auth login`".to_string(),
@@ -862,7 +862,7 @@ fn replies() -> Value {
         ),
     );
 
-    // The settings a person keeps apart from the works, asked of the entrance that may change
+    // The settings a person keeps apart from the specs, asked of the entrance that may change
     // them; the others are shown only by what they are refused.
     let settings = ConnectionStore::at(common::scratch("contract-settings"));
     let policy = Policy::shipped();
@@ -1302,8 +1302,8 @@ fn replies() -> Value {
         refusal(&store, "list_connections", json!({})),
     );
     // A request made for a connection, and what is refused to a caller it is not for.
-    let pinned_work = ask("create_work", json!({ "title": "Pinned" }));
-    let pinned_id = pinned_work["id"].as_str().expect("a work id").to_string();
+    let pinned_spec = ask("create_spec", json!({ "title": "Pinned" }));
+    let pinned_id = pinned_spec["id"].as_str().expect("a spec id").to_string();
     let pinned_source = ask(
         "save_source",
         json!({ "id": pinned_id, "text": "The lock opens when the code matches." }),
@@ -1322,16 +1322,16 @@ fn replies() -> Value {
         .to_string();
     answers.insert("request_generation_pinned".into(), pinned);
     // A request the owner made asking for every requirement of the list to be issued a new id.
-    let fresh_work = ask("create_work", json!({ "title": "Renumbered" }));
-    let fresh_work_id = fresh_work["id"].as_str().expect("a work id").to_string();
+    let fresh_spec = ask("create_spec", json!({ "title": "Renumbered" }));
+    let fresh_spec_id = fresh_spec["id"].as_str().expect("a spec id").to_string();
     let fresh_source = ask(
         "save_source",
-        json!({ "id": fresh_work_id, "text": "The lock opens when the code matches." }),
+        json!({ "id": fresh_spec_id, "text": "The lock opens when the code matches." }),
     );
     let fresh = ask(
         "request_generation",
         json!({
-            "id": fresh_work_id, "key": "press-fresh", "origin": "gui",
+            "id": fresh_spec_id, "key": "press-fresh", "origin": "gui",
             "expect": { "source": fresh_source["revision"], "answers": null },
             "fresh_ids": true,
         }),
@@ -1370,13 +1370,13 @@ fn replies() -> Value {
     );
 
     // A requirement list that keeps the lineage it was built against, and the refusal of one
-    // that would lose it. Last, in a work of its own, so that no earlier reply moves.
-    let lineage_work = answer(
+    // that would lose it. Last, in a spec of its own, so that no earlier reply moves.
+    let lineage_spec = answer(
         &store,
-        "create_work",
+        "create_spec",
         json!({"title": "Window blind lineage"}),
     );
-    let lineage_id = lineage_work["id"].as_str().unwrap().to_string();
+    let lineage_id = lineage_spec["id"].as_str().unwrap().to_string();
     let lineage_source = answer(
         &store,
         "save_source",
@@ -1404,7 +1404,7 @@ fn replies() -> Value {
         "read_requirements_lineage".into(),
         answer(&store, "read_requirements", json!({"id": lineage_id})),
     );
-    // Each refusal of a lineage the work cannot keep, from the work holding the second revision.
+    // Each refusal of a lineage the spec cannot keep, from the spec holding the second revision.
     let save_over_it = |manifest: String, sidecar: String, lineage: Option<String>| {
         let mut args = json!({"id": lineage_id, "manifest": manifest, "sidecar": sidecar,
                               "base": held_revision, "written_for": lineage_head});
@@ -1443,7 +1443,7 @@ fn replies() -> Value {
             Some(list("first", "lineage_text")),
         ),
     );
-    // A list of its own lineage that has one revision where the work's has two: a model that
+    // A list of its own lineage that has one revision where the spec's has two: a model that
     // built the list again without the lineage it was given.
     refusals.insert(
         "lineage-not-continued".into(),
@@ -1454,15 +1454,15 @@ fn replies() -> Value {
         ),
     );
 
-    // What a revision of a work did, requirement by requirement: a work whose lists keep their
-    // lineages, accepted at the first revision and revised to the second. In a work of its own,
+    // What a revision of a spec did, requirement by requirement: a spec whose lists keep their
+    // lineages, accepted at the first revision and revised to the second. In a spec of its own,
     // after the others, so that no earlier reply moves.
-    let revision_work = answer(
+    let revision_spec = answer(
         &store,
-        "create_work",
+        "create_spec",
         json!({"title": "Window blind revision"}),
     );
-    let revision_id = revision_work["id"].as_str().unwrap().to_string();
+    let revision_id = revision_spec["id"].as_str().unwrap().to_string();
     let revision_head = answer(
         &store,
         "save_source",
@@ -1536,18 +1536,18 @@ fn replies() -> Value {
         "refusals": refusals,
     });
     name_the_unstable(&mut document, &root.display().to_string(), "<root>");
-    name_the_unstable(&mut document, &id, "<work-id>");
-    name_the_unstable(&mut document, &other_id, "<removed-work-id>");
-    name_the_unstable(&mut document, &accepted_id, "<accepted-work-id>");
-    name_the_unstable(&mut document, &lineage_id, "<lineage-work-id>");
-    name_the_unstable(&mut document, &revision_id, "<revision-work-id>");
+    name_the_unstable(&mut document, &id, "<spec-id>");
+    name_the_unstable(&mut document, &other_id, "<removed-spec-id>");
+    name_the_unstable(&mut document, &accepted_id, "<accepted-spec-id>");
+    name_the_unstable(&mut document, &lineage_id, "<lineage-spec-id>");
+    name_the_unstable(&mut document, &revision_id, "<revision-spec-id>");
     name_the_unstable(&mut document, &request_id, "<request-id>");
     name_the_unstable(&mut document, &failed_id, "<failed-request-id>");
     name_the_unstable(&mut document, &cancelled_id, "<cancelled-request-id>");
     name_the_unstable(&mut document, &pinned_request, "<pinned-request-id>");
-    name_the_unstable(&mut document, &pinned_id, "<pinned-work-id>");
+    name_the_unstable(&mut document, &pinned_id, "<pinned-spec-id>");
     name_the_unstable(&mut document, &fresh_request_id, "<fresh-request-id>");
-    name_the_unstable(&mut document, &fresh_work_id, "<fresh-work-id>");
+    name_the_unstable(&mut document, &fresh_spec_id, "<fresh-spec-id>");
     // A revision stays the shape of one, so that the screen's guard reads the file as it
     // would read the core.
     name_the_unstable(&mut document, &bundle_revision, &"b".repeat(64));

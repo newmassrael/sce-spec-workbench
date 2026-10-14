@@ -8,9 +8,9 @@
 #
 # An installer exists so that nothing has to be installed beside the application. What is judged is
 # that: the application the installer installs finds the programs it carries (the generator,
-# `sce-work` and the authoring server) with nothing on the machine to help, and says what it found
+# `sce-spec` and the authoring server) with nothing on the machine to help, and says what it found
 # where the owner looks, in the record a shell keeps of its executor (`.sce-hosts/desktop.json` in
-# the works folder).
+# the specs folder).
 #
 #   0. What it asks the package manager for: the deb declares a package for every Python module
 #      the server says it needs (`sce_author/needs.py`), because it does not carry Python.
@@ -52,8 +52,8 @@ for tool in dpkg-deb xvfb-run timeout python3; do
     fi
 done
 
-unset SCE_CODEGEN SCE_WORK SCE_AUTHOR_MCP SCE_EXECUTOR SCE_CLAUDE_MODEL SCE_CLAUDE_BUDGET_USD
-unset SCE_TEMPLATE_DIR SCE_WORKS_DIR PYTHONPATH
+unset SCE_CODEGEN SCE_SPEC SCE_AUTHOR_MCP SCE_EXECUTOR SCE_CLAUDE_MODEL SCE_CLAUDE_BUDGET_USD
+unset SCE_TEMPLATE_DIR SCE_SPECS_DIR PYTHONPATH
 
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
@@ -65,7 +65,7 @@ app="$root/usr/bin/sce-spec-workbench"
 [[ -x "$app" ]] || fail "the installer does not install usr/bin/sce-spec-workbench"
 bundle="$(find "$root/usr/lib" -maxdepth 2 -type d -name sce-author -print -quit)"
 [[ -n "$bundle" ]] || fail "the installer carries no sce-author bundle under usr/lib"
-for program in sce-author-mcp sce-work sce-codegen; do
+for program in sce-author-mcp sce-spec sce-codegen; do
     [[ -x "$bundle/bin/$program" ]] || fail "the bundle carries no bin/$program"
 done
 
@@ -100,12 +100,12 @@ chmod +x "$client"
 # a window that fails later (a runner with no graphics) is not the installer's fault. An
 # application that stops before it reports, or never reports, is.
 host_record() {
-    local works="$scratch/works-$1"
-    local record="$works/.sce-hosts/desktop.json"
+    local specs="$scratch/specs-$1"
+    local record="$specs/.sce-hosts/desktop.json"
     local log="$scratch/app-$1.log"
     local pid ticks=0
-    mkdir -p "$works"
-    SCE_WORKS_DIR="$works" SCE_CLAUDE="$client" PATH=/usr/bin:/bin \
+    mkdir -p "$specs"
+    SCE_SPECS_DIR="$specs" SCE_CLAUDE="$client" PATH=/usr/bin:/bin \
         timeout --kill-after=5 60 xvfb-run -a "$app" >"$log" 2>&1 &
     pid=$!
     until [[ -f "$record" ]]; do

@@ -27,7 +27,7 @@ use sce_spec_workbench_core::codex::AUTHOR_TOOLS;
 use sce_spec_workbench_core::http_client::Endpoint;
 use sce_spec_workbench_core::local::{list_models, Local, LocalConfig, ModelsError, Step};
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
-use sce_works::{Revision, WorkId};
+use sce_specs::{Revision, SpecId};
 use serde_json::{json, Value};
 
 use common::model_server::{
@@ -47,7 +47,7 @@ const NOBODY: &str = "http://127.0.0.1:1/v1";
 
 fn job() -> Job {
     Job {
-        work: WorkId::parse("door-lock").unwrap(),
+        spec: SpecId::parse("door-lock").unwrap(),
         title: "Door lock".to_string(),
         request: "req-7".to_string(),
         attempt: 1,
@@ -94,7 +94,7 @@ impl Rig {
 /// The tools the stand-in has: the ones a client may use, and one that saves, which none may.
 fn with_a_saving_tool() -> Vec<&'static str> {
     let mut tools = AUTHOR_TOOLS.to_vec();
-    tools.push("works_save_model");
+    tools.push("specs_save_model");
     tools
 }
 
@@ -105,11 +105,11 @@ fn tool_message(messages: &[Value], at: usize) -> String {
 // ---- the conversation ------------------------------------------------------------------------
 
 #[test]
-fn a_model_that_reads_the_work_and_then_answers_is_asked_twice_and_its_draft_is_taken() {
+fn a_model_that_reads_the_spec_and_then_answers_is_asked_twice_and_its_draft_is_taken() {
     let rig = Rig::new(
         "local-ok",
         vec![
-            calls(&[(Some("call_1"), "works_read", "{\"work\":\"door-lock\"}")]),
+            calls(&[(Some("call_1"), "specs_read", "{\"spec\":\"door-lock\"}")]),
             says(&draft("<scxml><!-- door --></scxml>")),
         ],
     );
@@ -155,7 +155,7 @@ fn a_model_that_reads_the_work_and_then_answers_is_asked_twice_and_its_draft_is_
         .contains("`door-lock`"));
     // The call the model made reached the authoring server, with its arguments.
     assert!(
-        called(&rig.folder).contains("\"arguments\":{\"work\":\"door-lock\"}"),
+        called(&rig.folder).contains("\"arguments\":{\"spec\":\"door-lock\"}"),
         "{}",
         called(&rig.folder)
     );
@@ -164,14 +164,14 @@ fn a_model_that_reads_the_work_and_then_answers_is_asked_twice_and_its_draft_is_
     assert_eq!(second.len(), 4);
     assert_eq!(second[2]["role"], "assistant");
     assert_eq!(second[2]["tool_calls"][0]["id"], "call_1");
-    assert_eq!(second[2]["tool_calls"][0]["function"]["name"], "works_read");
+    assert_eq!(second[2]["tool_calls"][0]["function"]["name"], "specs_read");
     assert!(
         second[2].get("reasoning").is_none(),
         "the model's reasoning is its own"
     );
     assert_eq!(second[3]["role"], "tool");
     assert_eq!(second[3]["tool_call_id"], "call_1");
-    assert_eq!(second[3]["content"], "ok:works_read");
+    assert_eq!(second[3]["content"], "ok:specs_read");
 }
 
 #[test]
@@ -193,9 +193,9 @@ fn the_model_is_offered_the_tools_a_client_may_use_with_what_the_server_says_of_
     // These and no other, in the order they are named: a tool that saves is not among them.
     assert_eq!(names, AUTHOR_TOOLS);
     assert_eq!(tools[0]["type"], "function");
-    assert_eq!(tools[0]["function"]["description"], "Does works_read.");
+    assert_eq!(tools[0]["function"]["description"], "Does specs_read.");
     assert_eq!(
-        tools[0]["function"]["parameters"]["properties"]["work"]["type"],
+        tools[0]["function"]["parameters"]["properties"]["spec"]["type"],
         "string"
     );
 }
@@ -205,7 +205,7 @@ fn a_tool_that_was_not_offered_is_not_called_and_the_model_is_told_which_there_a
     let rig = Rig::new(
         "local-not-offered",
         vec![
-            calls(&[(Some("c1"), "works_save_model", "{}")]),
+            calls(&[(Some("c1"), "specs_save_model", "{}")]),
             says(&draft("<scxml/>")),
         ],
     );
@@ -216,16 +216,16 @@ fn a_tool_that_was_not_offered_is_not_called_and_the_model_is_told_which_there_a
 
     // It exists on the authoring server, and the model has no way to reach it.
     assert!(
-        !called(&rig.folder).contains("works_save_model"),
+        !called(&rig.folder).contains("specs_save_model"),
         "{}",
         called(&rig.folder)
     );
     let told = tool_message(&rig.server.messages(1), 3);
     assert!(
-        told.starts_with("Error: there is no tool named `works_save_model`"),
+        told.starts_with("Error: there is no tool named `specs_save_model`"),
         "{told}"
     );
-    assert!(told.contains("works_read"), "{told}");
+    assert!(told.contains("specs_read"), "{told}");
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn what_a_tool_gives_is_handed_back_in_order_and_a_failure_and_nothing_are_said_
         "local-results",
         vec![
             calls(&[
-                (Some("a"), "works_read", "{}"),
+                (Some("a"), "specs_read", "{}"),
                 (Some("b"), "validate_scxml", "{}"),
                 (Some("c"), "scxml_unresolved", "{}"),
             ]),
@@ -252,7 +252,7 @@ fn what_a_tool_gives_is_handed_back_in_order_and_a_failure_and_nothing_are_said_
             second[3]["tool_call_id"].as_str(),
             second[3]["content"].as_str()
         ),
-        (Some("a"), Some("ok:works_read"))
+        (Some("a"), Some("ok:specs_read"))
     );
     assert_eq!(
         (
@@ -275,7 +275,7 @@ fn calls_that_have_no_id_are_each_answered_under_one_made_for_them() {
     let rig = Rig::new(
         "local-no-id",
         vec![
-            calls(&[(None, "works_read", "{}"), (None, "scxml_kinds", "{}")]),
+            calls(&[(None, "specs_read", "{}"), (None, "scxml_kinds", "{}")]),
             says(&draft("<scxml/>")),
         ],
     );
@@ -292,7 +292,7 @@ fn calls_that_have_no_id_are_each_answered_under_one_made_for_them() {
             second[3]["tool_call_id"].as_str(),
             second[3]["content"].as_str()
         ),
-        (Some("call_0_0"), Some("ok:works_read"))
+        (Some("call_0_0"), Some("ok:specs_read"))
     );
     assert_eq!(
         (
@@ -309,7 +309,7 @@ fn arguments_that_are_not_json_are_answered_to_the_model_as_the_error_they_are_a
     let rig = Rig::new(
         "local-bad-arguments",
         vec![
-            calls(&[(Some("c1"), "works_read", "{not json")]),
+            calls(&[(Some("c1"), "specs_read", "{not json")]),
             says(&draft("<scxml/>")),
         ],
     );
@@ -477,8 +477,8 @@ fn what_another_tool_gives_is_not_the_list_even_when_it_is_shaped_like_one() {
         "local-list-other-tool",
         vec![
             calls(&[(Some("c1"), "scxml_requirement_set", "{}")]),
-            // `works_read` gives back the list that was saved before, in the same two fields.
-            calls(&[(Some("c2"), "works_read", "{}")]),
+            // `specs_read` gives back the list that was saved before, in the same two fields.
+            calls(&[(Some("c2"), "specs_read", "{}")]),
             says(&model_only("<scxml/>")),
         ],
     );
@@ -488,7 +488,7 @@ fn what_another_tool_gives_is_not_the_list_even_when_it_is_shaped_like_one() {
     );
     tool_gives(
         &rig.folder,
-        "works_read",
+        "specs_read",
         &json!({"manifest_text": "{\"rev\":\"saved-before\"}\n"}),
     );
 
@@ -572,7 +572,7 @@ fn a_model_that_says_the_schema_back_is_told_that_it_did() {
 #[test]
 fn a_model_that_only_calls_tools_runs_out_of_turns() {
     let script = (0..10)
-        .map(|_| calls(&[(Some("c"), "works_read", "{}")]))
+        .map(|_| calls(&[(Some("c"), "specs_read", "{}")]))
         .collect();
     let rig = Rig::new("local-turns", script);
     let config = LocalConfig {
@@ -1052,23 +1052,23 @@ fn an_answer_that_is_not_a_chat_completion_is_said_not_to_be() {
 }
 
 #[test]
-fn the_authoring_server_is_told_which_work_the_run_is_for() {
+fn the_authoring_server_is_told_which_spec_the_run_is_for() {
     let rig = Rig::new("local-scope", vec![says(&draft("<scxml/>"))]);
 
     rig.run().unwrap();
 
-    // Without it the server answers for every work of the folder, and a specification that names
-    // another work in a call is read by the model.
+    // Without it the server answers for every spec of the folder, and a specification that names
+    // another spec in a call is read by the model.
     assert_eq!(scope_of(&rig.folder), "door-lock");
 }
 
 #[test]
-fn a_work_the_host_named_for_the_server_is_not_the_work_the_run_is_for() {
+fn a_spec_the_host_named_for_the_server_is_not_the_spec_the_run_is_for() {
     let rig = Rig::new("local-scope-replaced", vec![says(&draft("<scxml/>"))]);
     let mut author = authoring_server(&rig.folder, &AUTHOR_TOOLS);
     author
         .env
-        .push(("SCE_AUTHOR_WORK".to_string(), "another-work".to_string()));
+        .push(("SCE_AUTHOR_SPEC".to_string(), "another-spec".to_string()));
     let local = Local::new(
         Endpoint::parse(&rig.server.address).unwrap(),
         author,
@@ -1113,7 +1113,7 @@ fn a_tool_call_the_server_could_not_read_is_told_to_the_model_which_makes_it_aga
     let rig = Rig::new(
         "local-unreadable",
         vec![
-            calls(&[(Some("c1"), "works_read", "{\"work\":\"door-lock\"}")]),
+            calls(&[(Some("c1"), "specs_read", "{\"spec\":\"door-lock\"}")]),
             unreadable_call(
                 "{ \"documents\": [ { \"name\": \"door",
                 "unexpected end of JSON input",
@@ -1376,7 +1376,7 @@ fn a_run_tells_whoever_watches_each_step_of_it_in_order() {
         "local-trace",
         vec![
             calls(&[
-                (Some("a"), "works_read", "{\"work\":\"w\"}"),
+                (Some("a"), "specs_read", "{\"spec\":\"w\"}"),
                 (Some("b"), "validate_scxml", "{}"),
             ]),
             says("not the draft"),
@@ -1410,12 +1410,12 @@ fn a_run_tells_whoever_watches_each_step_of_it_in_order() {
             said(
                 0,
                 "",
-                &[("works_read", "{\"work\":\"w\"}"), ("validate_scxml", "{}")]
+                &[("specs_read", "{\"spec\":\"w\"}"), ("validate_scxml", "{}")]
             ),
             Step::Tool {
-                name: "works_read".to_string(),
+                name: "specs_read".to_string(),
                 failed: false,
-                words: "ok:works_read".to_string()
+                words: "ok:specs_read".to_string()
             },
             // A tool that said it failed is a step that says so, with its words.
             Step::Tool {

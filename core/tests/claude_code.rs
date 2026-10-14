@@ -7,7 +7,7 @@
 //! line the client is started with (the tools it may use are the whole of its power), what it
 //! is told, what is read back from what it says, and what happens when it is stopped, slow,
 //! missing or wrong. That the real client writes good models is not a thing a test can hold;
-//! that it cannot write to a work, run a command or read the owner's other files is.
+//! that it cannot write to a spec, run a command or read the owner's other files is.
 //!
 //! Unix only: the stand-in is a shell script.
 
@@ -25,7 +25,7 @@ use sce_spec_workbench_core::claude_code::{
     AuthorServer, ClaudeCode, ClaudeCodeConfig, ALLOWED_TOOLS,
 };
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
-use sce_works::{ModelFiles, Revision, WorkId};
+use sce_specs::{ModelFiles, Revision, SpecId};
 use serde_json::{json, Value};
 
 /// A stand-in for `claude`, and where it wrote down what it was given.
@@ -91,8 +91,8 @@ fn author() -> AuthorServer {
         command: PathBuf::from("/opt/sce/bin/sce-author-mcp"),
         args: vec!["--stdio".to_string()],
         env: vec![
-            ("SCE_WORK".to_string(), "/opt/sce/bin/sce-work".to_string()),
-            ("SCE_WORKS_DIR".to_string(), "/home/owner/works".to_string()),
+            ("SCE_SPEC".to_string(), "/opt/sce/bin/sce-spec".to_string()),
+            ("SCE_SPECS_DIR".to_string(), "/home/owner/specs".to_string()),
         ],
     }
 }
@@ -103,7 +103,7 @@ fn client(fake: &Fake) -> ClaudeCode {
 
 fn job() -> Job {
     Job {
-        work: WorkId::parse("door-lock-3f2a1b9c").unwrap(),
+        spec: SpecId::parse("door-lock-3f2a1b9c").unwrap(),
         title: "Door lock".to_string(),
         request: "req-0123456789ab".to_string(),
         attempt: 1,
@@ -146,32 +146,32 @@ fn server_env(fake: &Fake) -> Value {
 }
 
 #[test]
-fn the_authoring_server_is_told_which_work_the_run_is_for() {
+fn the_authoring_server_is_told_which_spec_the_run_is_for() {
     let fake = Fake::answering("claude-scope", &answered(single("<scxml/>")));
 
     generate(&client(&fake), &job()).unwrap();
 
-    // Without it the server answers for every work of the folder: a specification that names
-    // another work in a call is read by the client, and the file-name check on what it writes and
+    // Without it the server answers for every spec of the folder: a specification that names
+    // another spec in a call is read by the client, and the file-name check on what it writes and
     // the folder the generator is held to are off.
     let env = server_env(&fake);
-    assert_eq!(env["SCE_AUTHOR_WORK"], "door-lock-3f2a1b9c");
+    assert_eq!(env["SCE_AUTHOR_SPEC"], "door-lock-3f2a1b9c");
     // What the host gave the server is still there.
-    assert_eq!(env["SCE_WORKS_DIR"], "/home/owner/works");
+    assert_eq!(env["SCE_SPECS_DIR"], "/home/owner/specs");
 }
 
 #[test]
-fn a_work_the_host_named_for_the_server_is_not_the_work_the_run_is_for() {
+fn a_spec_the_host_named_for_the_server_is_not_the_spec_the_run_is_for() {
     let fake = Fake::answering("claude-scope-replaced", &answered(single("<scxml/>")));
     let mut named = author();
     named
         .env
-        .push(("SCE_AUTHOR_WORK".to_string(), "another-work".to_string()));
+        .push(("SCE_AUTHOR_SPEC".to_string(), "another-spec".to_string()));
     let client = ClaudeCode::new(fake.binary.clone(), named, ClaudeCodeConfig::default());
 
     generate(&client, &job()).unwrap();
 
-    assert_eq!(server_env(&fake)["SCE_AUTHOR_WORK"], "door-lock-3f2a1b9c");
+    assert_eq!(server_env(&fake)["SCE_AUTHOR_SPEC"], "door-lock-3f2a1b9c");
 }
 
 #[test]
@@ -203,17 +203,17 @@ fn the_client_is_started_with_only_the_tools_the_task_needs() {
     for tool in allowed.split(',') {
         assert!(tool.starts_with("mcp__sce-author__"), "{tool}");
     }
-    // Reading a work is allowed, and writing to one is not: the application saves what the
+    // Reading a spec is allowed, and writing to one is not: the application saves what the
     // client answers, so a specification that tells the client to save elsewhere cannot.
-    assert!(allowed.contains("works_read"));
+    assert!(allowed.contains("specs_read"));
     for withheld in [
-        "works_save_model",
-        "works_save_requirements",
-        "works_begin_generation",
-        "works_finish_generation",
-        "works_fail_generation",
+        "specs_save_model",
+        "specs_save_requirements",
+        "specs_begin_generation",
+        "specs_finish_generation",
+        "specs_fail_generation",
         "scxml_accept",
-        "works_list",
+        "specs_list",
     ] {
         assert!(
             !allowed.contains(withheld),
@@ -276,9 +276,9 @@ fn the_author_server_is_the_one_the_host_names_and_the_only_one() {
             "command": "/opt/sce/bin/sce-author-mcp",
             "args": ["--stdio"],
             "env": {
-                "SCE_WORK": "/opt/sce/bin/sce-work",
-                "SCE_WORKS_DIR": "/home/owner/works",
-                "SCE_AUTHOR_WORK": "door-lock-3f2a1b9c",
+                "SCE_SPEC": "/opt/sce/bin/sce-spec",
+                "SCE_SPECS_DIR": "/home/owner/specs",
+                "SCE_AUTHOR_SPEC": "door-lock-3f2a1b9c",
             },
         }}})
     );
@@ -287,7 +287,7 @@ fn the_author_server_is_the_one_the_host_names_and_the_only_one() {
 }
 
 #[test]
-fn it_is_told_which_work_to_write_for_on_standard_input_and_not_on_the_command_line() {
+fn it_is_told_which_spec_to_write_for_on_standard_input_and_not_on_the_command_line() {
     let fake = Fake::answering("claude-prompt", &answered(single("<scxml/>")));
 
     generate(&client(&fake), &job()).unwrap();
@@ -295,12 +295,12 @@ fn it_is_told_which_work_to_write_for_on_standard_input_and_not_on_the_command_l
     let told = fake.read("stdin");
     assert!(told.contains("door-lock-3f2a1b9c"), "{told}");
     assert!(told.contains("Door lock"), "{told}");
-    assert!(told.contains("works_read"), "{told}");
+    assert!(told.contains("specs_read"), "{told}");
     assert!(!told.contains("refused"), "nothing was refused yet: {told}");
     // A prompt can be long and is the owner's: it is not in a process listing.
     assert!(
         fake.argv().iter().all(|a| !a.contains("The door opens")),
-        "the specification is read by the client with works_read, not handed on a command line"
+        "the specification is read by the client with specs_read, not handed on a command line"
     );
 }
 

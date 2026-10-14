@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use sce_spec_workbench_core::host::{start, HostSettings, NotHosted};
 use sce_spec_workbench_core::installed::Installed;
-use sce_works::{ManualClock, WorkStore};
+use sce_specs::{ManualClock, SpecStore};
 
 use common::FakeRenderer;
 
@@ -38,7 +38,7 @@ fn the_settings_are_read_from_the_names_the_environment_gives() {
         lookup(&[
             ("SCE_CLAUDE", "/opt/claude/bin/claude"),
             ("SCE_AUTHOR_MCP", "/opt/sce/bin/sce-author-mcp"),
-            ("SCE_WORK", "/opt/sce/bin/sce-work"),
+            ("SCE_SPEC", "/opt/sce/bin/sce-spec"),
             ("SCE_CODEGEN", "/opt/sce/bin/sce-codegen"),
             ("SCE_CLAUDE_MODEL", "sonnet"),
             ("SCE_CLAUDE_BUDGET_USD", "2.5"),
@@ -55,7 +55,7 @@ fn the_settings_are_read_from_the_names_the_environment_gives() {
         settings.author,
         Some(PathBuf::from("/opt/sce/bin/sce-author-mcp"))
     );
-    assert_eq!(settings.work, Some(PathBuf::from("/opt/sce/bin/sce-work")));
+    assert_eq!(settings.spec, Some(PathBuf::from("/opt/sce/bin/sce-spec")));
     assert_eq!(
         settings.codegen,
         Some(PathBuf::from("/opt/sce/bin/sce-codegen"))
@@ -68,13 +68,13 @@ fn the_settings_are_read_from_the_names_the_environment_gives() {
 fn what_an_installer_carried_is_used_where_the_environment_named_nothing() {
     let bundle = Installed {
         author: Some(PathBuf::from("/opt/app/sce-author/bin/sce-author-mcp")),
-        work: Some(PathBuf::from("/opt/app/sce-author/bin/sce-work")),
+        spec: Some(PathBuf::from("/opt/app/sce-author/bin/sce-spec")),
         codegen: Some(PathBuf::from("/opt/app/sce-author/bin/sce-codegen")),
     };
 
     let settings = HostSettings::from_lookup(
         "desktop",
-        lookup(&[("SCE_WORK", "/home/dev/target/debug/sce-work")]),
+        lookup(&[("SCE_SPEC", "/home/dev/target/debug/sce-spec")]),
     )
     .with_bundle(&bundle);
 
@@ -82,8 +82,8 @@ fn what_an_installer_carried_is_used_where_the_environment_named_nothing() {
     assert_eq!(settings.codegen, bundle.codegen);
     // A developer's word is the developer's: the variable that was set still wins.
     assert_eq!(
-        settings.work,
-        Some(PathBuf::from("/home/dev/target/debug/sce-work"))
+        settings.spec,
+        Some(PathBuf::from("/home/dev/target/debug/sce-spec"))
     );
     // A bundle that carries nothing changes nothing.
     let same = HostSettings::from_lookup("desktop", lookup(&[])).with_bundle(&Installed::default());
@@ -123,9 +123,9 @@ fn a_budget_that_is_not_a_positive_number_is_not_a_budget() {
     }
 }
 
-fn store(label: &str) -> (Arc<ManualClock>, Arc<WorkStore<Arc<ManualClock>>>) {
+fn store(label: &str) -> (Arc<ManualClock>, Arc<SpecStore<Arc<ManualClock>>>) {
     let clock = Arc::new(ManualClock::at(1_791_190_800));
-    let store = Arc::new(WorkStore::with_clock(
+    let store = Arc::new(SpecStore::with_clock(
         common::scratch(label),
         Arc::clone(&clock),
     ));
@@ -200,7 +200,7 @@ fn what_a_shell_cannot_host_is_said_where_the_owner_looks_and_not_only_to_the_te
 
     let host = start(Arc::clone(&store), Arc::new(FakeRenderer), settings);
 
-    // The word is in the works folder at once, for a screen to read: a message on the standard
+    // The word is in the specs folder at once, for a screen to read: a message on the standard
     // error of a program started from a menu is one nobody reads.
     let listing = store.host_status().unwrap();
     assert_eq!(listing.hosts.len(), 1);
@@ -243,8 +243,8 @@ mod hosting {
     use sce_spec_workbench_core::{
         AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
     };
-    use sce_works::requests::{Inputs, Pin, State};
-    use sce_works::{ConnectionId, Registration, Saved, WorkId};
+    use sce_specs::requests::{Inputs, Pin, State};
+    use sce_specs::{ConnectionId, Registration, Saved, SpecId};
     use serde_json::json;
 
     use super::*;
@@ -285,7 +285,7 @@ mod hosting {
     #[test]
     fn a_host_takes_the_request_the_owner_makes_and_leaves_when_it_is_dropped() {
         let (_, store) = store("host-run");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed("host-run-bin");
         let mut settings = HostSettings::from_lookup("desktop", lookup(&[]));
@@ -376,10 +376,10 @@ mod hosting {
         let (claude, _) = installed("host-check-env-bin");
         let dir = common::scratch("host-check-env-launcher");
         let launcher = dir.join("sce-author-mcp");
-        // Ready only when it is told where the works folder is: the folder of this store.
+        // Ready only when it is told where the specs folder is: the folder of this store.
         fs::write(
             &launcher,
-            "#!/bin/sh\n[ \"$1\" = \"--check\" ] || exit 0\n[ -n \"$SCE_WORKS_DIR\" ] || { echo 'no works folder' >&2; exit 1; }\nexit 0\n",
+            "#!/bin/sh\n[ \"$1\" = \"--check\" ] || exit 0\n[ -n \"$SCE_SPECS_DIR\" ] || { echo 'no specs folder' >&2; exit 1; }\nexit 0\n",
         )
         .unwrap();
         fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
@@ -420,7 +420,7 @@ mod hosting {
     #[test]
     fn a_host_says_which_request_it_could_not_run_and_why() {
         let (_, store) = store("host-waiting");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_saying(
             "host-waiting-bin",
@@ -448,14 +448,14 @@ mod hosting {
         let said = store.host_status().unwrap().hosts[0].host.waiting.clone();
         assert_eq!(said.len(), 1);
         assert_eq!(said[0].request, request);
-        assert_eq!(said[0].work, id.as_str());
+        assert_eq!(said[0].spec, id.as_str());
         assert_eq!(said[0].connection, "main");
         assert!(
             said[0].reason.contains("claude auth login"),
             "{}",
             said[0].reason
         );
-        // The works folder is shared: it carries a sentence, and nothing of this computer.
+        // The specs folder is shared: it carries a sentence, and nothing of this computer.
         assert!(
             !said[0]
                 .reason
@@ -475,7 +475,7 @@ mod hosting {
     #[test]
     fn a_host_stops_saying_it_waits_for_a_request_that_was_called_off() {
         let (_, store) = store("host-waiting-cleared");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_saying(
             "host-waiting-cleared-bin",
@@ -530,7 +530,7 @@ mod hosting {
         (settings, pin)
     }
 
-    fn ask_for(store: &WorkStore<Arc<ManualClock>>, id: &WorkId, pin: Option<Pin>) -> String {
+    fn ask_for(store: &SpecStore<Arc<ManualClock>>, id: &SpecId, pin: Option<Pin>) -> String {
         store
             .register_request_for(
                 id,
@@ -553,7 +553,7 @@ mod hosting {
     #[test]
     fn a_host_that_has_the_settings_runs_a_request_made_for_a_connection() {
         let (_, store) = store("host-pinned");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_signed_in("host-pinned-bin");
         let (settings_store, pin) = pinned("host-pinned-settings");
@@ -584,7 +584,7 @@ mod hosting {
     #[test]
     fn a_host_that_has_no_settings_leaves_a_request_made_for_a_connection_alone() {
         let (_, store) = store("host-pinned-alone");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_signed_in("host-pinned-alone-bin");
         let (_, pin) = pinned("host-pinned-alone-settings");
@@ -606,7 +606,7 @@ mod hosting {
     #[test]
     fn a_host_that_has_the_settings_leaves_a_request_nobody_chose_a_connection_for() {
         let (_, store) = store("host-unpinned-left");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_signed_in("host-unpinned-left-bin");
         let (settings_store, _) = pinned("host-unpinned-left-settings");
@@ -637,7 +637,7 @@ mod hosting {
     #[test]
     fn a_host_started_before_claude_was_installed_hosts_once_it_is() {
         let (_, store) = store("host-late");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author) = installed_signed_in("host-late-bin");
         // Not there yet: it is put where the host looks after the window is open.
@@ -699,7 +699,7 @@ mod hosting {
     #[test]
     fn what_the_environment_may_spend_bounds_the_run_made_for_a_connection() {
         let (_, store) = store("host-budget");
-        let id = store.create_work("Door lock").unwrap().id;
+        let id = store.create_spec("Door lock").unwrap().id;
         store.save_source(&id, "The lock opens.", None).unwrap();
         let (claude, author, record) = installed_recording("host-budget-bin");
         let (settings_store, pin) = pinned("host-budget-settings");
@@ -726,7 +726,7 @@ mod hosting {
         assert_eq!(at.map(|i| args[i + 1]), Some("2.5"), "{args:?}");
     }
 
-    fn ask(store: &WorkStore<Arc<ManualClock>>, id: &WorkId) -> String {
+    fn ask(store: &SpecStore<Arc<ManualClock>>, id: &SpecId) -> String {
         store
             .register_request(
                 id,

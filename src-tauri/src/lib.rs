@@ -15,7 +15,7 @@
 //! may close (`sce_close`); [`close_gate`] is what keeps the window open in between.
 //!
 //! Permissions are the least a window needs: no file system, no shell, no
-//! network. The works folder is reached only through the store, which is the
+//! network. The specs folder is reached only through the store, which is the
 //! only code that touches it.
 
 mod close_gate;
@@ -29,7 +29,7 @@ use sce_spec_workbench_core::installed::{self, Installed};
 use sce_spec_workbench_core::{
     call_in, default_settings_root, ConnectionStore, Context, Entrance, Policy,
 };
-use sce_works::{default_root, renderer_with_bundle, CommandError, Product, WorkStore};
+use sce_specs::{default_root, renderer_with_bundle, CommandError, Product, SpecStore};
 use serde_json::Value;
 use tauri::{Manager, RunEvent, WindowEvent};
 
@@ -41,10 +41,10 @@ const ASK_THE_SCREEN: &str = "window.sceCloseRequested && window.sceCloseRequest
 /// names it, and `scripts/package_app.sh` fills it).
 const BUNDLE_FOLDER: &str = "sce-author";
 
-/// The works folder this window works on, the product that draws a model and reads one for it,
+/// The specs folder this window works on, the product that draws a model and reads one for it,
 /// and the person's own settings, which only this window changes.
-struct Works {
-    store: WorkStore,
+struct Specs {
+    store: SpecStore,
     figures: Box<dyn Product>,
     settings: ConnectionStore,
     policy: Policy,
@@ -63,13 +63,13 @@ struct Executor(Mutex<Option<ExecutorHost>>);
 
 /// Host the application's own executor, or say why it does not. Not having Claude Code is not
 /// an error: the application shows that no AI is connected, and why, and works as it always did.
-/// What it could not do is said to the works folder, where the screen reads it, and also here.
+/// What it could not do is said to the specs folder, where the screen reads it, and also here.
 fn host_the_executor(
     root: std::path::PathBuf,
     connections: ConnectionStore,
     bundle: &Installed,
 ) -> Executor {
-    let store = Arc::new(WorkStore::at(root));
+    let store = Arc::new(SpecStore::at(root));
     let product: Arc<dyn Product> = Arc::from(renderer_with_bundle(bundle.codegen.as_deref()));
     let settings = HostSettings::from_environment("desktop").with_bundle(bundle);
     // The executor runs the requests made for a connection, for the connections it can run: it
@@ -93,20 +93,20 @@ fn host_the_executor(
 /// thread would freeze the window for all of them.
 #[tauri::command(async)]
 fn sce_call(
-    works: tauri::State<'_, Works>,
+    specs: tauri::State<'_, Specs>,
     name: String,
     args: Option<Value>,
 ) -> Result<Value, CommandError> {
     // This is the person at the keyboard: the one entrance that may change their settings.
     let context = Context::new(
-        &works.store,
-        works.figures.as_ref(),
-        &works.policy,
+        &specs.store,
+        specs.figures.as_ref(),
+        &specs.policy,
         Entrance::Desktop,
     )
-    .with_connections(Some(&works.settings))
-    .with_claude(works.claude.as_deref())
-    .with_codex(works.codex.as_deref());
+    .with_connections(Some(&specs.settings))
+    .with_claude(specs.claude.as_deref())
+    .with_codex(specs.codex.as_deref());
     call_in(&context, &name, args.unwrap_or(Value::Null))
 }
 
@@ -143,15 +143,15 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // `SCE_WORKS_DIR`, then the per-user data directory: the same place
-            // the authoring MCP's `sce-work` resolves to, so the two see one folder.
+            // `SCE_SPECS_DIR`, then the per-user data directory: the same place
+            // the authoring MCP's `sce-spec` resolves to, so the two see one folder.
             let root = default_root().unwrap_or_else(|| {
                 app.path()
                     .app_data_dir()
                     .expect("the platform has no per-user data directory")
-                    .join("works")
+                    .join("specs")
             });
-            // What an installer carried: the generator, `sce-work` and the authoring server, in a
+            // What an installer carried: the generator, `sce-spec` and the authoring server, in a
             // folder of the application's own resources. A development build carries none, and
             // finds them as it always did (the environment, beside the program, the search path).
             let bundle = app
@@ -159,8 +159,8 @@ pub fn run() {
                 .resource_dir()
                 .map(|dir| installed::in_bundle(&dir.join(BUNDLE_FOLDER)))
                 .unwrap_or_default();
-            // The person's settings are kept apart from the works: a works folder is shared and
-            // moved, and whose account a person reaches a model with is no part of a work.
+            // The person's settings are kept apart from the specs: a specs folder is shared and
+            // moved, and whose account a person reaches a model with is no part of a spec.
             let settings = default_settings_root().unwrap_or_else(|| {
                 app.path()
                     .app_config_dir()
@@ -175,8 +175,8 @@ pub fn run() {
             // The programs the environment named as the clients, which the status asked of each
             // is about.
             let named = HostSettings::from_environment("desktop");
-            app.manage(Works {
-                store: WorkStore::at(root),
+            app.manage(Specs {
+                store: SpecStore::at(root),
                 figures: renderer_with_bundle(bundle.codegen.as_deref()),
                 settings: ConnectionStore::at(settings),
                 policy: Policy::shipped(),

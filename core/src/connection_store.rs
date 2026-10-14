@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! The connections a person has made, in their own settings folder and not in the works folder.
+//! The connections a person has made, in their own settings folder and not in the specs folder.
 //!
 //! ```text
 //! <root>/.lock                        taken by every writer, for the whole folder
@@ -10,8 +10,8 @@
 //! <root>/connections/<id>/head        the revision that is current, or no file once deleted
 //! ```
 //!
-//! A works folder is shared and moved; whose account a person reaches a model with is nobody
-//! else's business, so it is not part of any work, and a folder of works carries none of it.
+//! A specs folder is shared and moved; whose account a person reaches a model with is nobody
+//! else's business, so it is not part of any spec, and a folder of specs carries none of it.
 //! A request pins a connection by id and revision, so a revision is never rewritten: a save
 //! writes a new file and then moves `head` by an atomic rename, and a reader that sees the new
 //! head finds the file it names. Deleting removes `head` and keeps the revisions, so a request
@@ -29,9 +29,9 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::json;
 
-use sce_works::lock;
-use sce_works::store::{atomic_write, Saved, Unreadable, LOCK_WAIT};
-use sce_works::{ConnectionId, Revision, StoreError};
+use sce_specs::lock;
+use sce_specs::store::{atomic_write, Saved, Unreadable, LOCK_WAIT};
+use sce_specs::{ConnectionId, Revision, StoreError};
 
 use crate::connection::Connection;
 
@@ -41,9 +41,9 @@ const DEFAULT_FILE: &str = "default";
 const LOCK_FILE: &str = ".lock";
 
 /// Where the settings of the person who runs this program are kept: `SCE_SETTINGS_DIR`, else the
-/// per-user configuration directory of the platform. The works are kept in the data directory
+/// per-user configuration directory of the platform. The specs are kept in the data directory
 /// (`default_root`) and these in the configuration directory, so that a person who copies,
-/// shares or backs up their works does not carry their accounts with them.
+/// shares or backs up their specs does not carry their accounts with them.
 pub fn default_settings_root() -> Option<PathBuf> {
     settings_root_from(|name| std::env::var_os(name))
 }
@@ -110,7 +110,7 @@ impl ConnectionStore {
     ///
     /// `base` is what the caller read before it changed anything: `None` for a connection it
     /// believes is not there. A save that does not name what it replaces is a conflict, as a
-    /// save of a work's text is, so a second window cannot quietly undo the first.
+    /// save of a spec's text is, so a second window cannot quietly undo the first.
     pub fn save(
         &self,
         connection: &Connection,
@@ -394,7 +394,7 @@ mod tests {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
-    fn the_settings_are_in_the_configuration_directory_and_not_beside_the_works() {
+    fn the_settings_are_in_the_configuration_directory_and_not_beside_the_specs() {
         let from_xdg = settings_root_from(environment(&[
             ("XDG_CONFIG_HOME", "/xdg/config"),
             ("HOME", "/home/coin"),
@@ -411,7 +411,7 @@ mod tests {
                 "/home/coin/.config/sce-spec-workbench/settings"
             ))
         );
-        // The works live under the data directory: a copy of them carries no settings.
+        // The specs live under the data directory: a copy of them carries no settings.
         assert_ne!(
             from_home.unwrap().parent(),
             Some(Path::new("/home/coin/.local/share/sce-spec-workbench"))

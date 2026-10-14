@@ -20,7 +20,7 @@ import { CommandFailure } from "./ipc";
  */
 const HELD_KINDS: readonly string[] = ["revision-not-current", "revision-not-judged"];
 
-/** Where the panel is. A work nobody accepted has no panel at all. */
+/** Where the panel is. A spec nobody accepted has no panel at all. */
 export type RevisionPanel =
   | { readonly phase: "reading" }
   /** The core cannot compare yet, and said why. */
@@ -29,7 +29,7 @@ export type RevisionPanel =
   | { readonly phase: "failed"; readonly message: string }
   | { readonly phase: "read"; readonly report: RevisionReport };
 
-/** The panel an answer makes; `null` for a work nobody accepted. */
+/** The panel an answer makes; `null` for a spec nobody accepted. */
 export function panelOfRead(read: ReadRevisionReport): RevisionPanel | null {
   return read.report === null ? null : { phase: "read", report: read.report };
 }
@@ -48,14 +48,14 @@ export function panelOfFailure(error: unknown, explain: (error: unknown) => stri
 
 /**
  * Whether a report is of the revisions the screen is showing. The report names the revisions it
- * compared; one that names others than the screen's is of a work that has moved since, and is not
+ * compared; one that names others than the screen's is of a spec that has moved since, and is not
  * shown as if it were of this one.
  */
 export function reportIsOf(report: RevisionReport, shown: Basis): boolean {
   return sameBasis(report.of.now, shown);
 }
 
-/** What the panel keeps of its last answer while the screen asks again about a changed work. */
+/** What the panel keeps of its last answer while the screen asks again about a changed spec. */
 export function stillShown(panel: RevisionPanel | null, shown: Basis): RevisionPanel | null {
   if (panel === null || panel.phase !== "read") return panel;
   return reportIsOf(panel.report, shown) ? panel : { phase: "reading" };

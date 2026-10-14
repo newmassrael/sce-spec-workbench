@@ -30,7 +30,7 @@ pub mod server;
 pub mod token;
 
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy};
-use sce_works::{CommandError, Product, WorkStore, MAX_SOURCE_BYTES};
+use sce_specs::{CommandError, Product, SpecStore, MAX_SOURCE_BYTES};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -78,7 +78,7 @@ impl Reply {
 /// * 400: what was sent is not well formed (an id, a title, an address, a field).
 /// * 403: this entrance is not where that is done; the desktop application is.
 /// * 404: what is asked about does not exist.
-/// * 409: the work, the request or the connection is not in the state the call assumes: the
+/// * 409: the spec, the request or the connection is not in the state the call assumes: the
 ///   caller read, or wrote from, something that has moved. Reading again and deciding is the
 ///   way out.
 /// * 413, 422, 502, 503, 504: too large; understood and refused on its content; the product
@@ -88,7 +88,7 @@ impl Reply {
 /// contract file to a status written down on purpose, so a new kind is a choice and not a 500.
 fn status_of(kind: &str) -> u16 {
     match kind {
-        "not-found" | "unknown-command" | "no-settings" | "removed-work" => 404,
+        "not-found" | "unknown-command" | "no-settings" | "removed-spec" => 404,
         "invalid-id" | "invalid-title" | "bad-request" | "bad-connection" | "bad-adapter"
         | "bad-lease" | "bad-server-address" | "bad-host" | "bad-instructions" => 400,
         // This shell is not where that is done: the desktop application is.
@@ -96,11 +96,11 @@ fn status_of(kind: &str) -> u16 {
         | "not-allowed-to-find-clients"
         | "not-allowed-to-read-server-status"
         | "not-allowed-to-start-a-program" => 403,
-        // Something moved since the caller read it, or the call assumes a state the work, the
+        // Something moved since the caller read it, or the call assumes a state the spec, the
         // request or the connection is not in: a text saved from another revision, a model or a
         // list written for an earlier text (so nothing is compared or accepted until it is
         // written again), a request that is held, ended or pinned elsewhere, a lineage that does
-        // not continue the one the work keeps.
+        // not continue the one the spec keeps.
         "conflict"
         | "model-conflict"
         | "connection-conflict"
@@ -119,7 +119,7 @@ fn status_of(kind: &str) -> u16 {
         | "wrong-connection"
         | "no-candidate"
         | "no-core-check"
-        | "bundled-work"
+        | "bundled-spec"
         | "lineage-dropped"
         | "lineage-not-continued"
         | "lineage-numbers-reused" => 409,
@@ -155,13 +155,13 @@ struct Envelope {
     args: Value,
 }
 
-/// The handler: the works folder it serves, the product that draws a model and
+/// The handler: the specs folder it serves, the product that draws a model and
 /// reads one for it, the token it requires, the screen it shows.
 ///
 /// It may be given the person's settings folder to read ([`Shell::with_settings`]) and never to
 /// change: what a token can reach over a network is not the person at the keyboard.
 pub struct Shell {
-    store: WorkStore,
+    store: SpecStore,
     figures: Box<dyn Product>,
     token: String,
     assets: Option<Assets>,
@@ -171,7 +171,7 @@ pub struct Shell {
 
 impl Shell {
     pub fn new(
-        store: WorkStore,
+        store: SpecStore,
         figures: Box<dyn Product>,
         token: String,
         assets: Option<Assets>,
@@ -298,7 +298,7 @@ mod tests {
         ("bad-request", 400),
         ("bad-server-address", 400),
         ("busy", 503),
-        ("bundled-work", 409),
+        ("bundled-spec", 409),
         ("candidate-moved", 409),
         ("check-refused", 422),
         ("fresh-ids-not-issued", 422),
@@ -333,7 +333,7 @@ mod tests {
         ("not-found", 404),
         ("not-holder", 409),
         ("not-resuming", 409),
-        ("removed-work", 404),
+        ("removed-spec", 404),
         ("request-connection-moved", 409),
         ("request-ended", 409),
         ("request-held", 409),
@@ -349,7 +349,7 @@ mod tests {
     ];
 
     /// A refusal is the caller's situation and not a fault of the server, so it does not travel as
-    /// the 500 a monitor counts: a work whose model or list was not written again for its text,
+    /// the 500 a monitor counts: a spec whose model or list was not written again for its text,
     /// a request that is held, a lineage that does not continue, a model that is not one.
     #[test]
     fn each_kind_travels_under_the_status_chosen_for_it() {

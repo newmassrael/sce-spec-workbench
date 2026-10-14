@@ -18,9 +18,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use sce_specs::{NoRenderer, SpecStore};
 use sce_web_shell::server::{serve, Limits};
 use sce_web_shell::{Shell, MAX_BODY_BYTES};
-use sce_works::{NoRenderer, WorkStore};
 use serde_json::json;
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef";
@@ -58,7 +58,7 @@ impl Running {
     fn start(name: &str, limits: Limits) -> Running {
         let scratch = Scratch::new(name);
         let shell = Arc::new(Shell::new(
-            WorkStore::at(scratch.0.join("works")),
+            SpecStore::at(scratch.0.join("specs")),
             Box::new(NoRenderer),
             TOKEN.to_string(),
             None,

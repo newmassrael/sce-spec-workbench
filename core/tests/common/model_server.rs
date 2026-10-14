@@ -195,7 +195,7 @@ pub fn authoring_server(folder: &Path, tools: &[&str]) -> AuthorServer {
         .iter()
         .map(|name| {
             format!(
-                "{{\"name\":\"{name}\",\"description\":\"Does {name}.\",\"inputSchema\":{{\"type\":\"object\",\"properties\":{{\"work\":{{\"type\":\"string\"}}}}}}}}"
+                "{{\"name\":\"{name}\",\"description\":\"Does {name}.\",\"inputSchema\":{{\"type\":\"object\",\"properties\":{{\"spec\":{{\"type\":\"string\"}}}}}}}}"
             )
         })
         .collect::<Vec<_>>()
@@ -205,7 +205,7 @@ pub fn authoring_server(folder: &Path, tools: &[&str]) -> AuthorServer {
         "#!/bin/sh\n\
          [ \"$1\" = \"--version\" ] && exit 0\n\
          [ \"$1\" = \"--check\" ] && exit 0\n\
-         printf '%s\\n' \"${{SCE_AUTHOR_WORK-unset}}\" > '{folder}'/scope\n\
+         printf '%s\\n' \"${{SCE_AUTHOR_SPEC-unset}}\" > '{folder}'/scope\n\
          tool_text() {{\n\
            if [ -f '{folder}'/answer.$1.json ]; then cat '{folder}'/answer.$1.json; else printf '\"ok:%s\"' \"$1\"; fi\n\
          }}\n\
@@ -276,7 +276,7 @@ fn put_answer(folder: &Path, file: &str, answer: &Value) {
     std::fs::write(folder.join(file), literal).unwrap();
 }
 
-/// The work the stand-in was told it is for (`SCE_AUTHOR_WORK`), or `unset` when it was told none.
+/// The spec the stand-in was told it is for (`SCE_AUTHOR_SPEC`), or `unset` when it was told none.
 /// Written when it started, so it is there after a run.
 pub fn scope_of(folder: &Path) -> String {
     std::fs::read_to_string(folder.join("scope"))

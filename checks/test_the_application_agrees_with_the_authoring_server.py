@@ -9,8 +9,8 @@ application is built with:
 
 - the tools a generation may use: the application approves them unattended and enables them in the
   client (`AUTHOR_TOOLS`), and the server advertises them and refuses the rest;
-- the variable that tells the server which work a run is for (`WORK_SCOPE`): a name that drifted
-  on one side leaves a server that answers for every work of the folder and says nothing;
+- the variable that tells the server which spec a run is for (`SPEC_SCOPE`): a name that drifted
+  on one side leaves a server that answers for every spec of the folder and says nothing;
 - the Python packages the `.deb` declares, because it carries the server and not the Python it
   runs in: the server says which it needs (`sce_author.needs`);
 - the packages the CI machine that tries the installer is given, since a machine that already has
@@ -48,14 +48,14 @@ class TheToolsAndTheScope(unittest.TestCase):
 
     def test_the_variable_every_client_sets_is_the_one_that_scopes_the_server(self):
         source = CLIENT_RUN.read_text(encoding="utf-8")
-        declared = re.search(r'const WORK_SCOPE: &str = "([A-Z_]+)";', source)
-        self.assertIsNotNone(declared, "WORK_SCOPE is not where this test looks for it")
+        declared = re.search(r'const SPEC_SCOPE: &str = "([A-Z_]+)";', source)
+        self.assertIsNotNone(declared, "SPEC_SCOPE is not where this test looks for it")
         with patch.dict(os.environ):
             # Unscoped, the server advertises more than a generation may use: the control that
             # shows the answer below comes from the variable and not from the server's default.
             os.environ.pop(declared.group(1), None)
             unscoped = mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
-            os.environ[declared.group(1)] = "assigned-work"
+            os.environ[declared.group(1)] = "assigned-spec"
             scoped = mcp.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertNotEqual(mcp.WORKBENCH_TOOLS,
                             {t["name"] for t in unscoped["result"]["tools"]})

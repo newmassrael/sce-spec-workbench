@@ -25,22 +25,22 @@ import {
   type RequirementOutcome,
   type RequirementsReport,
   type Standing,
-  type WorkSnapshot,
+  type SpecSnapshot,
 } from "./contract";
 
 /** Where the panel is. */
 export type AcceptancePanel =
   | { readonly phase: "reading" }
-  /** The work has no requirement list: there is nothing to accept a design against. */
+  /** The spec has no requirement list: there is nothing to accept a design against. */
   | { readonly phase: "no-list" }
   /** The list or the acceptance could not be read at all. */
   | { readonly phase: "failed"; readonly message: string }
   | { readonly phase: "read"; readonly state: AcceptanceState };
 
-/** A work that has a list, and what is known of it. */
+/** A spec that has a list, and what is known of it. */
 export interface AcceptanceState {
   /**
-   * The revisions of the work this is of: the snapshot it was read beside, which SCE was asked
+   * The revisions of the spec this is of: the snapshot it was read beside, which SCE was asked
    * about by name. The list, the report and the standing are all of these and of no others.
    */
   readonly basis: Basis;
@@ -122,10 +122,10 @@ function whatIsNotShown(shown: Shown, basis: Basis): "unread" | "differs" | null
 }
 
 /**
- * The revisions of the work a snapshot holds, which is what SCE is asked about; `null` when it
+ * The revisions of the spec a snapshot holds, which is what SCE is asked about; `null` when it
  * holds no text, no model or no list, since there is no design to measure against anything.
  */
-export function basisOf(snapshot: WorkSnapshot): Basis | null {
+export function basisOf(snapshot: SpecSnapshot): Basis | null {
   const { source, model, requirements } = snapshot;
   if (source === null || model === null || requirements === null) return null;
   return {
@@ -137,9 +137,9 @@ export function basisOf(snapshot: WorkSnapshot): Basis | null {
 }
 
 /**
- * The panel for the work `snapshot` holds, from what SCE said of those revisions. Every part is
+ * The panel for the spec `snapshot` holds, from what SCE said of those revisions. Every part is
  * of the snapshot: the list is its list, the measure and the standing were asked of its revisions
- * by name, so nothing has to be compared and no part can be of another state of the work. Where
+ * by name, so nothing has to be compared and no part can be of another state of the spec. Where
  * the design and the list stand to the text is the snapshot's own word, read in the same state as
  * the revisions: SCE's measure is of their content and does not say it, since the same bytes kept
  * again for a later text would otherwise change what was said of the state that was read. SCE
@@ -147,7 +147,7 @@ export function basisOf(snapshot: WorkSnapshot): Basis | null {
  * that did not say) are states of the panel, with their reasons: whether the owner's acceptance
  * holds is not something to guess at, and the measure is still shown when only the verdict failed.
  */
-export function panelOf(snapshot: WorkSnapshot, judgment: Judgment): AcceptancePanel {
+export function panelOf(snapshot: SpecSnapshot, judgment: Judgment): AcceptancePanel {
   if (snapshot.requirements === null || snapshot.source === null) return { phase: "no-list" };
   const held = snapshot.acceptance;
   // A verdict is asked for exactly when an acceptance was made, so an answer that disagrees is a
@@ -183,7 +183,7 @@ interface Claims {
   readonly requirementsStanding: Standing;
 }
 
-function claimsOf(snapshot: WorkSnapshot): Claims {
+function claimsOf(snapshot: SpecSnapshot): Claims {
   const { source, requirements, model_standing, requirements_standing } = snapshot;
   if (source === null || requirements === null || model_standing === null || requirements_standing === null) {
     throw new ContractError("snapshot", "a text, a list and a standing for every part it holds");
@@ -215,7 +215,7 @@ function reportOf(measure: Measure, basis: Basis, claims: Claims): RequirementsR
  * is taken at once. Left as it was, the accept would be offered or withheld by a claim the screen
  * no longer holds until SCE answered, which can be a long time.
  */
-export function restanded(state: AcceptanceState, snapshot: WorkSnapshot): AcceptanceState {
+export function restanded(state: AcceptanceState, snapshot: SpecSnapshot): AcceptanceState {
   const claims = claimsOf(snapshot);
   return {
     ...state,
@@ -236,7 +236,7 @@ export function refusedForTheInput(refusal: Refusal): boolean {
 
 /**
  * Whether the panel holds an answer SCE did not give for a reason that passes, which is worth
- * asking for again of the same revisions: the saved work has not changed, so nothing else will
+ * asking for again of the same revisions: the saved spec has not changed, so nothing else will
  * make the screen ask. How often is the watch's (it waits twice as long after each failure).
  */
 export function worthAskingAgain(state: AcceptanceState): boolean {
@@ -245,12 +245,12 @@ export function worthAskingAgain(state: AcceptanceState): boolean {
 }
 
 /**
- * Whether a panel read is of the work `snapshot` holds: the same revisions, and the same acceptance
+ * Whether a panel read is of the spec `snapshot` holds: the same revisions, and the same acceptance
  * (an acceptance made elsewhere moves nothing a basis names). A panel that is not is not shown
  * beside that snapshot's model, since a verdict of one design beside another is a false statement
  * about what the owner is looking at; it is asked for again.
  */
-export function panelIsOf(state: AcceptanceState, snapshot: WorkSnapshot): boolean {
+export function panelIsOf(state: AcceptanceState, snapshot: SpecSnapshot): boolean {
   const basis = basisOf(snapshot);
   return (
     basis !== null &&
@@ -260,11 +260,11 @@ export function panelIsOf(state: AcceptanceState, snapshot: WorkSnapshot): boole
 }
 
 /**
- * Whether the acceptance's standing was judged of the work the screen is showing. The panel is of
+ * Whether the acceptance's standing was judged of the spec the screen is showing. The panel is of
  * the snapshot the model was read in, so the design shown is the one judged; what can differ is
  * the text and the answers, which the person edits apart from it and which are read again
  * apart. A part still being read is not held against the standing, and where there is no
- * acceptance there is no standing to be of another work.
+ * acceptance there is no standing to be of another spec.
  */
 export function standingIsOfWhatIsShown(state: AcceptanceState, shown: Shown): boolean {
   if (state.accepted === null) return true;

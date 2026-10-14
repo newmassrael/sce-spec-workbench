@@ -53,10 +53,10 @@ import {
   parseReview,
   parseSaved,
   parseServerStatus,
-  parseWork,
-  parseWorkAndHead,
-  parseWorkHeads,
-  parseWorkSnapshot,
+  parseSpec,
+  parseSpecAndHead,
+  parseSpecHeads,
+  parseSpecSnapshot,
   SUPPORTED_APPLICATION_COMMAND_SET_VERSION,
   SUPPORTED_COMMAND_SET_VERSION,
 } from "../src/contract";
@@ -74,9 +74,9 @@ const replies = JSON.parse(
 
 const parsers: Record<string, (value: unknown) => unknown> = {
   describe: parseDescribed,
-  list_works: parseListing,
-  create_work: (v) => parseWork(v),
-  read_work: parseWorkAndHead,
+  list_specs: parseListing,
+  create_spec: (v) => parseSpec(v),
+  read_spec: parseSpecAndHead,
   read_source: parseReadSource,
   save_source: parseSaved,
   history: parseHistory,
@@ -84,7 +84,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   read_model: parseReadModel,
   model_history: parseHistory,
   figures: parseFigures,
-  remove_work: parseRemoved,
+  remove_spec: parseRemoved,
   review: parseReview,
   read_answers: parseReadAnswers,
   save_answers: parseSaved,
@@ -95,9 +95,9 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   read_acceptance: parseReadAcceptance,
   read_acceptance_delta: parseReadAcceptanceDelta,
   read_revision_report: parseReadRevisionReport,
-  read_work_snapshot: parseWorkSnapshot,
+  read_spec_snapshot: parseSpecSnapshot,
   read_judgment: parseJudgment,
-  read_work_heads: parseWorkHeads,
+  read_spec_heads: parseSpecHeads,
   request_generation: parseRegisteredRequest,
   read_request: parseRequestReply,
   list_requests: parseRequestList,
@@ -164,7 +164,7 @@ describe("the replies the core gives", () => {
   it("carry the facts the screen branches on", () => {
     expect(parseReadSource(replies.answers["read_source_none"])).toBeNull();
     expect(parseReadSource(replies.answers["read_source"])?.text).toContain("Three misses");
-    expect(parseWorkAndHead(replies.answers["read_work_no_text"]).head).toBeNull();
+    expect(parseSpecAndHead(replies.answers["read_spec_no_text"]).head).toBeNull();
     expect(parseSaved(replies.answers["save_source_first"])).toMatchObject({ outcome: "saved", parent: null });
     expect(parseSaved(replies.answers["save_source_unchanged"]).outcome).toBe("unchanged");
     expect(parseHistory(replies.answers["history"])).toHaveLength(2);
@@ -276,8 +276,8 @@ describe("the replies the core gives", () => {
     expect(lapsed.now?.model).not.toBe(lapsed.acceptance?.basis.model);
   });
 
-  it("give a work as one state, in the words of the commands that read one chain", () => {
-    const empty = parseWorkSnapshot(replies.answers["read_work_snapshot_empty"]);
+  it("give a spec as one state, in the words of the commands that read one chain", () => {
+    const empty = parseSpecSnapshot(replies.answers["read_spec_snapshot_empty"]);
     expect(empty).toMatchObject({
       source: null,
       model: null,
@@ -287,16 +287,16 @@ describe("the replies the core gives", () => {
       requirements_standing: null,
       acceptance: null,
     });
-    // A work with a text, a model and answers, and no list and no acceptance.
-    const door = parseWorkSnapshot(replies.answers["read_work_snapshot"]);
-    expect(door.work.title).toBe("Door lock");
+    // A spec with a text, a model and answers, and no list and no acceptance.
+    const door = parseSpecSnapshot(replies.answers["read_spec_snapshot"]);
+    expect(door.spec.title).toBe("Door lock");
     expect(door.model_standing).toBe("current");
     expect(door.model).toEqual(parseReadModel(replies.answers["read_model_kept"]).model);
     expect(door.answers).toEqual(parseReadAnswers(replies.answers["read_answers"]));
     expect(door.requirements).toBeNull();
     expect(door.acceptance).toBeNull();
-    // A work with a text, a model, a list and an acceptance, and no answers.
-    const garage = parseWorkSnapshot(replies.answers["read_work_snapshot_accepted"]);
+    // A spec with a text, a model, a list and an acceptance, and no answers.
+    const garage = parseSpecSnapshot(replies.answers["read_spec_snapshot_accepted"]);
     expect(garage.answers).toBeNull();
     expect(garage.requirements_standing).toBe("current");
     expect(garage.requirements).toEqual(parseReadRequirements(replies.answers["read_requirements"]).requirements);
@@ -373,8 +373,8 @@ describe("the replies the core gives", () => {
     expect(() => parseJudgment(unknown)).toThrow(/standing/);
   });
 
-  it("give where each chain of a work stands, with what the model and the list were written for", () => {
-    expect(parseWorkHeads(replies.answers["read_work_heads_empty"])).toEqual({
+  it("give where each chain of a spec stands, with what the model and the list were written for", () => {
+    expect(parseSpecHeads(replies.answers["read_spec_heads_empty"])).toEqual({
       source: null,
       model: null,
       answers: null,
@@ -383,14 +383,14 @@ describe("the replies the core gives", () => {
       bundle: null,
       request: null,
     });
-    const door = parseWorkHeads(replies.answers["read_work_heads"]);
-    const snapshot = parseWorkSnapshot(replies.answers["read_work_snapshot"]);
+    const door = parseSpecHeads(replies.answers["read_spec_heads"]);
+    const snapshot = parseSpecSnapshot(replies.answers["read_spec_snapshot"]);
     expect(door.source).toBe(snapshot.source?.revision);
     expect(door.model).toEqual({ revision: snapshot.model?.revision, written_for: snapshot.model?.written_for });
     expect(door.answers).toBe(snapshot.answers?.revision);
     expect(door.requirements).toBeNull();
-    const garage = parseWorkHeads(replies.answers["read_work_heads_accepted"]);
-    const held = parseWorkSnapshot(replies.answers["read_work_snapshot_accepted"]);
+    const garage = parseSpecHeads(replies.answers["read_spec_heads_accepted"]);
+    const held = parseSpecSnapshot(replies.answers["read_spec_snapshot_accepted"]);
     expect(garage.requirements).toEqual({
       revision: held.requirements?.revision,
       written_for: held.requirements?.written_for,
@@ -419,10 +419,10 @@ describe("the replies the core gives", () => {
       note: "SCE refused the model",
     });
     expect(parseRequestReply(replies.answers["cancel_request"]).state).toBe("cancelled");
-    // What an executor looks at to find work: the requests that can still produce a result.
+    // What an executor looks at to find spec: the requests that can still produce a result.
     const open = parseRequestList(replies.answers["list_open_requests"]);
     expect(open.map((r) => [r.id, r.state])).toEqual([["<request-id>", "queued"]]);
-    // Newest first, and one request of a work is open at most.
+    // Newest first, and one request of a spec is open at most.
     const listed = parseRequestList(replies.answers["list_requests"]);
     expect(listed.map((r) => r.seq)).toEqual([...listed.map((r) => r.seq)].sort((a, b) => b - a));
     expect(listed.filter((r) => isOpenRequest(r.state))).toHaveLength(0);
@@ -436,7 +436,7 @@ describe("the replies the core gives", () => {
     expect(listing.hosts[0]?.reason).toContain("SCE_CLAUDE");
   });
 
-  it("say what an executor wrote for a request, and that it is not the work's until it completes", () => {
+  it("say what an executor wrote for a request, and that it is not the spec's until it completes", () => {
     const written = parseRequestReply(replies.answers["save_request_candidate"]);
     expect(written.candidate?.model).toMatch(/^[0-9a-f]{64}$/);
     expect(written.candidate?.requirements).toMatch(/^[0-9a-f]{64}$/);
@@ -449,7 +449,7 @@ describe("the replies the core gives", () => {
     expect(refused.detail.missing).toEqual(["model", "requirements"]);
   });
 
-  it("say which bundle a completed request made the work's, and what was checked of it", () => {
+  it("say which bundle a completed request made the spec's, and what was checked of it", () => {
     const done = parseCompletedRequest(replies.answers["complete_request"]);
     // The contract file names a bundle's revision, which varies with the request that made it.
     expect(done.bundle).toBe("b".repeat(64));
@@ -469,18 +469,18 @@ describe("the replies the core gives", () => {
     expect(parseRequestReply(replies.answers["save_request_candidate"]).candidate?.instructions).toBe(
       "claude-code/0123456789ab",
     );
-    // The work had a model before the first bundle, and the bundle says what it took over from.
+    // The spec had a model before the first bundle, and the bundle says what it took over from.
     expect(read?.bundle.previous?.model).toMatch(/^[0-9a-f]{64}$/);
     expect(parseHistory(replies.answers["bundle_history"]).map((h) => h.revision)).toEqual([done.bundle]);
-    expect(parseWorkHeads(replies.answers["read_work_heads_bundled"]).bundle).toBe(done.bundle);
-    expect(parseWorkHeads(replies.answers["read_work_heads_bundled"]).model?.revision).toBe(read?.bundle.model);
-    expect((replies.refusals["bundled-work"] as { kind: string }).kind).toBe("bundled-work");
+    expect(parseSpecHeads(replies.answers["read_spec_heads_bundled"]).bundle).toBe(done.bundle);
+    expect(parseSpecHeads(replies.answers["read_spec_heads_bundled"]).model?.revision).toBe(read?.bundle.model);
+    expect((replies.refusals["bundled-spec"] as { kind: string }).kind).toBe("bundled-spec");
     expect((replies.refusals["check-refused"] as { detail: { checks: string[] } }).detail.checks).toEqual(["model"]);
   });
 
-  it("say where the latest request of a work stands in its heads", () => {
-    expect(parseWorkHeads(replies.answers["read_work_heads"]).request).toBeNull();
-    const heads = parseWorkHeads(replies.answers["read_work_heads_requested"]);
+  it("say where the latest request of a spec stands in its heads", () => {
+    expect(parseSpecHeads(replies.answers["read_spec_heads"]).request).toBeNull();
+    const heads = parseSpecHeads(replies.answers["read_spec_heads_requested"]);
     expect(heads.request).toMatchObject({ state: "running", attempt: 1 });
     expect(heads.request?.id).toBe("<request-id>");
   });
@@ -515,12 +515,12 @@ describe("the replies the core gives", () => {
     expect(asCommandError(replies.refusals["sce-timeout"])?.detail).toEqual({ seconds: 30 });
   });
 
-  it("say which work was removed, and that it is no longer listed or readable", () => {
-    expect(parseRemoved(replies.answers["remove_work"]).title).toBe("Window blind");
-    const after = parseListing(replies.answers["list_works_after_removal"]);
-    expect(after.works.map((w) => w.title)).toEqual(["Door lock"]);
+  it("say which spec was removed, and that it is no longer listed or readable", () => {
+    expect(parseRemoved(replies.answers["remove_spec"]).title).toBe("Window blind");
+    const after = parseListing(replies.answers["list_specs_after_removal"]);
+    expect(after.specs.map((w) => w.title)).toEqual(["Door lock"]);
     expect(after.unreadable).toEqual([]);
-    const refusal = asCommandError(replies.refusals["removed-work"]);
+    const refusal = asCommandError(replies.refusals["removed-spec"]);
     expect(refusal?.kind).toBe("not-found");
     expect(refusal?.message).toContain("removed");
   });
@@ -818,13 +818,13 @@ describe("the replies the core gives", () => {
 });
 
 describe("a reply that is not the promised shape", () => {
-  const listing = replies.answers["list_works"] as { works: Record<string, unknown>[] };
+  const listing = replies.answers["list_specs"] as { specs: Record<string, unknown>[] };
 
   it("is refused with the place it went wrong", () => {
-    expect(() => parseListing({ works: [{ id: "a", title: 1, created_at: "x" }], unreadable: [] })).toThrow(
-      /listing\.works\[0\]\.title: expected a string/,
+    expect(() => parseListing({ specs: [{ id: "a", title: 1, created_at: "x" }], unreadable: [] })).toThrow(
+      /listing\.specs\[0\]\.title: expected a string/,
     );
-    expect(() => parseListing({ works: [] })).toThrow(/listing\.unreadable: expected a list/);
+    expect(() => parseListing({ specs: [] })).toThrow(/listing\.unreadable: expected a list/);
     expect(() => parseListing(null)).toThrow(ContractError);
     expect(() => parseListing([])).toThrow(ContractError);
   });
@@ -836,12 +836,12 @@ describe("a reply that is not the promised shape", () => {
   });
 
   it("is refused when a field the screen reads is missing", () => {
-    const work = { ...(listing.works[0] ?? {}) };
-    delete work["title"];
-    expect(() => parseWork(work)).toThrow(/work\.title/);
-    expect(() => parseWorkAndHead({ work: listing.works[0] })).toThrow(/read_work\.head/);
+    const spec = { ...(listing.specs[0] ?? {}) };
+    delete spec["title"];
+    expect(() => parseSpec(spec)).toThrow(/spec\.title/);
+    expect(() => parseSpecAndHead({ spec: listing.specs[0] })).toThrow(/read_spec\.head/);
     expect(() => parseReadSource({})).toThrow(/read_source\.source/);
-    expect(() => parseRemoved({})).toThrow(/remove_work\.removed/);
+    expect(() => parseRemoved({})).toThrow(/remove_spec\.removed/);
     // A request in a state the core does not have is refused by name, and so is one without a count.
     const request = (replies.answers["claim_request"] as { request: Record<string, unknown> }).request;
     expect(() => parseGenerationRequest({ ...request, state: "paused" })).toThrow(/request\.state/);
@@ -850,14 +850,14 @@ describe("a reply that is not the promised shape", () => {
     expect(() => parseRegisteredRequest({ request })).toThrow(/request_generation\.created/);
     // A snapshot that leaves a chain out says which, and a standing must agree with
     // whether the part it is about is there.
-    const snapshot = replies.answers["read_work_snapshot"] as Record<string, unknown>;
+    const snapshot = replies.answers["read_spec_snapshot"] as Record<string, unknown>;
     const { answers: _answers, ...withoutAnswers } = snapshot;
-    expect(() => parseWorkSnapshot(withoutAnswers)).toThrow(/read_work_snapshot\.answers/);
-    expect(() => parseWorkSnapshot({ ...snapshot, model_standing: null })).toThrow(
-      /read_work_snapshot\.model_standing/,
+    expect(() => parseSpecSnapshot(withoutAnswers)).toThrow(/read_spec_snapshot\.answers/);
+    expect(() => parseSpecSnapshot({ ...snapshot, model_standing: null })).toThrow(
+      /read_spec_snapshot\.model_standing/,
     );
-    expect(() => parseWorkSnapshot({ ...snapshot, requirements_standing: "current" })).toThrow(
-      /read_work_snapshot\.requirements_standing: expected null/,
+    expect(() => parseSpecSnapshot({ ...snapshot, requirements_standing: "current" })).toThrow(
+      /read_spec_snapshot\.requirements_standing: expected null/,
     );
     const set = replies.answers["read_model_set"] as { model: Record<string, unknown> } & Record<string, unknown>;
     expect(() => parseReadModel({ ...set, model: { ...set.model, entry: "gone.scxml" } })).toThrow(
@@ -931,7 +931,7 @@ describe("a reply that is not the promised shape", () => {
     expect(read.report?.requirements.map((row) => row["kind"]).sort())
       .toEqual(["carries-over", "carries-over", "carries-over", "carries-over", "retired-cleanly"]);
     expect(read.report?.page).toContain("Verdict: within-reach");
-    // The two states are the work's own chain: the list accepted and the list the work has now.
+    // The two states are the spec's own chain: the list accepted and the list the spec has now.
     expect(read.report?.of.accepted.requirements).not.toBe(read.report?.of.now.requirements);
     expect(read.acceptance?.basis.requirements).toBe(read.report?.of.accepted.requirements);
   });
@@ -1038,7 +1038,7 @@ describe("a reply that is not the promised shape", () => {
   });
 
   it("is accepted when the core has added a field the screen does not read", () => {
-    expect(() => parseWork({ ...(listing.works[0] ?? {}), colour: "blue" })).not.toThrow();
+    expect(() => parseSpec({ ...(listing.specs[0] ?? {}), colour: "blue" })).not.toThrow();
   });
 
   it("is not mistaken for a refusal unless it has a kind and a message", () => {

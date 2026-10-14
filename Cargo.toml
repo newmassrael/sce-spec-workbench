@@ -11,8 +11,8 @@
 #                display (see README.md). A separate program, so a release build of the
 #                application cannot contain it.
 #   ui/          the screen, TypeScript, served to either entrance
-#   sce/         SCE itself, as a submodule at ONE revision: the works folder the application
-#                links (`sce/sce-works`), and the generator, `sce-work` and the authoring server an
+#   sce/         SCE itself, as a submodule at ONE revision: the specs folder the application
+#                links (`sce/sce-specs`), and the generator, `sce-spec` and the authoring server an
 #                installer carries. One revision, so that the crate the application links and the
 #                programs it ships beside it are never of two versions.
 #
@@ -34,7 +34,7 @@ authors = ["newmassrael <newmassrael@gmail.com>"]
 
 [workspace.dependencies]
 sce-spec-workbench-core = { path = "core" }
-sce-works = { path = "sce/sce-works" }
+sce-specs = { path = "sce/sce-specs" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

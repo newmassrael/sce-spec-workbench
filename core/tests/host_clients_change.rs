@@ -29,13 +29,13 @@ use sce_spec_workbench_core::host::{start_with, HostSettings};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
 };
-use sce_works::requests::{Inputs, Pin, State};
-use sce_works::{ConnectionId, ManualClock, Registration, Saved, WorkId, WorkStore};
+use sce_specs::requests::{Inputs, Pin, State};
+use sce_specs::{ConnectionId, ManualClock, Registration, Saved, SpecId, SpecStore};
 use serde_json::json;
 
 use common::FakeRenderer;
 
-type Works = Arc<WorkStore<Arc<ManualClock>>>;
+type Specs = Arc<SpecStore<Arc<ManualClock>>>;
 
 fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
     let map: HashMap<String, OsString> = pairs
@@ -45,9 +45,9 @@ fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
     move |key| map.get(key).cloned()
 }
 
-fn works(label: &str) -> Works {
+fn specs(label: &str) -> Specs {
     let clock = Arc::new(ManualClock::at(1_791_190_800));
-    Arc::new(WorkStore::with_clock(common::scratch(label), clock))
+    Arc::new(SpecStore::with_clock(common::scratch(label), clock))
 }
 
 /// The programs of one computer: a Claude Code that is signed in and writes a model, a Codex that
@@ -134,15 +134,15 @@ fn pinned(label: &str, adapter: AdapterKind) -> (ConnectionStore, Pin) {
     (store, pin)
 }
 
-fn ask_for(works: &WorkStore<Arc<ManualClock>>, id: &WorkId, pin: Pin) -> String {
-    works
+fn ask_for(specs: &SpecStore<Arc<ManualClock>>, id: &SpecId, pin: Pin) -> String {
+    specs
         .register_request_for(
             id,
             Registration {
                 key: "press-1",
                 origin: "gui",
                 expect: Inputs {
-                    source: works.head(id).unwrap().unwrap(),
+                    source: specs.head(id).unwrap().unwrap(),
                     answers: None,
                 },
                 supersede: false,
@@ -163,8 +163,8 @@ fn within_ten_seconds(what: &str, until: impl Fn() -> bool) {
 }
 
 /// Why the host says the oldest request it left is waiting, when it left one.
-fn waiting_reason(works: &WorkStore<Arc<ManualClock>>) -> Option<String> {
-    works.host_status().unwrap().hosts[0]
+fn waiting_reason(specs: &SpecStore<Arc<ManualClock>>) -> Option<String> {
+    specs.host_status().unwrap().hosts[0]
         .host
         .waiting
         .first()
@@ -173,16 +173,16 @@ fn waiting_reason(works: &WorkStore<Arc<ManualClock>>) -> Option<String> {
 
 #[test]
 fn a_host_that_started_with_codex_runs_for_claude_code_installed_after_it() {
-    let works = works("hcc-claude-later");
-    let id = works.create_work("Door lock").unwrap().id;
-    works.save_source(&id, "The lock opens.", None).unwrap();
+    let specs = specs("hcc-claude-later");
+    let id = specs.create_spec("Door lock").unwrap().id;
+    specs.save_source(&id, "The lock opens.", None).unwrap();
     let programs = programs("hcc-claude-later-bin");
     let back = away(&programs.claude);
     let (connections, pin) = pinned("hcc-claude-later-settings", AdapterKind::ClaudeCode);
-    let request = ask_for(&works, &id, pin);
+    let request = ask_for(&specs, &id, pin);
 
     let host = start_with(
-        Arc::clone(&works),
+        Arc::clone(&specs),
         Arc::new(FakeRenderer),
         settings(&programs),
         Some((connections, Policy::shipped())),
@@ -192,9 +192,9 @@ fn a_host_that_started_with_codex_runs_for_claude_code_installed_after_it() {
     assert_eq!(host.not_hosted(), None);
     assert_eq!(host.client_version().as_deref(), Some("0.159.1"));
     within_ten_seconds("the request was not said to wait", || {
-        waiting_reason(&works).is_some()
+        waiting_reason(&specs).is_some()
     });
-    let reason = waiting_reason(&works).unwrap();
+    let reason = waiting_reason(&specs).unwrap();
     assert!(reason.contains("Claude Code was not found"), "{reason}");
 
     // The person installs it while the window is open.
@@ -202,14 +202,14 @@ fn a_host_that_started_with_codex_runs_for_claude_code_installed_after_it() {
 
     within_ten_seconds(
         "the request was not run once Claude Code was installed",
-        || works.read_request(&id, &request).unwrap().state == State::Completed,
+        || specs.read_request(&id, &request).unwrap().state == State::Completed,
     );
     // And the host says it is Claude Code that it runs for now, where the screen reads it.
     within_ten_seconds("the host did not say which client it is", || {
         host.client_version().as_deref() == Some("2.1.289")
     });
     within_ten_seconds("the adapter was not reported as Claude Code", || {
-        works
+        specs
             .adapter_status()
             .unwrap()
             .adapters
@@ -221,16 +221,16 @@ fn a_host_that_started_with_codex_runs_for_claude_code_installed_after_it() {
 
 #[test]
 fn a_host_that_started_with_claude_code_looks_for_codex_again() {
-    let works = works("hcc-codex-later");
-    let id = works.create_work("Door lock").unwrap().id;
-    works.save_source(&id, "The lock opens.", None).unwrap();
+    let specs = specs("hcc-codex-later");
+    let id = specs.create_spec("Door lock").unwrap().id;
+    specs.save_source(&id, "The lock opens.", None).unwrap();
     let programs = programs("hcc-codex-later-bin");
     let back = away(&programs.codex);
     let (connections, pin) = pinned("hcc-codex-later-settings", AdapterKind::Codex);
-    ask_for(&works, &id, pin);
+    ask_for(&specs, &id, pin);
 
     let host = start_with(
-        Arc::clone(&works),
+        Arc::clone(&specs),
         Arc::new(FakeRenderer),
         settings(&programs),
         Some((connections, Policy::shipped())),
@@ -238,9 +238,9 @@ fn a_host_that_started_with_claude_code_looks_for_codex_again() {
 
     assert_eq!(host.client_version().as_deref(), Some("2.1.289"));
     within_ten_seconds("the request was not said to wait", || {
-        waiting_reason(&works).is_some()
+        waiting_reason(&specs).is_some()
     });
-    let reason = waiting_reason(&works).unwrap();
+    let reason = waiting_reason(&specs).unwrap();
     assert!(reason.contains("Codex was not found"), "{reason}");
 
     fs::rename(&back, &programs.codex).unwrap();
@@ -248,20 +248,20 @@ fn a_host_that_started_with_claude_code_looks_for_codex_again() {
     // Codex is judged as Codex now: this build has verified none, and says so, and not that it
     // was not found.
     within_ten_seconds("the reason did not follow the install", || {
-        waiting_reason(&works).is_some_and(|r| r.contains("has not been verified"))
+        waiting_reason(&specs).is_some_and(|r| r.contains("has not been verified"))
     });
     drop(host);
 }
 
 #[test]
 fn a_client_that_goes_away_while_the_host_runs_is_said_to_be_gone() {
-    let works = works("hcc-gone");
-    let id = works.create_work("Door lock").unwrap().id;
-    works.save_source(&id, "The lock opens.", None).unwrap();
+    let specs = specs("hcc-gone");
+    let id = specs.create_spec("Door lock").unwrap().id;
+    specs.save_source(&id, "The lock opens.", None).unwrap();
     let programs = programs("hcc-gone-bin");
     let (connections, pin) = pinned("hcc-gone-settings", AdapterKind::ClaudeCode);
     let host = start_with(
-        Arc::clone(&works),
+        Arc::clone(&specs),
         Arc::new(FakeRenderer),
         settings(&programs),
         Some((connections, Policy::shipped())),
@@ -270,11 +270,11 @@ fn a_client_that_goes_away_while_the_host_runs_is_said_to_be_gone() {
     let _held = away(&programs.claude);
 
     // A request made now is not started on a program that is not there: it waits, and says so.
-    ask_for(&works, &id, pin);
+    ask_for(&specs, &id, pin);
 
     within_ten_seconds(
         "the request was not said to wait for a program that is gone",
-        || waiting_reason(&works).is_some_and(|r| r.contains("Claude Code was not found")),
+        || waiting_reason(&specs).is_some_and(|r| r.contains("Claude Code was not found")),
     );
     drop(host);
 }

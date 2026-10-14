@@ -37,7 +37,7 @@ fn server(folder: &Path, behaviour: &str) -> AuthorServer {
              *'\"method\":\"initialize\"'*)\n\
                printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{{\"tools\":{{}}}},\"serverInfo\":{{\"name\":\"fake\",\"version\":\"1\"}},\"instructions\":\"Use the tools.\"}}}}\\n' \"$id\" ;;\n\
              *'\"method\":\"tools/list\"'*)\n\
-               printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"tools\":[{{\"name\":\"works_read\",\"description\":\"Read a work.\",\"inputSchema\":{{\"type\":\"object\",\"properties\":{{\"work\":{{\"type\":\"string\"}}}}}}}},{{\"name\":\"bare\"}}]}}}}\\n' \"$id\" ;;\n\
+               printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"tools\":[{{\"name\":\"specs_read\",\"description\":\"Read a spec.\",\"inputSchema\":{{\"type\":\"object\",\"properties\":{{\"spec\":{{\"type\":\"string\"}}}}}}}},{{\"name\":\"bare\"}}]}}}}\\n' \"$id\" ;;\n\
              *'\"method\":\"tools/call\"'*)\n\
                printf '%s\\n' \"$line\" >> '{calls}'\n\
                {behaviour}\n\
@@ -54,7 +54,7 @@ fn server(folder: &Path, behaviour: &str) -> AuthorServer {
     }
 }
 
-const ANSWER: &str = "printf '{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"the work\"},{\"type\":\"text\",\"text\":\"more\"}],\"isError\":false}}\\n' \"$id\"";
+const ANSWER: &str = "printf '{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"the spec\"},{\"type\":\"text\",\"text\":\"more\"}],\"isError\":false}}\\n' \"$id\"";
 
 fn within(seconds: u64) -> Instant {
     Instant::now() + Duration::from_secs(seconds)
@@ -86,9 +86,9 @@ fn it_lists_the_tools_with_what_they_say_of_themselves_and_a_schema_when_they_sa
     let tools = client.tools(within(10), &Cancel::new()).unwrap();
 
     assert_eq!(tools.len(), 2);
-    assert_eq!(tools[0].name, "works_read");
-    assert_eq!(tools[0].description, "Read a work.");
-    assert_eq!(tools[0].schema["properties"]["work"]["type"], "string");
+    assert_eq!(tools[0].name, "specs_read");
+    assert_eq!(tools[0].description, "Read a spec.");
+    assert_eq!(tools[0].schema["properties"]["spec"]["type"], "string");
     // A tool that says nothing of its arguments takes none.
     assert_eq!(tools[1].name, "bare");
     assert_eq!(tools[1].schema, json!({"type": "object", "properties": {}}));
@@ -100,8 +100,8 @@ fn a_call_names_the_tool_and_gives_the_arguments_and_the_words_it_answers_are_pu
 
     let called = client
         .call(
-            "works_read",
-            &json!({"work": "door-lock"}),
+            "specs_read",
+            &json!({"spec": "door-lock"}),
             within(10),
             &Cancel::new(),
         )
@@ -110,14 +110,14 @@ fn a_call_names_the_tool_and_gives_the_arguments_and_the_words_it_answers_are_pu
     assert_eq!(
         called,
         Called {
-            text: "the work\nmore".to_string(),
+            text: "the spec\nmore".to_string(),
             is_error: false
         }
     );
     let sent = fs::read_to_string(folder.join("calls")).unwrap();
-    assert!(sent.contains("\"name\":\"works_read\""), "{sent}");
+    assert!(sent.contains("\"name\":\"specs_read\""), "{sent}");
     assert!(
-        sent.contains("\"arguments\":{\"work\":\"door-lock\"}"),
+        sent.contains("\"arguments\":{\"spec\":\"door-lock\"}"),
         "{sent}"
     );
 }
@@ -126,17 +126,17 @@ fn a_call_names_the_tool_and_gives_the_arguments_and_the_words_it_answers_are_pu
 fn a_tool_that_says_it_failed_is_an_answer_and_not_an_error_of_the_server() {
     let (mut client, _) = started(
         "mcp-is-error",
-        "printf '{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no such work\"}],\"isError\":true}}\\n' \"$id\"",
+        "printf '{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no such spec\"}],\"isError\":true}}\\n' \"$id\"",
     );
 
     let called = client
-        .call("works_read", &json!({}), within(10), &Cancel::new())
+        .call("specs_read", &json!({}), within(10), &Cancel::new())
         .unwrap();
 
     assert_eq!(
         called,
         Called {
-            text: "no such work".to_string(),
+            text: "no such spec".to_string(),
             is_error: true
         }
     );
@@ -151,7 +151,7 @@ fn what_the_server_says_that_is_not_the_answer_is_passed_over() {
     );
 
     let called = client
-        .call("works_read", &json!({}), within(10), &Cancel::new())
+        .call("specs_read", &json!({}), within(10), &Cancel::new())
         .unwrap();
 
     assert_eq!(called.text, "ok");
@@ -165,7 +165,7 @@ fn an_error_the_server_gives_is_its_refusal_in_its_words() {
     );
 
     let refused = client
-        .call("works_read", &json!({}), within(10), &Cancel::new())
+        .call("specs_read", &json!({}), within(10), &Cancel::new())
         .unwrap_err();
 
     assert_eq!(
@@ -187,7 +187,7 @@ fn a_server_that_does_not_answer_is_stopped_waiting_for_when_told_to() {
     };
 
     let began = Instant::now();
-    let stopped = client.call("works_read", &json!({}), within(60), &cancel);
+    let stopped = client.call("specs_read", &json!({}), within(60), &cancel);
     stopper.join().unwrap();
 
     assert_eq!(stopped, Err(McpError::Cancelled));
@@ -204,7 +204,7 @@ fn a_server_that_takes_longer_than_the_time_given_is_stopped_waiting_for_at_that
 
     let began = Instant::now();
     let late = client.call(
-        "works_read",
+        "specs_read",
         &json!({}),
         Instant::now() + Duration::from_millis(400),
         &Cancel::new(),
@@ -226,7 +226,7 @@ fn a_server_that_goes_away_is_said_to_be_gone_with_what_it_last_said() {
     );
 
     let gone = client
-        .call("works_read", &json!({}), within(10), &Cancel::new())
+        .call("specs_read", &json!({}), within(10), &Cancel::new())
         .unwrap_err();
 
     let McpError::Gone(why) = gone else {
@@ -275,7 +275,7 @@ fn the_server_is_started_with_the_environment_it_was_given_and_is_gone_when_the_
         &program,
         "#!/bin/sh\n\
          [ \"$1\" = \"--version\" ] && exit 0\n\
-         printf '%s' \"$SCE_WORKS_DIR\" > \"$(dirname \"$0\")/env\"\n\
+         printf '%s' \"$SCE_SPECS_DIR\" > \"$(dirname \"$0\")/env\"\n\
          echo $$ > \"$(dirname \"$0\")/pid\"\n\
          while IFS= read -r line; do\n\
            id=$(printf '%s' \"$line\" | sed -n 's/.*\"id\":\\([0-9][0-9]*\\).*/\\1/p')\n\
@@ -285,7 +285,7 @@ fn the_server_is_started_with_the_environment_it_was_given_and_is_gone_when_the_
     let author = AuthorServer {
         command: program,
         args: vec![],
-        env: vec![("SCE_WORKS_DIR".to_string(), "/works".to_string())],
+        env: vec![("SCE_SPECS_DIR".to_string(), "/specs".to_string())],
     };
 
     let client = McpClient::start(&author, &folder, within(10), &Cancel::new()).unwrap();
@@ -296,7 +296,7 @@ fn the_server_is_started_with_the_environment_it_was_given_and_is_gone_when_the_
     let env = fs::read_to_string(folder.join("env")).unwrap();
     drop(client);
 
-    assert_eq!(env, "/works");
+    assert_eq!(env, "/specs");
     // The process was ended with the client.
     let gone = (0..50).any(|_| {
         let there = Path::new(&format!("/proc/{pid}")).exists();
@@ -349,7 +349,7 @@ fn deaf_server(folder: &Path) -> AuthorServer {
          printf '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"deaf\",\"version\":\"1\"}}}\\n'\n\
          IFS= read -r line\n\
          IFS= read -r line\n\
-         printf '{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"works_read\"}]}}\\n'\n\
+         printf '{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"specs_read\"}]}}\\n'\n\
          exec sleep 60\n",
     );
     AuthorServer {
@@ -383,7 +383,7 @@ fn a_server_that_closes_its_input_and_lives_on_is_said_to_be_gone_and_not_waited
          IFS= read -r line\n\
          IFS= read -r line\n\
          exec 0<&-\n\
-         printf '{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"works_read\"}]}}\\n'\n\
+         printf '{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"specs_read\"}]}}\\n'\n\
          exec sleep 60\n",
     );
     let mut client = McpClient::start(
@@ -401,8 +401,8 @@ fn a_server_that_closes_its_input_and_lives_on_is_said_to_be_gone_and_not_waited
 
     let started = Instant::now();
     let called = client.call(
-        "works_read",
-        &json!({"work": "w"}),
+        "specs_read",
+        &json!({"spec": "w"}),
         within(30),
         &Cancel::new(),
     );
@@ -415,13 +415,13 @@ fn a_server_that_closes_its_input_and_lives_on_is_said_to_be_gone_and_not_waited
 #[test]
 fn a_call_that_is_being_sent_is_stopped_at_its_time_and_when_told_to_stop() {
     // Longer than a pipe holds, so that sending it waits on a server that reads none of it.
-    let arguments = json!({ "work": "x".repeat(16 * 1024 * 1024) });
+    let arguments = json!({ "spec": "x".repeat(16 * 1024 * 1024) });
     let mut late = deaf_client("mcp-deaf-late");
     let mut told = deaf_client("mcp-deaf-told");
 
     let started = Instant::now();
     let timed_out = late.call(
-        "works_read",
+        "specs_read",
         &arguments,
         Instant::now() + Duration::from_millis(400),
         &Cancel::new(),
@@ -436,7 +436,7 @@ fn a_call_that_is_being_sent_is_stopped_at_its_time_and_when_told_to_stop() {
         })
     };
     let started = Instant::now();
-    let cancelled = told.call("works_read", &arguments, within(60), &cancel);
+    let cancelled = told.call("specs_read", &arguments, within(60), &cancel);
     let cancelled_after = started.elapsed();
     stopper.join().unwrap();
 

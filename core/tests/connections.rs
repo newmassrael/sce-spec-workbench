@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! Which AI a person connects the workbench to, kept apart from the works.
+//! Which AI a person connects the workbench to, kept apart from the specs.
 //!
 //! A connection is the settings of one way to reach a model: which client, which model,
 //! where its credentials come from. It is kept in the person's own settings folder and not in
-//! the works folder, because a works folder is shared and moved, and nobody's account is
-//! part of a work. A request will pin a connection by its id and the revision it had when the
+//! the specs folder, because a specs folder is shared and moved, and nobody's account is
+//! part of a spec. A request will pin a connection by its id and the revision it had when the
 //! request was made, so a revision is the digest of its bytes, an earlier one stays readable,
 //! and a save that does not know what it replaces is refused. No secret is kept here: a field
 //! that could hold one is not accepted, and a file that has one is not read.
@@ -18,7 +18,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 
 use sce_spec_workbench_core::{AdapterKind, AuthSource, Connection, ConnectionStore, Limits};
-use sce_works::{ConnectionId, Revision, Saved, StoreError};
+use sce_specs::{ConnectionId, Revision, Saved, StoreError};
 
 fn id(text: &str) -> ConnectionId {
     ConnectionId::parse(text).expect("a valid connection id")

@@ -6,7 +6,7 @@
 //! When a person presses the button the request is made against one connection, in the state it
 //! was in then: a later change of the settings moves no request that was already made. The core
 //! copies from the connection what a run needs to be the same run (which client, which model,
-//! what it may spend) and nothing that says where or as whom: the works folder is shared, and a
+//! what it may spend) and nothing that says where or as whom: the specs folder is shared, and a
 //! server's address, a name for it and the path of a program are not for whoever it is shared
 //! with. An executor takes a request by offering the connection it runs for, and a request that
 //! is for another is not given to it, so that a person who chose one AI is never answered by
@@ -17,14 +17,14 @@ mod common;
 use sce_spec_workbench_core::{
     call_in, AdapterKind, ConnectionStore, Context, Entrance, Limits, PinnedRun, Policy,
 };
-use sce_works::requests::{Inputs, Pin, Request};
-use sce_works::{call, CommandError, Registration, Revision, SystemClock, WorkId, WorkStore};
+use sce_specs::requests::{Inputs, Pin, Request};
+use sce_specs::{call, CommandError, Registration, Revision, SpecId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
 use common::FakeRenderer;
 
 struct Rig {
-    works: WorkStore,
+    specs: SpecStore,
     connections: ConnectionStore,
     policy: Policy,
 }
@@ -32,14 +32,14 @@ struct Rig {
 impl Rig {
     fn new(label: &str) -> Rig {
         Rig {
-            works: WorkStore::at(common::scratch(&format!("{label}-works"))),
+            specs: SpecStore::at(common::scratch(&format!("{label}-specs"))),
             connections: ConnectionStore::at(common::scratch(&format!("{label}-settings"))),
             policy: Policy::shipped(),
         }
     }
 
     fn context(&self) -> Context<'_, SystemClock> {
-        Context::new(&self.works, &FakeRenderer, &self.policy, Entrance::Desktop)
+        Context::new(&self.specs, &FakeRenderer, &self.policy, Entrance::Desktop)
             .with_connections(Some(&self.connections))
     }
 
@@ -52,10 +52,10 @@ impl Rig {
             .unwrap_or_else(|e| panic!("{name} was refused: {e:?}"))
     }
 
-    /// A work with a text, and the revision of that text.
-    fn work(&self) -> (String, String) {
-        let work = self.ok("create_work", json!({ "title": "Door lock" }));
-        let id = work["id"].as_str().unwrap().to_string();
+    /// A spec with a text, and the revision of that text.
+    fn spec(&self) -> (String, String) {
+        let spec = self.ok("create_spec", json!({ "title": "Door lock" }));
+        let id = spec["id"].as_str().unwrap().to_string();
         let saved = self.ok(
             "save_source",
             json!({ "id": id, "text": "The lock opens when the code matches." }),
@@ -70,13 +70,13 @@ impl Rig {
 
     fn request(
         &self,
-        work: &(String, String),
+        spec: &(String, String),
         key: &str,
         connection: Option<Value>,
     ) -> Result<Value, CommandError> {
         let mut args = json!({
-            "id": work.0, "key": key, "origin": "gui",
-            "expect": { "source": work.1, "answers": null },
+            "id": spec.0, "key": key, "origin": "gui",
+            "expect": { "source": spec.1, "answers": null },
         });
         if let Some(connection) = connection {
             args["connection"] = connection;
@@ -107,10 +107,10 @@ fn reference(id: &str, revision: &str) -> Value {
 fn a_request_made_for_a_connection_records_what_a_run_needs_of_it() {
     let rig = Rig::new("pin-record");
     let revision = rig.connection(claude());
-    let work = rig.work();
+    let spec = rig.spec();
 
     let made = rig
-        .request(&work, "press-1", Some(reference("main", &revision)))
+        .request(&spec, "press-1", Some(reference("main", &revision)))
         .unwrap();
 
     assert_eq!(
@@ -123,20 +123,20 @@ fn a_request_made_for_a_connection_records_what_a_run_needs_of_it() {
 }
 
 #[test]
-fn nothing_that_says_where_or_as_whom_is_copied_into_the_works_folder() {
+fn nothing_that_says_where_or_as_whom_is_copied_into_the_specs_folder() {
     let rig = Rig::new("pin-nothing-else");
     let revision = rig.connection(pc2());
-    let work = rig.work();
+    let spec = rig.spec();
 
     let made = rig
-        .request(&work, "press-1", Some(reference("pc2", &revision)))
+        .request(&spec, "press-1", Some(reference("pc2", &revision)))
         .unwrap();
 
     assert_eq!(made["request"]["pin"]["adapter"], json!("local"));
-    // The answer a screen reads and every file the works folder holds: neither names the
+    // The answer a screen reads and every file the specs folder holds: neither names the
     // server, what the person calls it, or a program.
     let mut seen = vec![made.to_string()];
-    for entry in walk(rig.works.root()) {
+    for entry in walk(rig.specs.root()) {
         seen.push(std::fs::read_to_string(&entry).unwrap_or_default());
     }
     for text in seen {
@@ -149,7 +149,7 @@ fn nothing_that_says_where_or_as_whom_is_copied_into_the_works_folder() {
         ] {
             assert!(
                 !text.contains(secret),
-                "`{secret}` reached the works folder"
+                "`{secret}` reached the specs folder"
             );
         }
     }
@@ -181,10 +181,10 @@ fn a_request_for_a_revision_that_is_no_longer_current_is_refused_as_moved() {
         "save_connection",
         json!({ "connection": changed, "base": first }),
     );
-    let work = rig.work();
+    let spec = rig.spec();
 
     let refused = rig
-        .request(&work, "press-1", Some(reference("main", &first)))
+        .request(&spec, "press-1", Some(reference("main", &first)))
         .unwrap_err();
 
     assert_eq!(refused.kind, "moved");
@@ -194,7 +194,7 @@ fn a_request_for_a_revision_that_is_no_longer_current_is_refused_as_moved() {
     );
     // Nothing was registered.
     assert_eq!(
-        rig.ok("list_requests", json!({ "id": work.0 }))["requests"],
+        rig.ok("list_requests", json!({ "id": spec.0 }))["requests"],
         json!([])
     );
 }
@@ -202,10 +202,10 @@ fn a_request_for_a_revision_that_is_no_longer_current_is_refused_as_moved() {
 #[test]
 fn a_request_for_a_connection_that_is_not_there_is_not_found() {
     let rig = Rig::new("pin-absent");
-    let work = rig.work();
+    let spec = rig.spec();
 
     let refused = rig
-        .request(&work, "press-1", Some(reference("nobody", &"a".repeat(64))))
+        .request(&spec, "press-1", Some(reference("nobody", &"a".repeat(64))))
         .unwrap_err();
 
     assert_eq!(refused.kind, "not-found");
@@ -214,15 +214,15 @@ fn a_request_for_a_connection_that_is_not_there_is_not_found() {
 #[test]
 fn an_entrance_with_no_settings_cannot_pin_a_connection() {
     let rig = Rig::new("pin-no-settings");
-    let work = rig.work();
+    let spec = rig.spec();
 
     let refused = call(
-        &rig.works,
+        &rig.specs,
         &FakeRenderer,
         "request_generation",
         json!({
-            "id": work.0, "key": "press-1", "origin": "mcp",
-            "expect": { "source": work.1, "answers": null },
+            "id": spec.0, "key": "press-1", "origin": "mcp",
+            "expect": { "source": spec.1, "answers": null },
             "connection": reference("main", &"a".repeat(64)),
         }),
     )
@@ -236,13 +236,13 @@ fn the_same_press_sent_again_is_the_request_it_made_whatever_connection_it_names
     let rig = Rig::new("pin-idempotent");
     let main = rig.connection(claude());
     let other = rig.connection(pc2());
-    let work = rig.work();
+    let spec = rig.spec();
     let first = rig
-        .request(&work, "press-1", Some(reference("main", &main)))
+        .request(&spec, "press-1", Some(reference("main", &main)))
         .unwrap();
 
     let again = rig
-        .request(&work, "press-1", Some(reference("pc2", &other)))
+        .request(&spec, "press-1", Some(reference("pc2", &other)))
         .unwrap();
 
     assert_eq!(again["created"], json!(false));
@@ -255,9 +255,9 @@ fn the_same_press_sent_again_is_the_request_it_made_whatever_connection_it_names
 fn a_press_sent_again_after_the_connection_changed_is_still_the_request_it_made() {
     let rig = Rig::new("pin-idempotent-after-change");
     let first_revision = rig.connection(claude());
-    let work = rig.work();
+    let spec = rig.spec();
     let first = rig
-        .request(&work, "press-1", Some(reference("main", &first_revision)))
+        .request(&spec, "press-1", Some(reference("main", &first_revision)))
         .unwrap();
     let mut changed = claude();
     changed["model"] = json!("sonnet");
@@ -269,7 +269,7 @@ fn a_press_sent_again_after_the_connection_changed_is_still_the_request_it_made(
     // The connection is not an input of the key: the same press is the same request, and is
     // not refused for a connection that moved after it was made.
     let again = rig
-        .request(&work, "press-1", Some(reference("main", &first_revision)))
+        .request(&spec, "press-1", Some(reference("main", &first_revision)))
         .unwrap();
 
     assert_eq!(again["created"], json!(false));
@@ -280,9 +280,9 @@ fn a_press_sent_again_after_the_connection_changed_is_still_the_request_it_made(
 #[test]
 fn a_request_made_without_a_connection_has_none() {
     let rig = Rig::new("pin-none");
-    let work = rig.work();
+    let spec = rig.spec();
 
-    let made = rig.request(&work, "press-1", None).unwrap();
+    let made = rig.request(&spec, "press-1", None).unwrap();
 
     assert_eq!(made["request"]["pin"], json!(null));
 }
@@ -292,13 +292,13 @@ fn only_the_executor_of_the_pinned_connection_takes_a_request() {
     let rig = Rig::new("pin-claim");
     let main = rig.connection(claude());
     let other = rig.connection(pc2());
-    let work = rig.work();
+    let spec = rig.spec();
     let made = rig
-        .request(&work, "press-1", Some(reference("main", &main)))
+        .request(&spec, "press-1", Some(reference("main", &main)))
         .unwrap();
     let request = made["request"]["id"].as_str().unwrap().to_string();
     let claim = |connection: Option<Value>| {
-        let mut args = json!({ "id": work.0, "request": request, "holder": "desktop" });
+        let mut args = json!({ "id": spec.0, "request": request, "holder": "desktop" });
         if let Some(connection) = connection {
             args["connection"] = connection;
         }
@@ -323,7 +323,7 @@ fn only_the_executor_of_the_pinned_connection_takes_a_request() {
     }
     // Refused, it is still nobody's.
     assert_eq!(
-        rig.ok("read_request", json!({ "id": work.0, "request": request }))["request"]["state"],
+        rig.ok("read_request", json!({ "id": spec.0, "request": request }))["request"]["state"],
         json!("queued")
     );
 
@@ -335,15 +335,15 @@ fn only_the_executor_of_the_pinned_connection_takes_a_request() {
 fn a_request_with_no_connection_is_taken_by_an_executor_that_offers_none() {
     let rig = Rig::new("pin-claim-none");
     let main = rig.connection(claude());
-    let work = rig.work();
-    let made = rig.request(&work, "press-1", None).unwrap();
+    let spec = rig.spec();
+    let made = rig.request(&spec, "press-1", None).unwrap();
     let request = made["request"]["id"].as_str().unwrap().to_string();
 
     let offered = rig
         .ask(
             "claim_request",
             json!({
-                "id": work.0, "request": request, "holder": "desktop",
+                "id": spec.0, "request": request, "holder": "desktop",
                 "connection": reference("main", &main),
             }),
         )
@@ -354,7 +354,7 @@ fn a_request_with_no_connection_is_taken_by_an_executor_that_offers_none() {
     let taken = rig
         .ask(
             "claim_request",
-            json!({ "id": work.0, "request": request, "holder": "mcp-1" }),
+            json!({ "id": spec.0, "request": request, "holder": "mcp-1" }),
         )
         .unwrap();
     assert_eq!(taken["request"]["state"], json!("running"));
@@ -365,15 +365,15 @@ fn taking_a_request_again_is_held_to_the_same_connection() {
     let rig = Rig::new("pin-resume");
     let main = rig.connection(claude());
     let other = rig.connection(pc2());
-    let work = rig.work();
+    let spec = rig.spec();
     let made = rig
-        .request(&work, "press-1", Some(reference("main", &main)))
+        .request(&spec, "press-1", Some(reference("main", &main)))
         .unwrap();
     let request = made["request"]["id"].as_str().unwrap().to_string();
     rig.ask(
         "claim_request",
         json!({
-            "id": work.0, "request": request, "holder": "desktop", "ttl_seconds": 10,
+            "id": spec.0, "request": request, "holder": "desktop", "ttl_seconds": 10,
             "connection": reference("main", &main),
         }),
     )
@@ -382,7 +382,7 @@ fn taking_a_request_again_is_held_to_the_same_connection() {
         .ask(
             "claim_request",
             json!({
-                "id": work.0, "request": request, "holder": "other", "resume": true,
+                "id": spec.0, "request": request, "holder": "other", "resume": true,
                 "connection": reference("pc2", &other),
             }),
         )
@@ -396,7 +396,7 @@ fn taking_a_request_again_is_held_to_the_same_connection() {
         .ask(
             "claim_request",
             json!({
-                "id": work.0, "request": request, "holder": "other", "resume": true,
+                "id": spec.0, "request": request, "holder": "other", "resume": true,
                 "connection": reference("main", &main),
             }),
         )
@@ -421,27 +421,27 @@ fn a_request_written_before_connections_existed_still_reads() {
 }
 
 #[test]
-fn the_works_hold_a_request_to_its_connection_and_keep_what_it_asks_of_its_run_unread() {
+fn the_specs_hold_a_request_to_its_connection_and_keep_what_it_asks_of_its_run_unread() {
     // Which clients there are is the application's to say. A request one made for a client the
-    // works have never heard of, with a field they do not have, is held to its connection as any
-    // other, and what it asks of its run is in its record as it was written, after the works
+    // specs have never heard of, with a field they do not have, is held to its connection as any
+    // other, and what it asks of its run is in its record as it was written, after the specs
     // have taken it, kept it and written it again.
     let rig = Rig::new("pin-unread");
-    let work = rig.work();
+    let spec = rig.spec();
     let settings = "c".repeat(64);
     let pin = json!({
         "connection": "main", "revision": settings,
         "adapter": "a-client-of-tomorrow", "budget": { "usd": 3 },
     });
     let made = rig
-        .works
+        .specs
         .register_request_with(
-            &WorkId::parse(&work.0).unwrap(),
+            &SpecId::parse(&spec.0).unwrap(),
             Registration {
                 key: "press-1",
                 origin: "gui",
                 expect: Inputs {
-                    source: Revision::parse(&work.1).unwrap(),
+                    source: Revision::parse(&spec.1).unwrap(),
                     answers: None,
                 },
                 supersede: false,
@@ -452,7 +452,7 @@ fn the_works_hold_a_request_to_its_connection_and_keep_what_it_asks_of_its_run_u
         .unwrap();
     let request = made.request.id;
     let claim = |connection: Option<Value>| {
-        let mut args = json!({ "id": work.0, "request": request, "holder": "desktop" });
+        let mut args = json!({ "id": spec.0, "request": request, "holder": "desktop" });
         if let Some(connection) = connection {
             args["connection"] = connection;
         }
@@ -464,7 +464,7 @@ fn the_works_hold_a_request_to_its_connection_and_keep_what_it_asks_of_its_run_u
     let taken = claim(Some(reference("main", &settings))).unwrap();
     assert_eq!(taken["request"]["state"], json!("running"));
 
-    let read = rig.ok("read_request", json!({ "id": work.0, "request": request }));
+    let read = rig.ok("read_request", json!({ "id": spec.0, "request": request }));
     assert_eq!(read["request"]["pin"], pin);
 }
 

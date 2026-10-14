@@ -12,7 +12,7 @@
 // `App`, driven through its buttons over a core whose answers can be held back,
 // has. They were found by an external review of the first version, each by a
 // sequence a person can perform, and each is a rule over the editor and not over a
-// pair of works, so the cases below vary the sequence and not only the names.
+// pair of specs, so the cases below vary the sequence and not only the names.
 
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -55,7 +55,7 @@ interface Gate {
 /** A core in memory, whose answers the test can hold back and let go of. */
 class FakeCore implements Transport {
   readonly calls: Array<{ name: string; args: Args }> = [];
-  private readonly works = new Map<string, { title: string; revisions: Revision[] }>();
+  private readonly specs = new Map<string, { title: string; revisions: Revision[] }>();
   private readonly revisionOf = new Map<string, string>();
   private readonly gates: Gate[] = [];
   private readonly failures: Array<{ name: string; error: CommandFailure }> = [];
@@ -69,7 +69,7 @@ class FakeCore implements Transport {
   >();
   private answerSaves = 0;
   private readonly lists = new Map<string, { revision: string; writtenFor: string | null; ids: string[] }>();
-  /** Every list a work had, by its revision: a revision is never rewritten, so SCE can be asked about an earlier one. */
+  /** Every list a spec had, by its revision: a revision is never rewritten, so SCE can be asked about an earlier one. */
   private readonly listsByRevision = new Map<string, { revision: string; writtenFor: string | null; ids: string[] }>();
   private readonly acceptances = new Map<
     string,
@@ -84,13 +84,13 @@ class FakeCore implements Transport {
   private listSaves = 0;
   private acceptSaves = 0;
   private readonly requestsOf = new Map<string, FakeRequest[]>();
-  /** Every model a work had, newest last, and each by its revision: what `model_history` and a review of an earlier one read. */
+  /** Every model a spec had, newest last, and each by its revision: what `model_history` and a review of an earlier one read. */
   private readonly modelHistoryOf = new Map<string, string[]>();
   private readonly modelsByRevision = new Map<
     string,
     { text: string; writtenFor: string | null; others: ReadonlyArray<{ name: string; text: string }> }
   >();
-  /** Where each requirement of a work is carried, and the sentence the list quotes for it, when a test says. */
+  /** Where each requirement of a spec is carried, and the sentence the list quotes for it, when a test says. */
   private readonly carriedOf = new Map<string, Record<string, string[]>>();
   private readonly quotesOf = new Map<string, Record<string, string>>();
 
@@ -99,7 +99,7 @@ class FakeCore implements Transport {
     this.carriedOf.set(id, carried);
   }
 
-  /** The sentences the work's requirement list quotes, by requirement: its sidecar. */
+  /** The sentences the spec's requirement list quotes, by requirement: its sidecar. */
   setQuotes(id: string, quotes: Record<string, string>): void {
     this.quotesOf.set(id, quotes);
   }
@@ -131,7 +131,7 @@ class FakeCore implements Transport {
     hosting: boolean;
     reason: string | null;
     live: boolean;
-    waiting: Array<{ work: string; request: string; connection: string; reason: string }>;
+    waiting: Array<{ spec: string; request: string; connection: string; reason: string }>;
   }> = [];
 
   /**
@@ -144,7 +144,7 @@ class FakeCore implements Transport {
       hosting?: boolean;
       reason?: string | null;
       live?: boolean;
-      waiting?: Array<{ work: string; request: string; connection: string; reason: string }>;
+      waiting?: Array<{ spec: string; request: string; connection: string; reason: string }>;
     }>,
   ): void {
     this.hostList = list.map((h) => ({
@@ -180,7 +180,7 @@ class FakeCore implements Transport {
     this.claudeStatus = status;
   }
 
-  /** The latest request of a work, as the core keeps it. */
+  /** The latest request of a spec, as the core keeps it. */
   latestRequest(id: string): FakeRequest | undefined {
     return this.requestsOf.get(id)?.at(-1);
   }
@@ -238,7 +238,7 @@ class FakeCore implements Transport {
   private requestJson(id: string, request: FakeRequest): unknown {
     return {
       id: request.id,
-      work: id,
+      spec: id,
       seq: request.seq,
       key: request.key,
       origin: "gui",
@@ -270,7 +270,7 @@ class FakeCore implements Transport {
   }
 
   /**
-   * The requirement list an authoring client saved for a work, and the text revision it
+   * The requirement list an authoring client saved for a spec, and the text revision it
    * says it read. A later call is a new revision of the list.
    */
   setRequirements(id: string, writtenFor: string | null, ids: string[] = ["R1", "R2"]): void {
@@ -285,7 +285,7 @@ class FakeCore implements Transport {
   /** Whether the report compared anything: a design that cites no requirement gives it nothing to compare. */
   revisionCompares = true;
 
-  /** What the owner accepted, as the core keeps it: the work as it stands now, stated on `channel`. */
+  /** What the owner accepted, as the core keeps it: the spec as it stands now, stated on `channel`. */
   setAcceptance(id: string, channel = "direct"): void {
     const basis = this.basisOf(id);
     if (basis === null) throw new Error(`${id} has no text, model and list to accept`);
@@ -314,7 +314,7 @@ class FakeCore implements Transport {
     this.commandSet = version;
   }
 
-  /** The same, of the application's own command set beside the works'. */
+  /** The same, of the application's own command set beside the specs'. */
   describeApplicationAs(version: number): void {
     this.applicationSet = version;
   }
@@ -333,7 +333,7 @@ class FakeCore implements Transport {
 
   /** The revisions of everything an acceptance is about, or `null` while one of them is missing. */
   private basisOf(id: string): Record<string, string> | null {
-    const source = this.works.get(id)?.revisions.at(-1)?.revision;
+    const source = this.specs.get(id)?.revisions.at(-1)?.revision;
     const model = this.models.get(id);
     const list = this.lists.get(id);
     if (source === undefined || model === undefined || list === undefined) return null;
@@ -376,17 +376,17 @@ class FakeCore implements Transport {
     return Object.fromEntries(Object.entries(this.answersOf.get(id)?.entries ?? {}).map(([q, e]) => [q, e.answer]));
   }
 
-  addWork(id: string, title: string, texts: string[]): void {
-    this.works.set(id, { title, revisions: texts.map((text) => ({ revision: this.revision(text), text })) });
+  addSpec(id: string, title: string, texts: string[]): void {
+    this.specs.set(id, { title, revisions: texts.map((text) => ({ revision: this.revision(text), text })) });
   }
 
   /** A text saved from another entrance: a new head, as `save_source` makes one. */
   saveElsewhere(id: string, text: string): void {
-    this.works.get(id)?.revisions.push({ revision: this.revision(text), text });
+    this.specs.get(id)?.revisions.push({ revision: this.revision(text), text });
   }
 
   /**
-   * The work's model, and the text revision its writer says it read. `others` makes it
+   * The spec's model, and the text revision its writer says it read. `others` makes it
    * a model of several documents: `text` is then the entry `door.scxml`, and each of
    * `others` is a document it imports.
    */
@@ -413,7 +413,7 @@ class FakeCore implements Transport {
   }
 
   headText(id: string): string | undefined {
-    return this.works.get(id)?.revisions.at(-1)?.text;
+    return this.specs.get(id)?.revisions.at(-1)?.text;
   }
 
   /** Hold the next call of `name` that `match`es until `release` is called. */
@@ -448,26 +448,26 @@ class FakeCore implements Transport {
   }
 
   private answer(name: string, args: Args): unknown {
-    const work = typeof args["id"] === "string" ? this.works.get(args["id"]) : undefined;
+    const spec = typeof args["id"] === "string" ? this.specs.get(args["id"]) : undefined;
     switch (name) {
       case "describe":
         return {
           command_set_version: this.commandSet,
           application_command_set_version: this.applicationSet,
           commands: [],
-          root: "/fake/works",
+          root: "/fake/specs",
           entrance: "desktop",
           settings: true,
           writes_settings: true,
           starts_programs: true,
         };
-      case "read_work_heads": {
-        if (work === undefined) throw new CommandFailure("not-found", "work `absent`");
+      case "read_spec_heads": {
+        if (spec === undefined) throw new CommandFailure("not-found", "spec `absent`");
         const id = String(args["id"]);
         const model = this.models.get(id);
         const list = this.lists.get(id);
         return {
-          source: work?.revisions.at(-1)?.revision ?? null,
+          source: spec?.revisions.at(-1)?.revision ?? null,
           model: model === undefined ? null : { revision: this.revision(`model:${model.text}`), written_for: model.writtenFor },
           answers: this.answersOf.get(id)?.revision ?? null,
           requirements: list === undefined ? null : { revision: list.revision, written_for: list.writtenFor },
@@ -477,12 +477,12 @@ class FakeCore implements Transport {
         };
       }
       case "request_generation": {
-        if (work === undefined) throw new CommandFailure("not-found", "work `absent`");
+        if (spec === undefined) throw new CommandFailure("not-found", "spec `absent`");
         const id = String(args["id"]);
         const expect = args["expect"] as { source: string; answers: string | null };
         const same = this.requestsOf.get(id)?.find((r) => r.key === args["key"]);
         if (same !== undefined) return { request: this.requestJson(id, same), created: false };
-        const head = work.revisions.at(-1)?.revision ?? null;
+        const head = spec.revisions.at(-1)?.revision ?? null;
         const answers = this.answersOf.get(id)?.revision ?? null;
         const moved = [
           ...(expect.source === head ? [] : ["source"]),
@@ -503,7 +503,7 @@ class FakeCore implements Transport {
         const open = this.latestRequest(id);
         if (open !== undefined && ["queued", "running", "interrupted"].includes(open.state)) {
           if (args["supersede"] !== true) {
-            throw new CommandFailure("active-request", "the work already has an open request", { open: open.id });
+            throw new CommandFailure("active-request", "the spec already has an open request", { open: open.id });
           }
           open.state = "superseded";
         }
@@ -597,16 +597,16 @@ class FakeCore implements Transport {
           })),
           unreadable: [],
         };
-      case "read_work_snapshot": {
+      case "read_spec_snapshot": {
         // One synchronous step over the core's state: what a snapshot is.
-        if (work === undefined) throw new CommandFailure("not-found", `work \`${String(args["id"])}\``);
+        if (spec === undefined) throw new CommandFailure("not-found", `spec \`${String(args["id"])}\``);
         const id = String(args["id"]);
         const model = this.answer("read_model", { id }) as { model: unknown; standing: string | null };
-        const head = work.revisions.at(-1);
+        const head = spec.revisions.at(-1);
         const list = this.lists.get(id);
         const held = this.acceptances.get(id);
         return {
-          work: { id, title: work.title, created_at: "2026-10-03T09:00:00Z" },
+          spec: { id, title: spec.title, created_at: "2026-10-03T09:00:00Z" },
           source: head === undefined ? null : { revision: head.revision, text: head.text },
           model: model.model,
           model_standing: model.standing,
@@ -638,12 +638,12 @@ class FakeCore implements Transport {
         };
       }
       case "read_judgment": {
-        // What SCE says of the revisions NAMED, wherever the work is now: a revision is never rewritten.
-        if (work === undefined) throw new CommandFailure("not-found", `work \`${String(args["id"])}\``);
+        // What SCE says of the revisions NAMED, wherever the spec is now: a revision is never rewritten.
+        if (spec === undefined) throw new CommandFailure("not-found", `spec \`${String(args["id"])}\``);
         const id = String(args["id"]);
         const asked = args["basis"] as Record<string, string | null | undefined>;
         const answersRevision = asked["answers"] ?? null;
-        const source = work.revisions.find((r) => r.revision === asked["source"]);
+        const source = spec.revisions.find((r) => r.revision === asked["source"]);
         const model = this.modelsByRevision.get(String(asked["model"]));
         const list = this.listsByRevision.get(String(asked["requirements"]));
         if (
@@ -652,11 +652,11 @@ class FakeCore implements Transport {
           list === undefined ||
           (answersRevision !== null && !this.answersByRevision.has(answersRevision))
         ) {
-          throw new CommandFailure("not-found", "a revision of this work that was not kept");
+          throw new CommandFailure("not-found", "a revision of this spec that was not kept");
         }
         const held = typeof args["acceptance"] === "string" ? this.acceptancesByRevision.get(args["acceptance"]) : undefined;
         if (typeof args["acceptance"] === "string" && held === undefined) {
-          throw new CommandFailure("not-found", "an acceptance of this work that was not kept");
+          throw new CommandFailure("not-found", "an acceptance of this spec that was not kept");
         }
         const basis: Record<string, string> = {
           source: source.revision,
@@ -717,7 +717,7 @@ class FakeCore implements Transport {
         const model = this.models.get(id);
         const list = this.lists.get(id);
         if (now === null || model === undefined || list === undefined) {
-          throw new CommandFailure("not-found", "a model or a requirement list of this work (none was saved)");
+          throw new CommandFailure("not-found", "a model or a requirement list of this spec (none was saved)");
         }
         const expected = args["expect"] as Record<string, string>;
         // The core compares each revision, and the owner's answers are none (`null`, or absent) until given.
@@ -729,7 +729,7 @@ class FakeCore implements Transport {
             { moved, current: now },
           );
         }
-        const head = work?.revisions.at(-1)?.revision ?? null;
+        const head = spec?.revisions.at(-1)?.revision ?? null;
         if (model.writtenFor !== head || list.writtenFor !== head) {
           throw new CommandFailure("not-current", "the model was not written for the text as it is now");
         }
@@ -810,7 +810,7 @@ class FakeCore implements Transport {
               ? this.models.get(args["id"])
               : undefined;
         if (model === undefined) throw new CommandFailure("not-found", "no model");
-        const head = work?.revisions.at(-1)?.revision ?? null;
+        const head = spec?.revisions.at(-1)?.revision ?? null;
         const revision = this.revision(`model:${model.text}`);
         const standing =
           model.writtenFor === null ? "unstated" : model.writtenFor === head ? "current" : "behind";
@@ -854,15 +854,15 @@ class FakeCore implements Transport {
           page_refusal: refused ? { code: "cli/pseudo-unsupported", message: "the page does not abbreviate this" } : null,
         };
       }
-      case "remove_work": {
-        if (work === undefined) throw new CommandFailure("not-found", "no such work");
-        this.works.delete(String(args["id"]));
-        return { removed: { id: String(args["id"]), title: work.title, created_at: "2026-10-03T09:00:00Z" } };
+      case "remove_spec": {
+        if (spec === undefined) throw new CommandFailure("not-found", "no such spec");
+        this.specs.delete(String(args["id"]));
+        return { removed: { id: String(args["id"]), title: spec.title, created_at: "2026-10-03T09:00:00Z" } };
       }
       case "read_model":
       case "figures": {
         const model = typeof args["id"] === "string" ? this.models.get(args["id"]) : undefined;
-        const head = work?.revisions.at(-1)?.revision ?? null;
+        const head = spec?.revisions.at(-1)?.revision ?? null;
         if (model === undefined) {
           if (name === "figures") throw new CommandFailure("not-found", "no model");
           return { model: null, source_head: head, standing: null };
@@ -896,51 +896,51 @@ class FakeCore implements Transport {
           ],
         };
       }
-      case "list_works":
+      case "list_specs":
         return {
-          works: [...this.works].map(([id, w]) => ({ id, title: w.title, created_at: "2026-10-03T09:00:00Z" })),
+          specs: [...this.specs].map(([id, w]) => ({ id, title: w.title, created_at: "2026-10-03T09:00:00Z" })),
           unreadable: [],
         };
-      case "create_work": {
+      case "create_spec": {
         const id = String(args["title"]).toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        this.works.set(id, { title: String(args["title"]), revisions: [] });
+        this.specs.set(id, { title: String(args["title"]), revisions: [] });
         return { id, title: String(args["title"]), created_at: "2026-10-03T09:00:00Z" };
       }
       case "read_source": {
-        const revisions = work?.revisions ?? [];
+        const revisions = spec?.revisions ?? [];
         const wanted = args["revision"];
         const found = wanted === undefined ? revisions.at(-1) : revisions.find((r) => r.revision === wanted);
         return { source: found === undefined ? null : { revision: found.revision, text: found.text } };
       }
       case "history":
         return {
-          entries: (work?.revisions ?? []).map((r, i, all) => ({
+          entries: (spec?.revisions ?? []).map((r, i, all) => ({
             revision: r.revision,
             parent: i === 0 ? null : (all[i - 1]?.revision ?? null),
             saved_at: "2026-10-03T09:00:00Z",
           })),
         };
       case "save_source": {
-        if (work === undefined) throw new CommandFailure("not-found", "no such work");
-        const head = work.revisions.at(-1)?.revision ?? null;
+        if (spec === undefined) throw new CommandFailure("not-found", "no such spec");
+        const head = spec.revisions.at(-1)?.revision ?? null;
         if ((args["base"] ?? null) !== head) {
           throw new CommandFailure("conflict", "the base is not current", { base: args["base"] ?? null, current: head });
         }
         const text = String(args["text"]);
         const revision = this.revision(text);
         if (revision === head) return { outcome: "unchanged", revision };
-        work.revisions.push({ revision, text });
+        spec.revisions.push({ revision, text });
         this.supersedeOpen(String(args["id"]));
         return { outcome: "saved", revision, parent: head };
       }
       case "read_revision_report": {
         // The core's rule: nothing accepted, nothing to report; a design or a list written for an
-        // earlier text than the work has now is held back, in one sentence, and never compared.
-        if (work === undefined) throw new CommandFailure("not-found", `work \`${String(args["id"])}\``);
+        // earlier text than the spec has now is held back, in one sentence, and never compared.
+        if (spec === undefined) throw new CommandFailure("not-found", `spec \`${String(args["id"])}\``);
         const id = String(args["id"]);
         const held = this.acceptances.get(id);
         if (held === undefined) return { acceptance: null, report: null };
-        const head = work.revisions.at(-1)?.revision ?? null;
+        const head = spec.revisions.at(-1)?.revision ?? null;
         const behind: string[] = [];
         if (standingOf(this.lists.get(id)?.writtenFor ?? null, head) === "behind") behind.push("requirement list");
         if (standingOf(this.models.get(id)?.writtenFor ?? null, head) === "behind") behind.push("model");
@@ -952,7 +952,7 @@ class FakeCore implements Transport {
           );
         }
         const now = this.basisOf(id);
-        if (now === null) throw new CommandFailure("not-found", "a model or a requirement list of this work");
+        if (now === null) throw new CommandFailure("not-found", "a model or a requirement list of this spec");
         const ids = this.lists.get(id)?.ids ?? [];
         return {
           acceptance: {
@@ -1008,8 +1008,8 @@ async function start(): Promise<void> {
   document.body.innerHTML = '<div id="app"></div>';
   root = document.getElementById("app") as HTMLElement;
   core = new FakeCore();
-  core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
-  core.addWork("beta", "Beta", ["beta one"]);
+  core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
+  core.addSpec("beta", "Beta", ["beta one"]);
   app = new App(root, { transport: core, storage: null, browserLanguage: "en" });
   await app.start();
   await settle();
@@ -1038,7 +1038,7 @@ async function type(text: string): Promise<void> {
 beforeEach(start);
 
 describe("an answer that arrives after the person has moved on", () => {
-  it("does not put one work's older text into another work's editor", async () => {
+  it("does not put one spec's older text into another spec's editor", async () => {
     await click("Alpha");
     expect(editor().value).toBe("alpha two");
     // History is newest first, so the older revision is the second "Load into editor".
@@ -1072,7 +1072,7 @@ describe("an answer that arrives after the person has moved on", () => {
     expect(root.textContent).toContain("was not loaded");
   });
 
-  it("shows the work last asked for when the first one answers last", async () => {
+  it("shows the spec last asked for when the first one answers last", async () => {
     const slow = core.hold("read_source", (a) => a["id"] === "alpha");
     await click("Alpha");
     await click("Beta");
@@ -1084,7 +1084,7 @@ describe("an answer that arrives after the person has moved on", () => {
     expect(editor().value).toBe("beta one");
   });
 
-  it("does not show an older revision of a work the person has left", async () => {
+  it("does not show an older revision of a spec the person has left", async () => {
     await click("Alpha");
     const older = core.revision("alpha one");
     const held = core.hold("read_source", (a) => a["revision"] === older);
@@ -1099,7 +1099,7 @@ describe("an answer that arrives after the person has moved on", () => {
 });
 
 describe("text that is not saved", () => {
-  it("is not replaced by opening another work, and the person is asked", async () => {
+  it("is not replaced by opening another spec, and the person is asked", async () => {
     await click("Alpha");
     await type("alpha changed");
     await click("Beta");
@@ -1130,7 +1130,7 @@ describe("text that is not saved", () => {
     expect(core.headText("alpha")).toBe("alpha two");
   });
 
-  it("is saved first when the person asks, and the other work then opens", async () => {
+  it("is saved first when the person asks, and the other spec then opens", async () => {
     await click("Alpha");
     await type("alpha changed");
     await click("Beta");
@@ -1145,7 +1145,7 @@ describe("text that is not saved", () => {
     await click("Alpha");
     await type("alpha changed");
     // Another writer got there first, so this save is refused as a conflict.
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two", "alpha elsewhere"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two", "alpha elsewhere"]);
     await click("Beta");
     await click("Save, then open it");
 
@@ -1154,7 +1154,7 @@ describe("text that is not saved", () => {
     expect(root.textContent).toContain("not saved");
   });
 
-  it("is protected for the same work too: opening it again does not reload over it", async () => {
+  it("is protected for the same spec too: opening it again does not reload over it", async () => {
     await click("Alpha");
     await type("alpha changed");
     await click("Alpha");
@@ -1163,7 +1163,7 @@ describe("text that is not saved", () => {
     expect(root.textContent).toContain("not saved");
   });
 
-  it("is protected from what is typed while the other work is still being read", async () => {
+  it("is protected from what is typed while the other spec is still being read", async () => {
     await click("Alpha");
     const slow = core.hold("read_source", (a) => a["id"] === "beta");
     await click("Beta");
@@ -1183,7 +1183,7 @@ describe("text that is not saved", () => {
     expect(heading()).toBe("Beta");
   });
 
-  it("is not lost to the other work arriving, when the person then lets it go", async () => {
+  it("is not lost to the other spec arriving, when the person then lets it go", async () => {
     await click("Alpha");
     const slow = core.hold("read_source", (a) => a["id"] === "beta");
     await click("Beta");
@@ -1197,7 +1197,7 @@ describe("text that is not saved", () => {
     expect(core.headText("alpha")).toBe("alpha two");
   });
 
-  it("does not hold the other work back when nothing was typed while it was read", async () => {
+  it("does not hold the other spec back when nothing was typed while it was read", async () => {
     await click("Alpha");
     const slow = core.hold("read_source", (a) => a["id"] === "beta");
     await click("Beta");
@@ -1248,7 +1248,7 @@ describe("a save that took, and a read after it that did not", () => {
   });
 });
 
-describe("the new-work field", () => {
+describe("the new-spec field", () => {
   it("keeps what is typed in it across a redraw", async () => {
     const field = root.querySelector('input[name="title"]') as HTMLInputElement;
     field.value = "Gamma";
@@ -1267,7 +1267,7 @@ const decoded = (image: HTMLImageElement): string =>
   decodeURIComponent(image.src.replace("data:image/svg+xml;charset=utf-8,", ""));
 
 describe("the model panel", () => {
-  it("says there is no model when the work has none, and draws nothing", async () => {
+  it("says there is no model when the spec has none, and draws nothing", async () => {
     await click("Alpha");
     expect(modelText()).toContain("No model yet");
     expect(images()).toHaveLength(0);
@@ -1396,7 +1396,7 @@ describe("the model panel", () => {
     expect(modelText()).not.toContain("SCE is drawing");
   });
 
-  it("does not put one work's drawing under another work", async () => {
+  it("does not put one spec's drawing under another spec", async () => {
     core.setModel("alpha", "<scxml>alpha</scxml>", core.revision("alpha two"));
     const held = core.hold("figures");
     await click("Alpha");
@@ -1460,7 +1460,7 @@ describe("the model panel", () => {
       document.body.innerHTML = '<div id="app"></div>';
       root = document.getElementById("app") as HTMLElement;
       core = new FakeCore();
-      core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
+      core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
       core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
       app = new App(root, { transport: core, storage, browserLanguage: "en" });
       await app.start();
@@ -1487,7 +1487,7 @@ describe("the model panel", () => {
 
   it("reports a model that cannot be read as the panel's own message, not as an empty one", async () => {
     core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
-    core.failNext("read_work_snapshot", new CommandFailure("corrupt", "the model file is damaged"));
+    core.failNext("read_spec_snapshot", new CommandFailure("corrupt", "the model file is damaged"));
     await click("Alpha");
 
     expect(modelText()).toContain("the model file is damaged");
@@ -1593,7 +1593,7 @@ describe("what SCE says of the model", () => {
     expect(pseudo()).not.toBeNull();
   });
 
-  it("does not put one work's page under another work", async () => {
+  it("does not put one spec's page under another spec", async () => {
     core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
     const page = core.hold("review", (args) => args["id"] === "alpha");
     await click("Alpha");
@@ -1606,7 +1606,7 @@ describe("what SCE says of the model", () => {
     expect(pseudo()).toBeNull();
   });
 
-  it("is not asked for a work that has no model, and is gone with a work that is removed", async () => {
+  it("is not asked for a spec that has no model, and is gone with a spec that is removed", async () => {
     await click("Alpha");
     expect(core.callsOf("review")).toHaveLength(0);
     expect(root.querySelector(".review")).toBeNull();
@@ -1614,7 +1614,7 @@ describe("what SCE says of the model", () => {
     core.setModel("beta", "<scxml/>", core.revision("beta one"));
     await click("Beta");
     expect(pseudo()).not.toBeNull();
-    await click("Remove this work");
+    await click("Remove this spec");
     await click("Remove");
     expect(root.querySelector(".review")).toBeNull();
   });
@@ -1763,7 +1763,7 @@ describe("the owner's answers", () => {
     expect(core.answersHeld("alpha")).toEqual({});
   });
 
-  it("are asked about before another work replaces them, and saved when the person says so", async () => {
+  it("are asked about before another spec replaces them, and saved when the person says so", async () => {
     await click("Alpha");
     await answer("open-guard", "Any card.");
     await click("Beta");
@@ -1777,7 +1777,7 @@ describe("the owner's answers", () => {
     expect(heading()).toBe("Beta");
   });
 
-  it("are protected from what is typed while the other work is still being read", async () => {
+  it("are protected from what is typed while the other spec is still being read", async () => {
     await click("Alpha");
     const slow = core.hold("read_source", (a) => a["id"] === "beta");
     await click("Beta");
@@ -1822,7 +1822,7 @@ describe("the owner's answers", () => {
     expect(fields()).toHaveLength(0);
   });
 
-  it("of one work are not put under another when they arrive late", async () => {
+  it("of one spec are not put under another when they arrive late", async () => {
     core.setAnswers("alpha", { "open-guard": "Any card." });
     const held = core.hold("read_answers", (args) => args["id"] === "alpha");
     await click("Alpha");
@@ -1858,8 +1858,8 @@ describe("a desktop window asked to close", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
-    core.addWork("beta", "Beta", ["beta one"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("beta", "Beta", ["beta one"]);
     core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
     app = new App(root, { transport: core, storage: null, browserLanguage: "en", desktop });
     await app.start();
@@ -1976,50 +1976,50 @@ describe("a desktop window asked to close", () => {
   });
 });
 
-// ---- removing a work ------------------------------------------------------
+// ---- removing a spec ------------------------------------------------------
 
-const workLinks = (): string[] => [...root.querySelectorAll(".work-link")].map((b) => b.textContent ?? "");
+const specLinks = (): string[] => [...root.querySelectorAll(".spec-link")].map((b) => b.textContent ?? "");
 
-describe("removing a work", () => {
+describe("removing a spec", () => {
   it("asks first, says what stays, and removes nothing until the person says yes", async () => {
     await click("Alpha");
-    await click("Remove this work");
+    await click("Remove this spec");
 
     expect(root.textContent).toContain('Remove "Alpha" from the list?');
     expect(root.textContent).toContain("removed.json");
-    expect(core.callsOf("remove_work")).toHaveLength(0);
+    expect(core.callsOf("remove_spec")).toHaveLength(0);
 
-    await click("Keep the work");
+    await click("Keep the spec");
     expect(root.textContent).not.toContain('Remove "Alpha" from the list?');
-    expect(core.callsOf("remove_work")).toHaveLength(0);
-    expect(workLinks()).toEqual(["Alpha", "Beta"]);
+    expect(core.callsOf("remove_spec")).toHaveLength(0);
+    expect(specLinks()).toEqual(["Alpha", "Beta"]);
   });
 
-  it("takes the work out of the list and the screen, and tells the person", async () => {
+  it("takes the spec out of the list and the screen, and tells the person", async () => {
     await click("Alpha");
-    await click("Remove this work");
+    await click("Remove this spec");
     await click("Remove");
 
-    expect(core.callsOf("remove_work")).toEqual([{ id: "alpha" }]);
-    expect(workLinks()).toEqual(["Beta"]);
+    expect(core.callsOf("remove_spec")).toEqual([{ id: "alpha" }]);
+    expect(specLinks()).toEqual(["Beta"]);
     expect(editor()).toBeNull();
-    expect(root.textContent).toContain("Pick a work");
+    expect(root.textContent).toContain("Pick a spec");
     expect(root.textContent).toContain('"Alpha" was removed from the list.');
 
-    // The work beside it is as it was.
+    // The spec beside it is as it was.
     await click("Beta");
     expect(editor().value).toBe("beta one");
     expect(root.textContent).not.toContain("was removed from the list");
   });
 
-  it("says that text not yet saved goes with the work, and only then", async () => {
+  it("says that text not yet saved goes with the spec, and only then", async () => {
     await click("Alpha");
-    await click("Remove this work");
+    await click("Remove this spec");
     expect(root.textContent).not.toContain("not saved is lost");
-    await click("Keep the work");
+    await click("Keep the spec");
 
     await type("alpha changed");
-    await click("Remove this work");
+    await click("Remove this spec");
     expect(root.textContent).toContain("not saved is lost");
   });
 
@@ -2029,36 +2029,36 @@ describe("removing a work", () => {
     await type("alpha changed");
     await click("Save");
 
-    const remove = buttons("Remove this work")[0];
+    const remove = buttons("Remove this spec")[0];
     expect(remove?.disabled).toBe(true);
     held.release();
     await settle();
-    expect(buttons("Remove this work")[0]?.disabled).toBe(false);
+    expect(buttons("Remove this spec")[0]?.disabled).toBe(false);
   });
 
-  it("does not let a drawing that was still on its way land under the work that replaced it", async () => {
+  it("does not let a drawing that was still on its way land under the spec that replaced it", async () => {
     core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
     const drawing = core.hold("figures");
     await click("Alpha");
-    await click("Remove this work");
+    await click("Remove this spec");
     await click("Remove");
     drawing.release();
     await settle();
 
     expect(images()).toHaveLength(0);
     expect(root.querySelector(".model")).toBeNull();
-    expect(root.textContent).toContain("Pick a work");
+    expect(root.textContent).toContain("Pick a spec");
   });
 
-  it("keeps the work on screen, with the core's words, when the removal is refused", async () => {
+  it("keeps the spec on screen, with the core's words, when the removal is refused", async () => {
     await click("Alpha");
-    core.failNext("remove_work", new CommandFailure("busy", "another save held the work for 30000 ms"));
-    await click("Remove this work");
+    core.failNext("remove_spec", new CommandFailure("busy", "another save held the spec for 30000 ms"));
+    await click("Remove this spec");
     await click("Remove");
 
-    expect(root.textContent).toContain("another save held the work");
+    expect(root.textContent).toContain("another save held the spec");
     expect(heading()).toBe("Alpha");
-    expect(workLinks()).toEqual(["Alpha", "Beta"]);
+    expect(specLinks()).toEqual(["Alpha", "Beta"]);
     expect(root.textContent).not.toContain("was removed from the list");
   });
 });
@@ -2074,7 +2074,7 @@ const requirementRows = (): string[][] =>
     [...row.querySelectorAll("td:not(.goto)")].map((cell) => cell.textContent ?? ""),
   );
 
-/** The revision of the text a work holds now: what a model or a list says it was written for. */
+/** The revision of the text a spec holds now: what a model or a list says it was written for. */
 const headOf = (id: string): string => core.revision(core.headText(id) as string);
 
 describe("accepting the design", () => {
@@ -2083,7 +2083,7 @@ describe("accepting the design", () => {
     core.setRequirements("alpha", headOf("alpha"));
   });
 
-  it("says there is no requirement list when the work has none, and offers nothing to accept", async () => {
+  it("says there is no requirement list when the spec has none, and offers nothing to accept", async () => {
     core.setModel("beta", "<scxml/>", headOf("beta"));
     await click("Beta");
 
@@ -2093,7 +2093,7 @@ describe("accepting the design", () => {
     expect(core.callsOf("read_judgment")).toHaveLength(0);
   });
 
-  it("is not asked for a work that has no model", async () => {
+  it("is not asked for a spec that has no model", async () => {
     await click("Beta");
 
     expect(root.querySelector(".acceptance")).toBeNull();
@@ -2144,7 +2144,7 @@ describe("accepting the design", () => {
     };
     const asked = (): Record<string, unknown> | undefined => core.callsOf("request_generation").at(-1);
 
-    it("is offered when the work has a requirement list, and is not ticked", async () => {
+    it("is offered when the spec has a requirement list, and is not ticked", async () => {
       await click("Alpha");
 
       expect(tick()).not.toBeNull();
@@ -2182,7 +2182,7 @@ describe("accepting the design", () => {
       expect(tick()?.checked).toBe(false);
     });
 
-    it("is of the work it was ticked on, not of the next one the owner opens", async () => {
+    it("is of the spec it was ticked on, not of the next one the owner opens", async () => {
       core.setModel("beta", "<scxml/>", headOf("beta"));
       core.setRequirements("beta", headOf("beta"));
       await click("Alpha");
@@ -2291,7 +2291,7 @@ describe("accepting the design", () => {
   it("accepts nothing when the text moved on in another entrance after the page was shown", async () => {
     await click("Alpha");
     // The text moves on in another entrance; this screen has not read it yet.
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two", "alpha three"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two", "alpha three"]);
     await click("Accept this design");
 
     expect(acceptanceText()).toContain("Nothing was accepted: source changed after you were shown it");
@@ -2354,7 +2354,7 @@ describe("accepting the design", () => {
     await settle();
     expect(core.callsOf("accept")).toHaveLength(0);
 
-    // Reading the work again shows the text the design is about, and the owner may accept.
+    // Reading the spec again shows the text the design is about, and the owner may accept.
     await click("Alpha");
     expect(editor().value).toBe("alpha three");
     expect(acceptButton().disabled).toBe(false);
@@ -2431,7 +2431,7 @@ describe("accepting the design", () => {
     expect(root.querySelector(".acceptance .revision .page pre")).not.toBeNull();
   });
 
-  it("has nothing to say of a revision for a work nobody accepted, and does not ask", async () => {
+  it("has nothing to say of a revision for a spec nobody accepted, and does not ask", async () => {
     await click("Alpha");
 
     expect(root.querySelector(".acceptance .revision")).toBeNull();
@@ -2505,7 +2505,7 @@ describe("accepting the design", () => {
     expect(acceptButton().textContent).toBe("Accept the design as it is now");
   });
 
-  it("is not put under another work when it arrives late, and is gone with a work that is removed", async () => {
+  it("is not put under another spec when it arrives late, and is gone with a spec that is removed", async () => {
     core.setRequirements("alpha", headOf("alpha"), ["A1", "A2"]);
     core.setModel("beta", "<scxml/>", headOf("beta"));
     core.setRequirements("beta", headOf("beta"), ["B1"]);
@@ -2516,12 +2516,12 @@ describe("accepting the design", () => {
     await settle();
 
     expect(requirementRows().map((row) => row[0])).toEqual(["B1"]);
-    await click("Remove this work");
+    await click("Remove this spec");
     await click("Remove");
     expect(root.querySelector(".acceptance")).toBeNull();
   });
 
-  it("is not accepted twice while the first is on its way, and a work is not removed under it", async () => {
+  it("is not accepted twice while the first is on its way, and a spec is not removed under it", async () => {
     await click("Alpha");
     const held = core.hold("accept");
     buttons("Accept this design")[0]?.click();
@@ -2529,7 +2529,7 @@ describe("accepting the design", () => {
 
     expect(acceptButton().textContent).toBe("Accepting...");
     expect(acceptButton().disabled).toBe(true);
-    expect(buttons("Remove this work")[0]?.disabled).toBe(true);
+    expect(buttons("Remove this spec")[0]?.disabled).toBe(true);
     held.release();
     await settle();
 
@@ -2570,8 +2570,8 @@ describe("a token the server asks for in the middle of a read", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
-    core.addWork("beta", "Beta", ["beta one"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("beta", "Beta", ["beta one"]);
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     app = new App(root, {
@@ -2584,10 +2584,10 @@ describe("a token the server asks for in the middle of a read", () => {
     await settle();
   });
 
-  // Each of these reads is started beside the others when a work opens, and each is
+  // Each of these reads is started beside the others when a spec opens, and each is
   // one the server can refuse first. Whichever it is, the person is shown the form that
   // asks for the token: a refusal that only sets a flag leaves the screen as it was.
-  for (const name of ["read_answers", "review", "read_work_snapshot", "read_judgment", "figures"]) {
+  for (const name of ["read_answers", "review", "read_spec_snapshot", "read_judgment", "figures"]) {
     it(`draws the sign-in form when \`${name}\` is the read that is refused`, async () => {
       core.failNext(name, new CommandFailure(UNAUTHORIZED, "no token"));
 
@@ -2599,7 +2599,7 @@ describe("a token the server asks for in the middle of a read", () => {
   }
 
   it("draws it though nothing else is left to draw, the refused read being the last to answer", async () => {
-    // A work with no model has nothing to draw once the model panel says so, and the
+    // A spec with no model has nothing to draw once the model panel says so, and the
     // answers are read beside it: the redraw that the model panel's answer brings comes
     // first, so the refusal that follows has to draw the form itself.
     core.failNext("read_answers", new CommandFailure(UNAUTHORIZED, "no token"));
@@ -2611,7 +2611,7 @@ describe("a token the server asks for in the middle of a read", () => {
   });
 });
 
-describe("a work that moves under the screen", () => {
+describe("a spec that moves under the screen", () => {
   let ticker: ManualTicker;
 
   beforeEach(async () => {
@@ -2619,8 +2619,8 @@ describe("a work that moves under the screen", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
-    core.addWork("beta", "Beta", ["beta one"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("beta", "Beta", ["beta one"]);
     app = new App(root, { transport: core, storage: null, browserLanguage: "en", ticker });
     await app.start();
     await settle();
@@ -2635,8 +2635,8 @@ describe("a work that moves under the screen", () => {
   const waitingForSce = (): boolean =>
     acceptanceText().includes("Reading the requirements and what was accepted") && verdict() === "";
 
-  // What SCE says of the work is asked of the revisions the screen read the design in, so a verdict
-  // is of the design beside it and of no other. The work can move while SCE answers, and the screen
+  // What SCE says of the spec is asked of the revisions the screen read the design in, so a verdict
+  // is of the design beside it and of no other. The spec can move while SCE answers, and the screen
   // can be behind the core for a moment; it is never made to say of one design what is true of
   // another. The screens before this one read the design, the list, the standing and the report with
   // a command each and compared them, and were handed, in turn, a "holds" beside a changed design and
@@ -2660,7 +2660,7 @@ describe("a work that moves under the screen", () => {
     expect(verdict()).toContain("It holds");
   });
 
-  it("shows the verdict of the design it shows when the work moved on while SCE was asked, and none beside the next", async () => {
+  it("shows the verdict of the design it shows when the spec moved on while SCE was asked, and none beside the next", async () => {
     core.setModel("alpha", "<scxml><!-- initial --></scxml>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     await click("Alpha");
@@ -2669,7 +2669,7 @@ describe("a work that moves under the screen", () => {
     const asked = core.hold("read_judgment");
     await ticker.fire();
 
-    // The work moves again while SCE is asked about the design the screen read.
+    // The spec moves again while SCE is asked about the design the screen read.
     const changed = "<scxml><!-- changed after SCE was asked --></scxml>";
     core.setModel("alpha", changed, headOf("alpha"));
     asked.release();
@@ -2678,7 +2678,7 @@ describe("a work that moves under the screen", () => {
     expect(design()).toBe("<scxml><!-- accepted --></scxml>");
     expect(verdict()).toContain("It holds");
 
-    // The next question sees the work moved. The changed design is not shown beside a verdict of the
+    // The next question sees the spec moved. The changed design is not shown beside a verdict of the
     // accepted one, and SCE's word for it is read.
     const again = core.hold("read_judgment");
     await ticker.fire();
@@ -2726,7 +2726,7 @@ describe("a work that moves under the screen", () => {
   // SCE not answering is an answer, and the screen asks again by itself for the reasons that pass:
   // a generator that timed out, crashed or could not be started is not a fact about the design.
   // One that refused the design is: asking again of the same revisions says the same, and only
-  // costs a run, so it is shown and not asked again until the work has moved.
+  // costs a run, so it is shown and not asked again until the spec has moved.
   describe("when SCE did not answer", () => {
     const parts = ["report", "acceptance"] as const;
     const passing = ["sce-timeout", "sce-failed", "sce-unavailable"] as const;
@@ -2747,7 +2747,7 @@ describe("a work that moves under the screen", () => {
           expect(refusalShown()).toContain("SCE failed this once");
           expect(acceptButton()?.disabled ?? true).toBe(true);
 
-          // Nothing in the saved work changed and nothing was pressed.
+          // Nothing in the saved spec changed and nothing was pressed.
           await ticker.fire();
 
           expect(refusalShown()).not.toContain("SCE failed this once");
@@ -2805,8 +2805,8 @@ describe("a work that moves under the screen", () => {
   });
 
   it("does not put what SCE said of an earlier read over what it said of a later one", async () => {
-    // SCE is slow about the work as it was read when it opened. Meanwhile the owner saves answers,
-    // which are part of what was accepted: the work is read again and SCE answers about it at once.
+    // SCE is slow about the spec as it was read when it opened. Meanwhile the owner saves answers,
+    // which are part of what was accepted: the spec is read again and SCE answers about it at once.
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     core.setAcceptance("alpha");
@@ -2820,7 +2820,7 @@ describe("a work that moves under the screen", () => {
 
     late.release();
     await settle();
-    // The word about the work without the answers, arriving late, is not put over the word about it with them.
+    // The word about the spec without the answers, arriving late, is not put over the word about it with them.
     expect(verdict()).toContain("no longer holds");
     expect(verdict()).not.toContain("It holds");
   });
@@ -2883,11 +2883,11 @@ describe("a work that moves under the screen", () => {
     },
   );
 
-  it("refuses a core of another command-set version before it reads anything of a work", async () => {
+  it("refuses a core of another command-set version before it reads anything of a spec", async () => {
     // A screen and a core that read each other's answers differently must not look connected: the
     // check is the screen's one chance to say so before a check and an accept fail on a shape.
     const stale = new FakeCore();
-    stale.addWork("alpha", "Alpha", ["alpha one"]);
+    stale.addSpec("alpha", "Alpha", ["alpha one"]);
     const older = SUPPORTED_COMMAND_SET_VERSION - 1;
     stale.describeAs(older);
     document.body.innerHTML = '<div id="app"></div>';
@@ -2898,15 +2898,15 @@ describe("a work that moves under the screen", () => {
 
     expect(root.textContent).toContain(String(older));
     expect(root.textContent).toContain(String(SUPPORTED_COMMAND_SET_VERSION));
-    expect(stale.callsOf("list_works")).toHaveLength(0);
+    expect(stale.callsOf("list_specs")).toHaveLength(0);
     expect(stale.callsOf("read_judgment")).toHaveLength(0);
   });
 
-  it("refuses an application of another command-set version though its works are the screen's", async () => {
-    // The works' version and the application's move apart: a core whose works speak the screen's
+  it("refuses an application of another command-set version though its specs are the screen's", async () => {
+    // The specs' version and the application's move apart: a core whose specs speak the screen's
     // set and whose own commands do not is refused the same way, by both numbers.
     const stale = new FakeCore();
-    stale.addWork("alpha", "Alpha", ["alpha one"]);
+    stale.addSpec("alpha", "Alpha", ["alpha one"]);
     const older = SUPPORTED_APPLICATION_COMMAND_SET_VERSION + 1;
     stale.describeApplicationAs(older);
     document.body.innerHTML = '<div id="app"></div>';
@@ -2919,10 +2919,10 @@ describe("a work that moves under the screen", () => {
     expect(root.textContent).toContain(
       `${SUPPORTED_COMMAND_SET_VERSION}.${SUPPORTED_APPLICATION_COMMAND_SET_VERSION}`,
     );
-    expect(stale.callsOf("list_works")).toHaveLength(0);
+    expect(stale.callsOf("list_specs")).toHaveLength(0);
   });
 
-  it("keeps the design and the verdict it shows together while the next read of the work is slow", async () => {
+  it("keeps the design and the verdict it shows together while the next read of the spec is slow", async () => {
     const accepted = "<scxml><!-- accepted --></scxml>";
     core.setModel("alpha", accepted, headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
@@ -2930,7 +2930,7 @@ describe("a work that moves under the screen", () => {
     await click("Alpha");
 
     core.setModel("alpha", "<scxml><!-- changed --></scxml>", headOf("alpha"));
-    const slow = core.hold("read_work_snapshot");
+    const slow = core.hold("read_spec_snapshot");
     await ticker.fire();
 
     // Nothing of the new design has been read: the old design, and the verdict of it, stay as they are.
@@ -2942,7 +2942,7 @@ describe("a work that moves under the screen", () => {
     expect(verdict()).toContain("no longer holds");
   });
 
-  it("shows each design with its own verdict while the work keeps moving, and settles when it stops", async () => {
+  it("shows each design with its own verdict while the spec keeps moving, and settles when it stops", async () => {
     core.setModel("alpha", "<scxml><!-- accepted --></scxml>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     core.setAcceptance("alpha");
@@ -2962,13 +2962,13 @@ describe("a work that moves under the screen", () => {
       expect(verdict()).toContain("no longer holds");
     }
 
-    // The work stops moving, and the screen has nothing more to read.
+    // The spec stops moving, and the screen has nothing more to read.
     const reads = core.callsOf("read_judgment").length;
     await ticker.fire();
     expect(core.callsOf("read_judgment")).toHaveLength(reads);
   });
 
-  it("shows a model an authoring client saved after the work was opened, without being asked", async () => {
+  it("shows a model an authoring client saved after the spec was opened, without being asked", async () => {
     await click("Alpha");
     expect(modelText()).toContain("No model yet");
 
@@ -2979,7 +2979,7 @@ describe("a work that moves under the screen", () => {
     expect(modelText()).toContain("written for the text as it is now");
   });
 
-  it("keeps what the person typed when the work moves under them", async () => {
+  it("keeps what the person typed when the spec moves under them", async () => {
     await click("Alpha");
     await type("alpha edited");
 
@@ -3065,18 +3065,18 @@ describe("a work that moves under the screen", () => {
     expect(core.callsOf("read_answers")).toHaveLength(1);
   });
 
-  it("reads nothing again while the work stays as it is shown", async () => {
+  it("reads nothing again while the spec stays as it is shown", async () => {
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     await click("Alpha");
     const read = (name: string): number => core.callsOf(name).length;
     const before = [read("read_model"), read("read_source"), read("read_answers"), read("requirements_report")];
-    const asked = read("read_work_heads");
+    const asked = read("read_spec_heads");
 
     await ticker.fire();
     await ticker.fire();
 
-    expect(core.callsOf("read_work_heads")).toHaveLength(asked + 2);
+    expect(core.callsOf("read_spec_heads")).toHaveLength(asked + 2);
     expect([read("read_model"), read("read_source"), read("read_answers"), read("requirements_report")]).toEqual(before);
   });
 
@@ -3095,12 +3095,12 @@ describe("a work that moves under the screen", () => {
   it("asks again only when the read it started is done, and then reads nothing more", async () => {
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     await click("Alpha");
-    const slow = core.hold("read_work_snapshot");
+    const slow = core.hold("read_spec_snapshot");
     core.setModel("alpha", "<scxml>next</scxml>", headOf("alpha"));
     await ticker.fire();
 
     // The read is on its way: the next question is not scheduled, so it cannot start the read over.
-    expect(core.callsOf("read_work_snapshot")).toHaveLength(2);
+    expect(core.callsOf("read_spec_snapshot")).toHaveLength(2);
     expect(ticker.pending).toEqual([]);
     slow.release();
     await settle();
@@ -3109,7 +3109,7 @@ describe("a work that moves under the screen", () => {
     await ticker.fire();
 
     // The read answered and the screen shows it: nothing more is read.
-    expect(core.callsOf("read_work_snapshot")).toHaveLength(2);
+    expect(core.callsOf("read_spec_snapshot")).toHaveLength(2);
     expect(root.querySelector(".scxml")?.textContent).toBe("<scxml>next</scxml>");
   });
 
@@ -3117,7 +3117,7 @@ describe("a work that moves under the screen", () => {
     await click("Alpha");
     expect(ticker.pending).toEqual([2000]);
 
-    core.failNext("read_work_heads", new CommandFailure("io", "the works folder could not be read"));
+    core.failNext("read_spec_heads", new CommandFailure("io", "the specs folder could not be read"));
     await ticker.fire();
     expect(ticker.pending).toEqual([4000]);
 
@@ -3125,17 +3125,17 @@ describe("a work that moves under the screen", () => {
     expect(ticker.pending).toEqual([2000]);
   });
 
-  it("stops asking about a work the person left", async () => {
+  it("stops asking about a spec the person left", async () => {
     await click("Alpha");
     await click("Beta");
     expect(ticker.pending).toEqual([2000]);
-    const before = core.callsOf("read_work_heads").length;
+    const before = core.callsOf("read_spec_heads").length;
 
     await ticker.fire();
 
     expect(
       core
-        .callsOf("read_work_heads")
+        .callsOf("read_spec_heads")
         .slice(before)
         .map((a) => a["id"]),
     ).toEqual(["beta"]);
@@ -3153,7 +3153,7 @@ describe("a work that moves under the screen", () => {
     await app.start();
     await settle();
     await click("Alpha");
-    core.failNext("read_work_heads", new CommandFailure(UNAUTHORIZED, "no token"));
+    core.failNext("read_spec_heads", new CommandFailure(UNAUTHORIZED, "no token"));
 
     await ticker.fire();
 
@@ -3185,7 +3185,7 @@ describe("a work that moves under the screen", () => {
   it("review regression: recovers model refresh after one temporary failure", async () => {
     await click("Alpha");
     core.setModel("alpha", "<scxml>new result</scxml>", headOf("alpha"));
-    core.failNext("read_work_snapshot", new CommandFailure("transport", "temporary disconnect"));
+    core.failNext("read_spec_snapshot", new CommandFailure("transport", "temporary disconnect"));
     await ticker.fire();
     expect(modelText()).toContain("temporary disconnect");
 
@@ -3210,9 +3210,9 @@ describe("a work that moves under the screen", () => {
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     await click("Alpha");
     core.setRequirements("alpha", headOf("alpha"));
-    core.failNext("read_work_snapshot", new CommandFailure("transport", "temporary disconnect"));
+    core.failNext("read_spec_snapshot", new CommandFailure("transport", "temporary disconnect"));
     await ticker.fire();
-    // The work is one read, so the design and the list beside it fail together and say so.
+    // The spec is one read, so the design and the list beside it fail together and say so.
     expect(modelText()).toContain("temporary disconnect");
 
     await ticker.fire();
@@ -3265,7 +3265,7 @@ describe("a work that moves under the screen", () => {
     expect(verdict()).toContain("no longer holds");
   });
 
-  it("recovers answers that could not be read when the work opened, at the next question", async () => {
+  it("recovers answers that could not be read when the spec opened, at the next question", async () => {
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setAnswers("alpha", { "open-guard": "Any car" });
     core.failNext("read_answers", new CommandFailure("io", "temporary disconnect"));
@@ -3292,7 +3292,7 @@ describe("a work that moves under the screen", () => {
     expect(fieldOf("open-guard").value).toBe("Any car");
   });
 
-  it("review regression: keeps the source and model coherent when they move while a work opens", async () => {
+  it("review regression: keeps the source and model coherent when they move while a spec opens", async () => {
     const oldModel = "<scxml><!-- model of alpha two --></scxml>";
     const newModel = "<scxml><!-- model of alpha three --></scxml>";
     core.setModel("alpha", oldModel, headOf("alpha"));
@@ -3312,13 +3312,13 @@ describe("a work that moves under the screen", () => {
     ]);
   });
 
-  it("says so when the work was taken away from another window, and stops asking", async () => {
+  it("says so when the spec was taken away from another window, and stops asking", async () => {
     await click("Alpha");
-    await core.call("remove_work", { id: "alpha" });
+    await core.call("remove_spec", { id: "alpha" });
 
     await ticker.fire();
 
-    expect(root.textContent).toContain("work `absent`");
+    expect(root.textContent).toContain("spec `absent`");
     expect(ticker.pending).toEqual([]);
   });
 });
@@ -3333,8 +3333,8 @@ describe("asking for a model", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
-    core.addWork("beta", "Beta", ["beta one"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("beta", "Beta", ["beta one"]);
     // The person has chosen a connection, so a request is made for it and an executor can run it.
     // What a request made without one is read as is the business of the cases that clear this.
     core.setConnections([{ id: "claude", model: "opus", revision: hex(7) }], "claude");
@@ -3354,7 +3354,7 @@ describe("asking for a model", () => {
     await settle();
   }
 
-  it("offers the button for a work that has text, and says that no AI is connected", async () => {
+  it("offers the button for a spec that has text, and says that no AI is connected", async () => {
     await click("Alpha");
 
     expect(button("generate")?.textContent).toBe("Generate pseudocode");
@@ -3413,9 +3413,9 @@ describe("asking for a model", () => {
     expect(generationAi()).toBe("Connected: desktop");
   });
 
-  it("does not offer a request for a work that has no text yet", async () => {
-    core.addWork("empty", "Empty", []);
-    await core.call("list_works");
+  it("does not offer a request for a spec that has no text yet", async () => {
+    core.addSpec("empty", "Empty", []);
+    await core.call("list_specs");
     await app.start();
     await settle();
 
@@ -3675,7 +3675,7 @@ describe("asking for a model", () => {
         name: "desktop",
         hosting: true,
         waiting: [
-          { work: "alpha", request: waiting.id, connection: "claude", reason: "nobody is signed in to Claude Code" },
+          { spec: "alpha", request: waiting.id, connection: "claude", reason: "nobody is signed in to Claude Code" },
         ],
       },
     ]);
@@ -3831,7 +3831,7 @@ describe("asking for a model", () => {
     expect(core.headText("alpha")).toBe("alpha typed again");
   });
 
-  it("asks nothing about a request of the work the person has left", async () => {
+  it("asks nothing about a request of the spec the person has left", async () => {
     core.setAdapters([{ name: "desktop" }]);
     await click("Alpha");
     await press("generate");
@@ -3852,7 +3852,7 @@ describe("where an answer stands", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
     core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
     core.setAdapters([{ name: "desktop" }]);
     core.setConnections([{ id: "claude", model: "opus", revision: hex(7) }], "claude");
@@ -3969,7 +3969,7 @@ describe("the sentence a question or a requirement is about", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["The door.", `A door controller.\n${FIRST}\n${SECOND}\n`]);
+    core.addSpec("alpha", "Alpha", ["The door.", `A door controller.\n${FIRST}\n${SECOND}\n`]);
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setRequirements("alpha", headOf("alpha"));
     core.setCarried("alpha", { R1: ["states.closed"], R2: ["states.opened"] });
@@ -3988,7 +3988,7 @@ describe("the sentence a question or a requirement is about", () => {
 
   /** The revision of the requirement list the core holds now: the one an accept would be matched against. */
   const listRevisionNow = async (): Promise<string> =>
-    ((await core.call("read_work_snapshot", { id: "alpha" })) as { requirements: { revision: string } }).requirements
+    ((await core.call("read_spec_snapshot", { id: "alpha" })) as { requirements: { revision: string } }).requirements
       .revision;
 
   // The sentences are the list's and the outcomes are SCE's measure of that same list, which SCE
@@ -4088,10 +4088,10 @@ describe("the sentence a question or a requirement is about", () => {
     expect(editor().value).toBe("Something else entirely.");
   });
 
-  it("is not shown for a work with no requirement list", async () => {
-    core.addWork("beta", "Beta", ["Another door."]);
+  it("is not shown for a spec with no requirement list", async () => {
+    core.addSpec("beta", "Beta", ["Another door."]);
     core.setModel("beta", "<scxml/>", headOf("beta"));
-    await core.call("list_works");
+    await core.call("list_specs");
     await app.start();
     await settle();
 
@@ -4162,7 +4162,7 @@ describe("what a new model changed from the one before", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "alpha two"]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "alpha two"]);
     app = new App(root, { transport: core, storage: null, browserLanguage: "en", ticker });
     await app.start();
     await settle();
@@ -4254,7 +4254,7 @@ describe("an answer the owner chooses to put into the text", () => {
     document.body.innerHTML = '<div id="app"></div>';
     root = document.getElementById("app") as HTMLElement;
     core = new FakeCore();
-    core.addWork("alpha", "Alpha", ["alpha one", "The door opens for a card."]);
+    core.addSpec("alpha", "Alpha", ["alpha one", "The door opens for a card."]);
     core.setModel("alpha", "<scxml/>", headOf("alpha"));
     core.setAnswers("alpha", { "open-guard": "Any card on the list opens it." });
     app = new App(root, { transport: core, storage: null, browserLanguage: "en" });

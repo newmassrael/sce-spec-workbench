@@ -23,7 +23,7 @@ const C = "c".repeat(64);
 const source = (revision: string, text: string): SourceText => ({ revision, text });
 const outcome = (revision: string, parent: string | null): Saved => ({ outcome: "saved", revision, parent });
 
-describe("a work with no text yet", () => {
+describe("a spec with no text yet", () => {
   it("opens empty and clean, with nothing to save until something is typed", () => {
     const model = open("w", null);
     expect(model).toMatchObject({ base: null, text: "", saved: "", phase: "idle" });
@@ -37,7 +37,7 @@ describe("a work with no text yet", () => {
   });
 });
 
-describe("a work with text", () => {
+describe("a spec with text", () => {
   it("names the revision it was opened from as the base of the next save", () => {
     const model = edit(open("w", source(A, "one")), "one and more");
     expect(saveRequest(model)).toEqual({ id: "w", text: "one and more", base: A });

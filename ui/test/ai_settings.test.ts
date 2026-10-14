@@ -46,7 +46,7 @@ const DESKTOP: Described = {
   command_set_version: SUPPORTED_COMMAND_SET_VERSION,
   application_command_set_version: SUPPORTED_APPLICATION_COMMAND_SET_VERSION,
   commands: [],
-  root: "/works",
+  root: "/specs",
   entrance: "desktop",
   settings: true,
   writes_settings: true,

@@ -18,7 +18,7 @@
 //! | Claude Code | `SCE_CLAUDE` | on the search path as `claude` |
 //! | Codex | `SCE_CODEX` | `codex`, beside the program or on the search path |
 //! | the authoring server's launcher | `SCE_AUTHOR_MCP` | `sce-author-mcp` |
-//! | `sce-work`, for the authoring server | `SCE_WORK` | `sce-work` |
+//! | `sce-spec`, for the authoring server | `SCE_SPEC` | `sce-spec` |
 //! | the product, for the authoring server | `SCE_CODEGEN` | `sce-codegen` |
 //!
 //! Any one of them is enough for a shell that has the person's settings: a request is then run for
@@ -41,8 +41,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sce_works::figures::GENERATOR_ENV;
-use sce_works::{Clock, HostReport, HostWaiting, Product, SceCodegen, WorkStore, WAITING_MAX};
+use sce_specs::figures::GENERATOR_ENV;
+use sce_specs::{Clock, HostReport, HostWaiting, Product, SceCodegen, SpecStore, WAITING_MAX};
 
 use crate::auth_policy::Policy;
 use crate::claude_code::{AuthorServer, ClaudeCode, ClaudeCodeConfig};
@@ -57,14 +57,14 @@ use crate::runner::{
     Cancel, Directory, Draft, GenerateError, Generator, Job, Runner, RunnerConfig, Waiting,
 };
 
-/// Names `SCE_EXECUTOR`, `SCE_CLAUDE`, `SCE_CODEX`, `SCE_AUTHOR_MCP`, `SCE_WORK`,
+/// Names `SCE_EXECUTOR`, `SCE_CLAUDE`, `SCE_CODEX`, `SCE_AUTHOR_MCP`, `SCE_SPEC`,
 /// `SCE_CLAUDE_MODEL`, `SCE_CLAUDE_BUDGET_USD` in the environment.
 const EXECUTOR_ENV: &str = "SCE_EXECUTOR";
 pub(crate) const CLAUDE_ENV: &str = "SCE_CLAUDE";
 pub(crate) const CODEX_ENV: &str = "SCE_CODEX";
 
 const AUTHOR_ENV: &str = "SCE_AUTHOR_MCP";
-const WORK_ENV: &str = "SCE_WORK";
+const SPEC_ENV: &str = "SCE_SPEC";
 const MODEL_ENV: &str = "SCE_CLAUDE_MODEL";
 const BUDGET_ENV: &str = "SCE_CLAUDE_BUDGET_USD";
 
@@ -77,7 +77,7 @@ pub struct HostSettings {
     pub claude: Option<PathBuf>,
     pub codex: Option<PathBuf>,
     pub author: Option<PathBuf>,
-    pub work: Option<PathBuf>,
+    pub spec: Option<PathBuf>,
     pub codegen: Option<PathBuf>,
     pub config: ClaudeCodeConfig,
     /// How long a shell that found something missing waits before it looks again. A person can
@@ -126,7 +126,7 @@ impl HostSettings {
             claude: path(CLAUDE_ENV),
             codex: path(CODEX_ENV),
             author: path(AUTHOR_ENV),
-            work: path(WORK_ENV),
+            spec: path(SPEC_ENV),
             codegen: path(GENERATOR_ENV),
             config,
             retry: RETRY_EVERY,
@@ -139,7 +139,7 @@ impl HostSettings {
     /// an installer carried is what is used, and a developer's word (a variable set) still wins.
     pub fn with_bundle(mut self, bundle: &Installed) -> Self {
         self.author = self.author.or_else(|| bundle.author.clone());
-        self.work = self.work.or_else(|| bundle.work.clone());
+        self.spec = self.spec.or_else(|| bundle.spec.clone());
         self.codegen = self.codegen.or_else(|| bundle.codegen.clone());
         self
     }
@@ -294,7 +294,7 @@ impl Drop for ExecutorHost {
 /// Never fails: that nothing could be hosted is a state a screen shows ("no AI is connected, and
 /// here is what to install or set") and not an error that stops the application.
 pub fn start<C>(
-    store: Arc<WorkStore<C>>,
+    store: Arc<SpecStore<C>>,
     product: Arc<dyn Product>,
     settings: HostSettings,
 ) -> ExecutorHost
@@ -310,7 +310,7 @@ where
 /// connection when it cannot. Without them it runs only the requests nobody chose a connection
 /// for, and leaves the rest alone.
 pub fn start_with<C>(
-    store: Arc<WorkStore<C>>,
+    store: Arc<SpecStore<C>>,
     product: Arc<dyn Product>,
     settings: HostSettings,
     connections: Option<(ConnectionStore, Policy)>,
@@ -327,7 +327,7 @@ where
     let codex_home = connections
         .as_ref()
         .map(|(settings_store, _)| settings_store.root().join(CODEX_HOME_DIR));
-    // The first look is made now, so that what it found is in the works folder when this returns.
+    // The first look is made now, so that what it found is in the specs folder when this returns.
     let first = find_clients(
         &store,
         &settings,
@@ -395,7 +395,7 @@ where
 /// is said to be gone, without the application being closed and opened again.
 #[allow(clippy::too_many_arguments)]
 fn supervise<C>(
-    store: Arc<WorkStore<C>>,
+    store: Arc<SpecStore<C>>,
     product: Arc<dyn Product>,
     settings: HostSettings,
     connections: Option<(ConnectionStore, Policy)>,
@@ -729,7 +729,7 @@ fn names_a_server(registry: Option<&ConnectionStore>) -> bool {
 /// credential to run on, and this is the application's own home for it. `registry` is where those
 /// settings are, and where a model server is found.
 fn find_clients<C: Clock>(
-    store: &WorkStore<C>,
+    store: &SpecStore<C>,
     settings: &HostSettings,
     codex_home: Option<&Path>,
     registry: Option<&ConnectionStore>,
@@ -805,7 +805,7 @@ fn find_codex(
 /// waits for changes, until told to stop: a person who pressed the button is told why nothing
 /// happens when it is true and not half a minute later.
 fn report_until_stopped<C: Clock>(
-    store: &WorkStore<C>,
+    store: &SpecStore<C>,
     stop: &Cancel,
     name: &str,
     shared: &Shared,
@@ -825,7 +825,7 @@ fn report_until_stopped<C: Clock>(
 }
 
 /// One report. A folder that could not be written to this time is written to at the next.
-fn say<C: Clock>(store: &WorkStore<C>, name: &str, standing: &Standing, waiting: &[HostWaiting]) {
+fn say<C: Clock>(store: &SpecStore<C>, name: &str, standing: &Standing, waiting: &[HostWaiting]) {
     let reason = standing.not_hosted.as_ref().map(ToString::to_string);
     let _ = store.report_host(HostReport {
         name,
@@ -843,7 +843,7 @@ fn waiting_words(waiting: &[Waiting]) -> Vec<HostWaiting> {
         .iter()
         .take(WAITING_MAX)
         .map(|w| HostWaiting {
-            work: w.work.as_str().to_string(),
+            spec: w.spec.as_str().to_string(),
             request: w.request.clone(),
             connection: w.connection.as_str().to_string(),
             reason: w.reason.clone(),
@@ -852,8 +852,8 @@ fn waiting_words(waiting: &[Waiting]) -> Vec<HostWaiting> {
 }
 
 /// How the client reaches the authoring server: the launcher, and what the server needs to find
-/// the works folder and the product, which are this shell's and no other's.
-fn author_server(settings: &HostSettings, works: &Path) -> Result<AuthorServer, NotHosted> {
+/// the specs folder and the product, which are this shell's and no other's.
+fn author_server(settings: &HostSettings, specs: &Path) -> Result<AuthorServer, NotHosted> {
     let launcher = match &settings.author {
         Some(path) if path.is_file() => path.clone(),
         Some(path) => {
@@ -868,13 +868,13 @@ fn author_server(settings: &HostSettings, works: &Path) -> Result<AuthorServer, 
             )
         })?,
     };
-    let mut env = vec![("SCE_WORKS_DIR".to_string(), works.display().to_string())];
-    let work = settings
-        .work
+    let mut env = vec![("SCE_SPECS_DIR".to_string(), specs.display().to_string())];
+    let spec = settings
+        .spec
         .clone()
-        .or_else(|| found_beside_or_on_path("sce-work"));
-    if let Some(work) = work {
-        env.push((WORK_ENV.to_string(), work.display().to_string()));
+        .or_else(|| found_beside_or_on_path("sce-spec"));
+    if let Some(spec) = spec {
+        env.push((SPEC_ENV.to_string(), spec.display().to_string()));
     }
     let codegen = settings
         .codegen

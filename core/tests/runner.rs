@@ -20,9 +20,9 @@ use std::time::{Duration, Instant};
 use sce_spec_workbench_core::runner::{
     Cancel, Draft, GenerateError, Generator, Job, Outcome, Runner, RunnerConfig,
 };
-use sce_works::requests::{Inputs, State};
-use sce_works::{
-    call, ManualClock, ModelFiles, Registration, Requirements, Revision, WorkId, WorkStore,
+use sce_specs::requests::{Inputs, State};
+use sce_specs::{
+    call, ManualClock, ModelFiles, Registration, Requirements, Revision, SpecId, SpecStore,
 };
 use serde_json::json;
 
@@ -91,18 +91,18 @@ fn draft(tag: &str) -> Draft {
 
 struct Fixture {
     clock: Arc<ManualClock>,
-    store: Arc<WorkStore<Arc<ManualClock>>>,
-    id: WorkId,
+    store: Arc<SpecStore<Arc<ManualClock>>>,
+    id: SpecId,
     source: Revision,
 }
 
 fn fixture(label: &str) -> Fixture {
     let clock = Arc::new(ManualClock::at(T0));
-    let store = Arc::new(WorkStore::with_clock(
+    let store = Arc::new(SpecStore::with_clock(
         common::scratch(label),
         Arc::clone(&clock),
     ));
-    let id = store.create_work("Door lock").unwrap().id;
+    let id = store.create_spec("Door lock").unwrap().id;
     store.save_source(&id, "The lock opens.", None).unwrap();
     let source = store.head(&id).unwrap().expect("a text");
     Fixture {
@@ -210,14 +210,14 @@ fn a_queued_request_is_taken_written_for_and_completed() {
     let outcome = runner.run_once().unwrap();
 
     let Outcome::Completed {
-        work,
+        spec,
         request: done,
         bundle,
     } = outcome
     else {
         panic!("expected a completion, got {outcome:?}");
     };
-    assert_eq!((work, done), (f.id.clone(), request.clone()));
+    assert_eq!((spec, done), (f.id.clone(), request.clone()));
     assert_eq!(f.state_of(&request), State::Completed);
     let model = f.store.read_model(&f.id, None).unwrap().expect("a model");
     assert!(model.text.contains("one"));
@@ -238,7 +238,7 @@ fn a_queued_request_is_taken_written_for_and_completed() {
 #[test]
 fn the_generator_is_asked_about_the_text_and_the_answers_the_request_was_made_about() {
     let f = fixture("runner-job");
-    // A model the work had, and an answer the owner gave to what it left open.
+    // A model the spec had, and an answer the owner gave to what it left open.
     f.store
         .save_model(
             &f.id,
@@ -263,7 +263,7 @@ fn the_generator_is_asked_about_the_text_and_the_answers_the_request_was_made_ab
     let jobs = generator.asked();
     assert_eq!(jobs.len(), 1);
     let job = &jobs[0];
-    assert_eq!(job.work, f.id);
+    assert_eq!(job.spec, f.id);
     assert_eq!(job.title, "Door lock");
     assert_eq!(job.request, request);
     assert_eq!(job.attempt, 1);
@@ -273,7 +273,7 @@ fn the_generator_is_asked_about_the_text_and_the_answers_the_request_was_made_ab
         job.answers.get("open-guard").map(String::as_str),
         Some("Any card on the list opens it.")
     );
-    let previous = job.previous.as_ref().expect("the work had a model");
+    let previous = job.previous.as_ref().expect("the spec had a model");
     assert!(previous.model.entry_text().contains("earlier"));
     assert!(job.refusal.is_none(), "nothing was refused yet");
     assert!(!job.fresh_ids, "the owner asked for nothing of the kind");
@@ -398,7 +398,7 @@ fn a_generator_that_cannot_says_why_and_the_owner_is_told() {
     assert_eq!(
         outcome,
         Outcome::Failed {
-            work: f.id.clone(),
+            spec: f.id.clone(),
             request: request.clone(),
             reason: "The text never says which cards open the door.".to_string(),
         }
@@ -441,7 +441,7 @@ fn a_model_the_core_refuses_is_written_again_from_the_products_own_words() {
     let model = f.store.read_model(&f.id, None).unwrap().unwrap();
     assert!(
         model.text.contains("two"),
-        "the repaired draft is the work's"
+        "the repaired draft is the spec's"
     );
 }
 
@@ -496,7 +496,7 @@ fn something_that_is_not_a_draft_is_told_what_was_wrong_and_written_again() {
 }
 
 #[test]
-fn the_claim_is_renewed_while_the_generator_works() {
+fn the_claim_is_renewed_while_the_generator_specs() {
     let f = fixture("runner-renewed");
     let request = f.ask("press-1");
     let store = Arc::clone(&f.store);
@@ -552,7 +552,7 @@ fn a_request_the_owner_calls_off_stops_the_generator_and_is_not_reported_as_its_
     assert_eq!(
         outcome,
         Outcome::Lost {
-            work: f.id.clone(),
+            spec: f.id.clone(),
             request: request.clone(),
             kind: "request-ended".to_string(),
         }
@@ -565,7 +565,7 @@ fn a_request_the_owner_calls_off_stops_the_generator_and_is_not_reported_as_its_
 }
 
 #[test]
-fn a_text_saved_while_the_generator_works_ends_the_request_and_nothing_is_published() {
+fn a_text_saved_while_the_generator_specs_ends_the_request_and_nothing_is_published() {
     let f = fixture("runner-superseded");
     let request = f.ask("press-1");
     let store = Arc::clone(&f.store);
@@ -616,7 +616,7 @@ fn a_runner_told_to_stop_leaves_the_request_to_run_out_its_lease() {
     assert_eq!(
         outcome,
         Outcome::Stopped {
-            work: f.id.clone(),
+            spec: f.id.clone(),
             request: request.clone()
         }
     );

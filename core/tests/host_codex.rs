@@ -28,8 +28,8 @@ use sce_spec_workbench_core::host::{start, start_with, HostSettings, NotHosted};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Policy,
 };
-use sce_works::requests::{Inputs, Pin, State};
-use sce_works::{ConnectionId, ManualClock, Registration, Saved, WorkId, WorkStore};
+use sce_specs::requests::{Inputs, Pin, State};
+use sce_specs::{ConnectionId, ManualClock, Registration, Saved, SpecId, SpecStore};
 
 use common::FakeRenderer;
 
@@ -41,9 +41,9 @@ fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
     move |key| map.get(key).cloned()
 }
 
-fn store(label: &str) -> Arc<WorkStore<Arc<ManualClock>>> {
+fn store(label: &str) -> Arc<SpecStore<Arc<ManualClock>>> {
     let clock = Arc::new(ManualClock::at(1_791_190_800));
-    Arc::new(WorkStore::with_clock(common::scratch(label), clock))
+    Arc::new(SpecStore::with_clock(common::scratch(label), clock))
 }
 
 /// A `codex` that says what it is and signs in as a ChatGPT plan, a `claude` that says what it
@@ -113,7 +113,7 @@ fn pinned_to_codex(label: &str) -> (ConnectionStore, Pin) {
     (settings, pin)
 }
 
-fn ask_for(store: &WorkStore<Arc<ManualClock>>, id: &WorkId, pin: Pin) -> String {
+fn ask_for(store: &SpecStore<Arc<ManualClock>>, id: &SpecId, pin: Pin) -> String {
     store
         .register_request_for(
             id,
@@ -183,7 +183,7 @@ fn a_computer_with_codex_and_no_claude_hosts_for_the_connections_it_has() {
 #[test]
 fn a_request_made_for_codex_waits_with_its_reason_where_the_screen_reads_it() {
     let store = store("hostx-waits");
-    let id = store.create_work("Door lock").unwrap().id;
+    let id = store.create_spec("Door lock").unwrap().id;
     store.save_source(&id, "The lock opens.", None).unwrap();
     let programs = programs("hostx-waits-bin");
     let (connections, pin) = pinned_to_codex("hostx-waits-settings");
@@ -221,7 +221,7 @@ fn a_request_made_for_codex_waits_with_its_reason_where_the_screen_reads_it() {
 #[test]
 fn a_computer_with_both_reports_as_claude_code_and_still_runs_for_codex() {
     let store = store("hostx-both");
-    let id = store.create_work("Door lock").unwrap().id;
+    let id = store.create_spec("Door lock").unwrap().id;
     store.save_source(&id, "The lock opens.", None).unwrap();
     let programs = programs("hostx-both-bin");
     let (connections, pin) = pinned_to_codex("hostx-both-settings");

@@ -13,7 +13,7 @@ const request = (state: RequestState, answers: string | null): { head: Inputs["h
   head: { id: "req-1", state, attempt: 1 },
   detail: {
     id: "req-1",
-    work: "door",
+    spec: "door",
     seq: 1,
     key: "k",
     origin: "gui",

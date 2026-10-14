@@ -31,7 +31,7 @@ pub fn check_bind(ip: IpAddr) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "{ip} would offer the works folder to a network this program cannot tell is private. \
+        "{ip} would offer the specs folder to a network this program cannot tell is private. \
          Listen on 127.0.0.1 and forward the port (ssh -L), or listen on this machine's \
          Tailscale address"
     ))

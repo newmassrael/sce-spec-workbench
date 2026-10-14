@@ -23,12 +23,12 @@ function fetching(status: number, body: unknown, seen: Seen[] = []): typeof fetc
 describe("the browser transport", () => {
   it("posts the command with the bearer token and returns the answer", async () => {
     const seen: Seen[] = [];
-    const transport = httpTransport({ fetch: fetching(200, { works: [] }, seen), token: () => "tok" });
-    expect(await transport.call("list_works", {})).toEqual({ works: [] });
+    const transport = httpTransport({ fetch: fetching(200, { specs: [] }, seen), token: () => "tok" });
+    expect(await transport.call("list_specs", {})).toEqual({ specs: [] });
     expect(seen[0]?.url).toBe("/api/call");
     expect(seen[0]?.init.method).toBe("POST");
     expect(seen[0]?.init.headers).toMatchObject({ Authorization: "Bearer tok" });
-    expect(JSON.parse(String(seen[0]?.init.body))).toEqual({ name: "list_works", args: {} });
+    expect(JSON.parse(String(seen[0]?.init.body))).toEqual({ name: "list_specs", args: {} });
   });
 
   it("sends no Authorization header when it has no token", async () => {
@@ -86,8 +86,8 @@ describe("the typed commands", () => {
   const A = "a".repeat(64);
 
   it("check the answer before a view sees it", async () => {
-    const api = apiOver({ call: async () => ({ works: "not a list", unreadable: [] }) });
-    await expect(api.listWorks()).rejects.toThrow(/listing\.works: expected a list/);
+    const api = apiOver({ call: async () => ({ specs: "not a list", unreadable: [] }) });
+    await expect(api.listSpecs()).rejects.toThrow(/listing\.specs: expected a list/);
   });
 
   it("send a read of an old revision with its revision, and a current read without", async () => {
