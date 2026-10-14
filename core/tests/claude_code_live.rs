@@ -12,7 +12,7 @@
 //! names and the answer's form mean to the real client what this side says they mean.
 //!
 //! ```text
-//! cargo test -p sce-spec-workbench-core --features cli --test claude_code_live -- --ignored --nocapture
+//! cargo test -p sce-spec-workbench-core --test claude_code_live -- --ignored --nocapture
 //! ```
 
 #![cfg(unix)]

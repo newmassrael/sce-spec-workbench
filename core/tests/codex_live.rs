@@ -5,7 +5,7 @@
 //!
 //! Requires a signed-in `codex`, Python and a built `sce-codegen`.
 //! `SCE_LIVE_MODEL` selects a model; `SCE_CODEX`/`SCE_CODEGEN` select executables.
-//! Run with `cargo test -p sce-spec-workbench-core --features cli --test codex_live -- --ignored --nocapture`.
+//! Run with `cargo test -p sce-spec-workbench-core --test codex_live -- --ignored --nocapture`.
 //! For reviewing a new CLI version *before* shipping it, `SCE_CODEX_VERIFY=1` constructs an
 //! in-memory candidate entry. This opt-in exists only in this ignored test, never in the app.
 //! Traces contain only this test's synthetic specification and are kept in a temporary folder.

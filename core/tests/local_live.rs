@@ -18,7 +18,7 @@
 //!
 //! ```text
 //! SCE_LOCAL_URL=http://127.0.0.1:11434/v1 SCE_LOCAL_MODEL=qwen3-coder:30b \
-//!   cargo test -p sce-spec-workbench-core --features cli --test local_live -- --ignored --nocapture
+//!   cargo test -p sce-spec-workbench-core --test local_live -- --ignored --nocapture
 //! ```
 
 #![cfg(unix)]

@@ -15,7 +15,7 @@
 //! (`cargo build -p sce-build --features cli --bin sce-codegen`):
 //!
 //! ```text
-//! cargo test -p sce-spec-workbench-core --features cli --test client_scope_live -- --ignored --nocapture
+//! cargo test -p sce-spec-workbench-core --test client_scope_live -- --ignored --nocapture
 //! ```
 
 #![cfg(unix)]
