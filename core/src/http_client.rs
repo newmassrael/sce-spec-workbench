@@ -1436,8 +1436,13 @@ mod tests {
     fn a_server_that_takes_the_connection_and_says_nothing_is_waited_for_in_the_handshake_only_as_long_as_told(
     ) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        // The address the server was opened on, and not `localhost`: the handshake never gets as
+        // far as the certificate, so no name is needed, and a name is resolved by the system. On
+        // Windows `localhost` is `::1` first, and a refused connection there takes long enough
+        // that a word to stop (300 ms) or a time that is up (400 ms) comes before the second
+        // address is tried, so the server is never reached.
         let address = format!(
-            "https://localhost:{}/v1",
+            "https://127.0.0.1:{}/v1",
             listener.local_addr().unwrap().port()
         );
         let (held_tx, held_rx) = mpsc::channel();
