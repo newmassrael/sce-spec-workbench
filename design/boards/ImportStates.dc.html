@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>가져오기 상태</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+.cell{display:flex;flex-direction:column;gap:14px;min-width:0}
+.cap{font:500 14px/22px var(--font);color:var(--ink-3);padding:0 4px}
+.card-s{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:20px;height:304px;display:flex;flex-direction:column;justify-content:center}
+.card-s .drop{padding:32px 20px 28px}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px; padding: 48px">
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 32px; max-width: 1280px; margin: 0 auto">
+
+    <div class="cell">
+      <div class="card-s">
+        <div class="drop">
+          <span class="tile"><span class="ic ic-upload" style="width: 28px; height: 28px"></span></span>
+          <div style="text-align: center">
+            <div style="font: 600 17px/26px var(--font)">문서를 여기에 끌어다 놓으세요</div>
+            <div style="margin-top: 2px; font: 400 14px/22px var(--font); color: var(--ink-3)">Word 또는 PDF</div>
+          </div>
+          <button class="btn" type="button"><span class="ic ic-doc"></span>파일 선택</button>
+        </div>
+      </div>
+      <div class="cap">처음</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s">
+        <div class="drop over" style="min-height: 232px; justify-content: center">
+          <span class="tile"><span class="ic ic-upload" style="width: 28px; height: 28px"></span></span>
+          <div style="font: 600 17px/26px var(--font); color: var(--accent-ink)">여기에 놓으세요</div>
+        </div>
+      </div>
+      <div class="cap">파일을 끌어올 때</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 18px">
+        <div class="file">
+          <span class="badge b-ok"><span class="ic ic-doc" style="width: 20px; height: 20px"></span></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+            <div style="font: 600 15px/22px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">문잠금-요구사항.docx</div>
+            <div class="bar" role="progressbar" aria-label="올리는 중" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100"><i style="width: 62%"></i></div>
+          </div>
+          <button class="btn quiet icon" type="button" aria-label="올리기 취소" style="width: 36px; height: 36px"><span class="ic ic-x" style="width: 16px; height: 16px"></span></button>
+        </div>
+      </div>
+      <div class="cap">올리는 중</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 20px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-ok" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-check" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">원본을 보관했어요</span>
+        </div>
+        <div class="file">
+          <span class="badge b-ai"><span class="spin"></span></span>
+          <div style="flex: 1; min-width: 0">
+            <div style="font: 600 15px/22px var(--font)">AI가 옮겨 쓰는 중</div>
+            <div style="font: 400 14px/22px var(--font); color: var(--ink-3)">목록에서 진행 상황을 볼 수 있어요</div>
+          </div>
+        </div>
+        <a class="btn quiet" href="Library.dc.html" style="align-self: flex-start">목록으로</a>
+      </div>
+      <div class="cap">올린 뒤, AI가 연결되어 있을 때</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 20px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-attn" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-alert" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">이 파일은 올릴 수 없어요</span>
+        </div>
+        <p style="margin: 0; font: 400 15px/24px var(--font); color: var(--ink-2)">Word(.docx) 또는 PDF로 저장해서 다시 올려 주세요.</p>
+        <button class="btn" type="button" style="align-self: flex-start"><span class="ic ic-doc"></span>다른 파일 선택</button>
+      </div>
+      <div class="cap">잘못된 파일</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 20px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-ok" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-check" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">원본을 보관했어요</span>
+        </div>
+        <p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span>AI 클라이언트가 연결되지 않았어요. 연결되면 바로 옮겨 쓰기 시작해요. <a href="#">연결 방법</a></span></p>
+        <a class="btn quiet" href="Library.dc.html" style="align-self: flex-start">목록으로</a>
+      </div>
+      <div class="cap">올린 뒤, AI가 연결되어 있지 않을 때</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

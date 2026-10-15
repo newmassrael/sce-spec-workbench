@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>마크다운 비교</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <div class="bar-top">
+    <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
+    <span style="font: 700 16px/24px var(--font)">온도 조절기</span>
+    <span class="count done" style="margin-left: 8px">바뀌는 곳 3곳</span>
+    <span class="count">옮기지 못한 곳 1곳</span>
+    <span class="grow" style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px">
+      <a class="btn quiet" href="Library.dc.html">이 제안 버리기</a>
+      <a class="btn" href="Accepted.dc.html"><span class="ic ic-check"></span>수락</a>
+    </span>
+  </div>
+
+  <div class="cols" style='--l1: "지금 사양"; --l2: "가져온 파일"'>
+    <div class="colhead"><span class="ic ic-doc" style="width: 16px; height: 16px"></span>지금 사양 · 서가 수정</div>
+    <div class="colhead"><span class="ic ic-doc" style="width: 16px; height: 16px"></span>가져온 파일 · 온도-조절기.md<span class="how">AI 없이 바로 읽었어요</span></div>
+
+    <div class="cell h first">온도 조절기 요구사항</div>
+    <div class="cell h first">온도 조절기 요구사항</div>
+
+    <div class="cell">설정한 온도에 도달하면 램프가 켜진다.</div>
+    <div class="cell">설정한 온도에 도달하면 램프가 켜진다.</div>
+
+    <div class="cell chg">켜진 뒤 30초가 지나면 스스로 꺼진다.</div>
+    <div class="cell chg">
+      <span class="tag n">바뀜</span>
+      <div>켜진 뒤 <del>30</del><ins>45</ins>초가 지나면 스스로 꺼진다.</div>
+    </div>
+
+    <div class="cell empty chg">지금 사양에 없어요</div>
+    <div class="cell chg">
+      <span class="tag n">추가됨</span>
+      <div><ins>램프가 켜져 있는 동안 설정 온도를 바꿀 수 없다.</ins></div>
+    </div>
+
+    <div class="cell chg">고장이 나면 경보를 보낸다.</div>
+    <div class="cell empty chg">
+      <span style="display: flex; flex-direction: column; align-items: flex-start"><span class="tag n">빠짐</span>가져온 파일에 없어요</span>
+    </div>
+
+    <div class="cell flag">온도별 꺼짐 시간 표 (3행)</div>
+    <div class="cell flag">
+      <span class="tag"><span class="ic ic-alert" style="width: 13px; height: 13px"></span>옮기지 못했어요</span>
+      <div style="font: 400 15px/24px var(--font)">파일의 표는 사양으로 읽지 못했어요.</div>
+      <span class="sub">수락하면 이 부분은 사양에서 빠져요. 표를 문장으로 풀어 쓰면 옮길 수 있어요.</span>
+    </div>
+
+    <div class="cell last">그 밖의 어떤 것도 램프 상태를 바꾸지 않는다.</div>
+    <div class="cell last">그 밖의 어떤 것도 램프 상태를 바꾸지 않는다.</div>
+  </div>
+  <div style="height: 64px"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

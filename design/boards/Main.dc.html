@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>처음 시작</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px 96px;min-height:640px}
+.srv{display:flex;align-items:center;gap:14px;padding:14px;border:1.5px solid var(--accent);border-radius:14px;background:var(--sel-bg)}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 800px; display: flex; flex-direction: column">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+    <span class="conn {{connClass}}"><i></i>{{connText}}</span>
+  </header>
+
+  <main class="stage" style="flex: 1">
+    <div style="width: 100%; max-width: 560px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center">
+      <h1 style="margin: 0; font: 700 32px/42px var(--font); letter-spacing: -0.02em">사양 문서를 올려 보세요</h1>
+      <p style="margin: 0; font: 400 16px/26px var(--font); color: var(--ink-2)">AI가 옮겨 쓴 결과를 원본과 나란히 놓고 확인해요.</p>
+    </div>
+
+    <div class="drop" style="max-width: 560px; margin-top: 36px">
+      <span class="tile"><span class="ic ic-upload" style="width: 28px; height: 28px"></span></span>
+      <div style="text-align: center">
+        <div style="font: 600 18px/28px var(--font)">문서를 여기에 끌어다 놓으세요</div>
+        <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink-3)">Word, PDF, 마크다운</div>
+      </div>
+      <a class="btn" href="Library.dc.html"><span class="ic ic-doc"></span>파일 선택</a>
+    </div>
+
+    <sc-if value="{{offline}}" hint-placeholder-val="{{ false }}">
+      <p class="note" style="max-width: 560px; margin-top: 16px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>AI가 연결되지 않았어요. 마크다운은 바로 가져올 수 있고, Word와 PDF는 연결되는 대로 옮겨 써요. <a href="#">AI 연결</a></span></p>
+    </sc-if>
+
+    <button class="fine" type="button" onClick="{{openServer}}" style="margin-top: 28px; display: inline-flex; align-items: center; gap: 8px; font: 400 14px/22px var(--font); color: var(--ink-3); background: transparent; border: 0; cursor: pointer"><span class="ic ic-server" style="width: 16px; height: 16px"></span>팀 서버에 연결</button>
+  </main>
+
+  <sc-if value="{{serverOpen}}" hint-placeholder-val="{{ false }}">
+    <button class="scrim" type="button" aria-label="닫기" onClick="{{closeServer}}"></button>
+  </sc-if>
+
+  <sc-if value="{{serverOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="팀 서버에 연결">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">팀 서버에 연결</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeServer}}"><span class="ic ic-x"></span></button>
+        </div>
+        <label class="lbl" for="srv">서버 주소나 초대 링크</label>
+        <input class="field" id="srv" type="text" placeholder="붙여넣기" value="{{addr}}">
+        <div style="margin-top: 8px; font: 400 13px/20px var(--font); color: var(--ink-3)">초대를 받았다면 링크를 그대로 붙여 넣으세요. 직접 운영하는 서버와 호스팅 서비스 모두 같아요.</div>
+
+        <sc-if value="{{found}}" hint-placeholder-val="{{ false }}">
+          <div class="srv" style="margin-top: 18px">
+            <span class="opt-ic" style="background: var(--accent-tint); color: var(--accent)"><span class="ic ic-server" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0"><span class="opt-t">우리 팀 서버</span><span class="opt-s">사양 12개 · 멤버 4명</span></span>
+            <span class="tag n" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>찾았어요</span>
+          </div>
+          <div style="margin-top: 12px; font: 400 13px/20px var(--font); color: var(--ink-3)">로그인이 필요하면 다음 단계에서 서버가 안내해요.</div>
+        </sc-if>
+        <sc-if value="{{failed}}" hint-placeholder-val="{{ false }}">
+          <p class="note" style="margin-top: 18px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>서버에 닿지 않아요. 주소를 다시 확인해 주세요. 이 컴퓨터의 사양은 그대로 있어요.</span></p>
+        </sc-if>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px">
+          <button class="btn quiet" type="button" onClick="{{closeServer}}">취소</button>
+          <sc-if value="{{showFind}}" hint-placeholder-val="{{ true }}">
+            <button class="btn" type="button" onClick="{{find}}">서버 찾기</button>
+          </sc-if>
+          <sc-if value="{{found}}" hint-placeholder-val="{{ false }}">
+            <a class="btn" href="Library.dc.html">연결하기</a>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"connected":{"editor":"boolean","default":true},"unreachable":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { server: false, step: 'input' };
+  }
+  renderVals() {
+    const on = this.props.connected !== false;
+    const { server, step } = this.state;
+    return {
+      connClass: on ? '' : 'off',
+      connText: on ? 'Claude Code 연결됨' : 'AI 연결 안 됨',
+      offline: !on,
+      serverOpen: server,
+      openServer: () => this.setState({ server: true, step: 'input' }),
+      closeServer: () => this.setState({ server: false }),
+      addr: step === 'input' ? '' : 'https://spec.example-team.com',
+      found: step === 'found',
+      failed: step === 'failed',
+      showFind: step !== 'found',
+      find: () => this.setState({ step: this.props.unreachable ? 'failed' : 'found' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

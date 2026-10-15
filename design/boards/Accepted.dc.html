@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>수락함</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
+.pop{animation:pop .5s ease-out both}
+.draw{stroke-dasharray:30;animation:draw .45s .2s ease-out both}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 800px; display: flex; flex-direction: column">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+  <main style="flex: 1; width: 100%; max-width: 520px; margin: 0 auto; padding: 48px 24px 96px; display: flex; flex-direction: column; align-items: center; gap: 28px">
+    <span class="pop" role="img" aria-label="수락함" style="display: inline-flex; width: 80px; height: 80px; border-radius: 999px; background: var(--accent); color: var(--on-accent); align-items: center; justify-content: center">
+      <svg viewBox="0 0 40 40" width="44" height="44" aria-hidden="true"><path class="draw" d="M10 21l7 7 14-15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </span>
+    <div style="text-align: center">
+      <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">사양으로 저장했어요</h1>
+      <p style="margin: 6px 0 0; font: 400 16px/26px var(--font); color: var(--ink-2)">휴대전화 문 잠금</p>
+    </div>
+
+    <div style="width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
+      <div class="item"><span class="dot"><span class="ic ic-check" style="width: 15px; height: 15px"></span></span><span style="font: 500 15px/22px var(--font)">원본대로 고침</span><span style="margin-left: auto; font: 400 14px/22px var(--font); color: var(--ink-3)">잠금 후 30초</span></div>
+      <div class="item"><span class="dot"><span class="ic ic-plus" style="width: 15px; height: 15px"></span></span><span style="font: 500 15px/22px var(--font)">추가함</span><span style="margin-left: auto; font: 400 14px/22px var(--font); color: var(--ink-3)">배터리 20% 알림</span></div>
+      <div class="item"><span class="dot"><span class="ic ic-x" style="width: 15px; height: 15px"></span></span><span style="font: 500 15px/22px var(--font)">지움</span><span style="margin-left: auto; font: 400 14px/22px var(--font); color: var(--ink-3)">램프 켜기</span></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px">
+      <a class="btn" href="Library.dc.html">사양 목록</a>
+      <a class="btn quiet" href="Main.dc.html"><span class="ic ic-upload"></span>다른 문서 가져오기</a>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

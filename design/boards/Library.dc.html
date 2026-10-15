@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>사양 목록</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+.rw:not(.hide) ~ .rw:not(.hide){border-top:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:16px;padding:16px 20px;transition:background .15s}
+.row:hover,.row:focus-visible{background:var(--hover)}
+.row .go{color:var(--faint);transition:color .15s,transform .15s}
+.row:hover .go{color:var(--ink-3);transform:translateX(2px)}
+.t{display:block;font:600 16px/24px var(--font)}
+.s{display:block;font:400 14px/22px var(--font)}
+.avs,.who{display:none}
+.team .avs{display:inline-flex;align-items:center;padding-left:8px}
+.team .who{display:inline}
+.tmain{display:flex;align-items:center;gap:8px;flex:1;height:100%;min-width:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+</style>
+</helmet>
+<div class="app {{teamClass}} {{allClass}}" style="width: 100%; min-height: 800px">
+  <header class="top">
+    <span style="display: inline-flex; align-items: center">
+      <a class="brand" href="Main.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+      <sc-if value="{{multi}}" hint-placeholder-val="{{ false }}">
+        <button class="ws" type="button" aria-label="작업 공간 바꾸기">우리 팀<span class="ic ic-down" style="width: 14px; height: 14px"></span></button>
+      </sc-if>
+    </span>
+    <button class="conn" type="button" onClick="{{openProvider}}" aria-label="AI 연결 바꾸기"><i></i>{{provName}}<span class="ic ic-down" style="width: 14px; height: 14px"></span></button>
+  </header>
+
+  <div class="shell">
+    <nav class="side" aria-label="사양 폴더">
+      <div class="side-h"><span class="ic {{wsIcon}}" style="width: 16px; height: 16px"></span>{{wsName}}</div>
+
+      <div class="tr {{onAll}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selAll}}"><span class="ic ic-doc" style="width: 16px; height: 16px"></span>전체 사양<span class="tn">{{nAll}}</span></button>
+      </div>
+
+      <div class="tr {{onBld}}">
+        <button class="tw {{twBld}}" type="button" aria-label="건물 폴더 펼치기" onClick="{{toggleBld}}"><span class="ic ic-chev"></span></button>
+        <button class="tmain" type="button" onClick="{{selBld}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>건물<span class="tn"><span class="pip {{pipBld}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nBld}}</span></button>
+      </div>
+      <div class="tr lv1 {{onAcc}} {{kids}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selAcc}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>출입<span class="tn"><span class="pip {{pipAcc}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nAcc}}</span></button>
+      </div>
+      <div class="tr lv1 {{onFac}} {{kids}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selFac}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>설비<span class="tn"><span class="pip {{pipFac}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nFac}}</span></button>
+      </div>
+
+      <div class="tr lv1 {{onCus}} {{hideCusBld}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selCus}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{cName}}<span class="tn">{{nCus}}</span></button>
+      </div>
+
+      <div class="tr {{onPay}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selPay}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>정산<span class="tn">{{nPay}}</span></button>
+      </div>
+      <div class="tr lv1 {{onCus}} {{hideCusPay}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selCus}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{cName}}<span class="tn">{{nCus}}</span></button>
+      </div>
+      <div class="tr {{onCus}} {{hideCusTop}}">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{selCus}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{cName}}<span class="tn">{{nCus}}</span></button>
+      </div>
+
+      <div class="tr" style="margin-top: 8px; color: var(--ink-3)">
+        <span class="tw none"><span class="ic ic-chev"></span></span>
+        <button class="tmain" type="button" onClick="{{openNew}}"><span class="ic ic-plus" style="width: 16px; height: 16px"></span>새 폴더</button>
+      </div>
+    </nav>
+
+    <main style="min-width: 0; max-width: 800px; padding: 32px 40px 96px 24px">
+      <div class="crumb {{crumbHide}}">{{crumb}}</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+        <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">{{title}}</h1>
+        <button class="btn" type="button" onClick="{{openImport}}"><span class="ic ic-upload"></span>문서 가져오기</button>
+      </div>
+
+      <div style="margin-top: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
+        <div class="rw {{h1}}">
+          <a class="row" href="Review.dc.html">
+            <span class="badge b-attn" role="img" aria-label="확인이 필요함"><span class="ic ic-alert" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">휴대전화 문 잠금</span>
+              <span class="s"><span class="st st-attn">확인할 부분 3곳</span><span class="where">{{w1}}</span><span class="who">민, 준이 검토 중</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="민, 준"><span class="av pa">민</span><span class="av pb">준</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="휴대전화 문 잠금을 다른 폴더로 옮기기" onClick="{{mv1}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h2}}">
+          <a class="row" href="Moved.dc.html">
+            <span class="badge b-attn" role="img" aria-label="원본이 바뀜"><span class="ic ic-swap" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">온도 조절기</span>
+              <span class="s"><span class="st st-attn">보던 사이에 바뀜</span><span class="where">{{w2}}</span><span class="who">서가 수정</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="서"><span class="av pc">서</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="온도 조절기를 다른 폴더로 옮기기" onClick="{{mv2}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h3}}">
+          <a class="row" href="ScanReview.dc.html">
+            <span class="badge b-attn" role="img" aria-label="확인이 필요함"><span class="ic ic-alert" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">엘리베이터 호출</span>
+              <span class="s"><span class="st st-attn">확인할 부분 2곳</span><span class="where">{{w3}}</span><span class="who">민이 올림</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="민"><span class="av pa">민</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="엘리베이터 호출을 다른 폴더로 옮기기" onClick="{{mv3}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h4}}">
+          <a class="row" href="Accepted.dc.html">
+            <span class="badge b-ok" role="img" aria-label="수락함"><span class="ic ic-check" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">데스크톱 문 잠금</span>
+              <span class="s"><span class="st st-ok">수락함</span><span class="when">어제</span><span class="where">{{w4}}</span><span class="who">서가 수락</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="서"><span class="av pc">서</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="데스크톱 문 잠금을 다른 폴더로 옮기기" onClick="{{mv4}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h5}}">
+          <a class="row" href="#">
+            <span class="badge b-ok" role="img" aria-label="수락함"><span class="ic ic-check" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">주차 요금 정산</span>
+              <span class="s"><span class="st st-ok">수락함</span><span class="when">10월 3일</span><span class="where">{{w5}}</span><span class="who">준이 수락</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="준"><span class="av pb">준</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="주차 요금 정산을 다른 폴더로 옮기기" onClick="{{mv5}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h6}}">
+          <a class="row" href="#">
+            <span class="badge b-ai" role="img" aria-label="AI가 옮겨 쓰는 중"><span class="spin"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">비상 호출 장치</span>
+              <span class="s"><span class="st st-ai">AI가 옮겨 쓰는 중</span><span class="where">{{w6}}</span><span class="who">민이 올림</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="민"><span class="av pa">민</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="비상 호출 장치를 다른 폴더로 옮기기" onClick="{{mv6}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h7}}">
+          <a class="row" href="MdReview.dc.html">
+            <span class="badge b-attn" role="img" aria-label="바뀌는 곳이 있음"><span class="ic ic-swap" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">도어락 규칙</span>
+              <span class="s"><span class="st st-attn">바뀌는 곳 3곳</span><span class="where">{{w7}}</span><span class="who">준이 올림</span></span>
+            </span>
+            <span class="avs" role="img" aria-label="준"><span class="av pb">준</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="도어락 규칙을 다른 폴더로 옮기기" onClick="{{mv7}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="{{emptyHide}}" style="padding: 40px 24px; text-align: center; font: 400 15px/24px var(--font); color: var(--ink-3)">이 폴더는 비어 있어요. 사양을 옮겨 오거나 문서를 가져오세요.</div>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{anySheet}}" hint-placeholder-val="{{ false }}">
+    <button class="scrim" type="button" aria-label="닫기" onClick="{{closeSheet}}"></button>
+  </sc-if>
+
+  <sc-if value="{{importOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="문서 가져오기">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">문서 가져오기</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+        <div class="drop">
+          <span class="tile"><span class="ic ic-upload" style="width: 28px; height: 28px"></span></span>
+          <div style="text-align: center">
+            <div style="font: 600 17px/26px var(--font)">문서를 여기에 끌어다 놓으세요</div>
+            <div style="margin-top: 2px; font: 400 14px/22px var(--font); color: var(--ink-3)">Word, PDF, 마크다운</div>
+          </div>
+          <button class="btn" type="button"><span class="ic ic-doc"></span>파일 선택</button>
+        </div>
+        <div style="margin-top: 18px; text-align: center; font: 400 13px/20px var(--font); color: var(--ink-3)">폴더째 가져올 수도 있어요</div>
+        <div style="display: flex; gap: 10px; margin-top: 10px">
+          <button class="btn out" type="button" style="flex: 1" onClick="{{openFolderPc}}"><span class="ic ic-monitor"></span>내 컴퓨터의 폴더</button>
+          <button class="btn out {{serverHide}}" type="button" style="flex: 1" onClick="{{openFolderServer}}"><span class="ic ic-server"></span>팀 서버의 폴더</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{folderOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet wide" role="dialog" aria-label="폴더에서 가져오기">
+        <div class="sheet-head">
+          <span style="display: inline-flex; align-items: center; gap: 4px">
+            <button class="btn quiet icon" type="button" aria-label="뒤로" onClick="{{openImport}}" style="width: 36px; height: 36px"><span class="ic ic-back"></span></button>
+            <span style="font: 700 18px/28px var(--font)">폴더에서 가져오기</span>
+          </span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+
+        <div class="seg {{serverHide}}" role="tablist">
+          <button type="button" class="{{segPc}}" onClick="{{srcPc}}"><span class="ic ic-monitor" style="width: 16px; height: 16px"></span>내 컴퓨터</button>
+          <button type="button" class="{{segServer}}" onClick="{{srcServer}}"><span class="ic ic-server" style="width: 16px; height: 16px"></span>팀 서버</button>
+        </div>
+        <div class="src-path">{{srcPath}}</div>
+
+        <div class="srcbox">
+          <button class="fr dir" type="button" onClick="{{toggleOut}}">
+            <span class="tw {{twOut}}" style="display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; color: var(--ink-3)"><span class="ic ic-chev" style="width: 14px; height: 14px"></span></span>
+            <span class="ic ic-folder" style="width: 18px; height: 18px"></span><span class="fn">출입</span>
+          </button>
+          <button class="fr l1 {{hideOut}}" type="button" role="checkbox" aria-checked="{{ariaF1}}" onClick="{{tog1}}">
+            <span class="cb {{cb1}}"><span class="ic ic-check"></span></span><span class="fn">휴대전화-문잠금.docx</span><span class="ft ai">AI가 옮겨 써요</span>
+          </button>
+          <button class="fr l1 {{hideOut}}" type="button" role="checkbox" aria-checked="{{ariaF2}}" onClick="{{tog2}}">
+            <span class="cb {{cb2}}"><span class="ic ic-check"></span></span><span class="fn">도어락-규칙.md</span><span class="ft md">바로 가져와요</span>
+          </button>
+          <div class="fr l1 off {{hideOut}}" aria-disabled="true">
+            <span class="cb dis"><span class="ic ic-check"></span></span><span class="fn">회의-메모.txt</span><span class="ft no">가져올 수 없어요</span>
+          </div>
+
+          <button class="fr dir" type="button" onClick="{{toggleFac}}">
+            <span class="tw {{twFac}}" style="display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; color: var(--ink-3)"><span class="ic ic-chev" style="width: 14px; height: 14px"></span></span>
+            <span class="ic ic-folder" style="width: 18px; height: 18px"></span><span class="fn">설비</span>
+          </button>
+          <button class="fr l1 {{hideFac}}" type="button" role="checkbox" aria-checked="{{ariaF3}}" onClick="{{tog3}}">
+            <span class="cb {{cb3}}"><span class="ic ic-check"></span></span><span class="fn">엘리베이터-호출.pdf</span><span class="ft ai">AI가 옮겨 써요</span>
+          </button>
+          <button class="fr l1 {{hideFac}}" type="button" role="checkbox" aria-checked="{{ariaF4}}" onClick="{{tog4}}">
+            <span class="cb {{cb4}}"><span class="ic ic-check"></span></span><span class="fn">온도-조절기.md</span><span class="ft md">바로 가져와요</span>
+          </button>
+        </div>
+
+        <button class="keep" type="button" role="switch" aria-checked="{{ariaKeep}}" onClick="{{toggleKeep}}">
+          <span class="cb {{cbKeep}}"><span class="ic ic-check"></span></span>폴더 구조도 그대로 가져오기
+        </button>
+        <div style="margin: 2px 0 0 34px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{keepHint}}</div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px">
+          <span style="font: 400 14px/22px var(--font); color: var(--ink-2)">{{sumText}}</span>
+          <sc-if value="{{hasSel}}" hint-placeholder-val="{{ true }}">
+            <a class="btn" href="MdReview.dc.html">가져오기</a>
+          </sc-if>
+          <sc-if value="{{noneSel}}" hint-placeholder-val="{{ false }}">
+            <button class="btn" type="button" disabled>가져오기</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{moveOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="폴더로 옮기기">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">폴더로 옮기기</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+        <div class="src-path" style="margin-top: -6px">{{mvName}}</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px">
+          <button class="opt sm {{pkNone}}" type="button" onClick="{{pickNone}}">
+            <span class="opt-ic"><span class="ic ic-doc" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">폴더 없이 맨 위에</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm {{pkBld}}" type="button" onClick="{{pickBld}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">건물</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm sub {{pkAcc}}" type="button" onClick="{{pickAcc}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">출입</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm sub {{pkFac}}" type="button" onClick="{{pickFac}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">설비</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm {{pkPay}}" type="button" onClick="{{pickPay}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">정산</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm {{pkCus}} {{cusOptHide}}" type="button" onClick="{{pickCus}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">{{cName}}</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+        </div>
+        <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">옮겨도 사양의 내용과 기록은 그대로예요.</div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px">
+          <button class="btn quiet" type="button" onClick="{{closeSheet}}">취소</button>
+          <button class="btn" type="button" onClick="{{applyMove}}">옮기기</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{newOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="새 폴더">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">새 폴더</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+        <label class="lbl" for="fname">이름</label>
+        <input class="field" id="fname" type="text" placeholder="예: 주차장" onInput="{{typeName}}">
+        <span class="lbl" style="margin-top: 18px">들어갈 곳</span>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <button class="opt sm {{npTop}}" type="button" onClick="{{newTop}}">
+            <span class="opt-ic"><span class="ic ic-doc" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">맨 위</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm {{npBld}}" type="button" onClick="{{newBld}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">건물 안에</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt sm {{npPay}}" type="button" onClick="{{newPay}}">
+            <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
+            <span><span class="opt-t">정산 안에</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+        </div>
+        <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">폴더 안의 폴더는 한 단계까지만 만들 수 있어요.</div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px">
+          <button class="btn quiet" type="button" onClick="{{closeSheet}}">취소</button>
+          <button class="btn" type="button" onClick="{{makeFolder}}">만들기</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{providerOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="AI 연결">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">AI 연결</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <button class="opt {{selAccount}}" type="button" disabled="{{accountOff}}" onClick="{{pickAccount}}">
+            <span class="opt-ic"><span class="ic ic-user" style="width: 20px; height: 20px"></span></span>
+            <span><span class="opt-t">내 AI 계정</span><span class="opt-s">Claude Code처럼 이미 쓰는 AI로</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt {{selKey}}" type="button" disabled="{{keyOff}}" onClick="{{pickKey}}">
+            <span class="opt-ic"><span class="ic ic-key" style="width: 20px; height: 20px"></span></span>
+            <span><span class="opt-t">API 키</span><span class="opt-s">키를 넣으면 앱이 직접 불러요</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+          <button class="opt {{selLocal}}" type="button" onClick="{{pickLocal}}">
+            <span class="opt-ic"><span class="ic ic-cpu" style="width: 20px; height: 20px"></span></span>
+            <span><span class="opt-t">이 컴퓨터의 모델</span><span class="opt-s">문서가 컴퓨터 밖으로 나가지 않아요</span></span>
+            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+          </button>
+        </div>
+        <sc-if value="{{policy}}" hint-placeholder-val="{{ false }}">
+          <p class="note" style="margin-top: 16px"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 모델만 쓸 수 있어요.</span></p>
+        </sc-if>
+        <div style="margin-top: 16px; font: 400 14px/22px var(--font); color: var(--ink-3)">{{provHint}}</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"team":{"editor":"boolean","default":false},"multi":{"editor":"boolean","default":false},"policy":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      sheet: null, prov: 'account',
+      sel: 'all', openBld: true,
+      src: 'pc', openOut: true, openFac: false,
+      f1: true, f2: true, f3: false, f4: false, keep: true,
+      loc: { 1: 'acc', 2: 'fac', 3: 'fac', 4: 'acc', 5: 'pay', 6: 'fac', 7: 'acc' },
+      moving: 1, pick: 'none', newParent: 'top',
+      // one folder made in this prototype; a real workspace holds any number
+      custom: null, typed: '',
+    };
+  }
+  renderVals() {
+    const policy = !!this.props.policy;
+    const hasServer = !!this.props.team || !!this.props.multi;
+    const prov = policy ? 'local' : this.state.prov;
+    const names = { account: 'Claude Code 연결됨', key: 'API 키 연결됨', local: '이 컴퓨터의 모델' };
+    const hints = {
+      account: '문서는 연결한 AI 서비스로 전송돼요.',
+      key: '문서는 키를 발급한 AI 서비스로 전송돼요.',
+      local: '문서는 이 컴퓨터를 떠나지 않아요.',
+    };
+    const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed } = this.state;
+
+    // specs 1, 2, 3 and 7 need a look; the others do not
+    const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true };
+    const ids = [1, 2, 3, 4, 5, 6, 7];
+    const cp = custom ? custom.parent : null;
+    const cName = custom ? custom.name : '';
+    const within = {
+      all: () => true,
+      bld: (f) => f === 'bld' || f === 'acc' || f === 'fac' || (f === 'custom' && cp === 'bld'),
+      acc: (f) => f === 'acc',
+      fac: (f) => f === 'fac',
+      pay: (f) => f === 'pay' || (f === 'custom' && cp === 'pay'),
+      custom: (f) => f === 'custom',
+    };
+    const count = (key) => ids.filter((i) => within[key](loc[i])).length;
+    const attn = (key) => ids.some((i) => within[key](loc[i]) && needs[i]);
+    const customPath = cp === 'bld' ? '건물 / ' + cName : cp === 'pay' ? '정산 / ' + cName : cName;
+    const place = { none: '', bld: '건물', acc: '건물 / 출입', fac: '건물 / 설비', pay: '정산', custom: customPath };
+    const specNames = { 1: '휴대전화 문 잠금', 2: '온도 조절기', 3: '엘리베이터 호출', 4: '데스크톱 문 잠금', 5: '주차 요금 정산', 6: '비상 호출 장치', 7: '도어락 규칙' };
+    const visible = ids.filter((i) => within[sel](loc[i])).length;
+
+    const titles = { all: '사양', bld: '건물', acc: '출입', fac: '설비', pay: '정산', custom: cName };
+    const crumbs = { acc: '건물', fac: '건물', custom: cp === 'bld' ? '건물' : cp === 'pay' ? '정산' : '' };
+    const on = (k) => (sel === k ? 'on' : '');
+    const pk = (k) => (pick === k ? 'sel' : '');
+    const np = (k) => (newParent === k ? 'sel' : '');
+
+    const mdCount = [f2, f4].filter(Boolean).length;
+    const aiCount = [f1, f3].filter(Boolean).length;
+    const n = mdCount + aiCount;
+    let sumText = '가져올 파일을 골라 주세요';
+    if (n > 0) {
+      const parts = [];
+      if (mdCount > 0) parts.push('마크다운 ' + mdCount + '개는 바로');
+      if (aiCount > 0) parts.push((mdCount > 0 ? '' : 'Word·PDF ') + aiCount + '개는 AI가 옮겨 써요');
+      sumText = n + '개 선택 · ' + parts.join(', ');
+    }
+    const root = src === 'pc' ? '내 컴퓨터' : '팀 서버';
+    const srcPath = root + ' › ' + (src === 'pc' ? '문서' : '공유') + ' › 사양';
+
+    const vals = {
+      teamClass: this.props.team ? 'team' : '',
+      allClass: sel === 'all' ? 'all' : '',
+      multi: !!this.props.multi,
+      policy,
+      provName: names[prov],
+      provHint: hints[prov],
+      selAccount: prov === 'account' ? 'sel' : '',
+      selKey: prov === 'key' ? 'sel' : '',
+      selLocal: prov === 'local' ? 'sel' : '',
+      accountOff: policy,
+      keyOff: policy,
+
+      wsIcon: this.props.team ? 'ic-server' : 'ic-monitor',
+      wsName: this.props.team ? '우리 팀 서버' : '내 컴퓨터',
+      onAll: on('all'), onBld: on('bld'), onAcc: on('acc'), onFac: on('fac'), onPay: on('pay'), onCus: on('custom'),
+      nAll: ids.length,
+      cName,
+      nCus: count('custom'),
+      hideCusTop: cp === 'top' ? '' : 'hide',
+      hideCusBld: cp === 'bld' && openBld ? '' : 'hide',
+      hideCusPay: cp === 'pay' ? '' : 'hide',
+      selCus: () => this.setState({ sel: 'custom' }),
+      cusOptHide: custom ? '' : 'hide',
+      pkCus: pk('custom'),
+      pickCus: () => this.setState({ pick: 'custom' }),
+      emptyHide: visible === 0 ? '' : 'hide',
+      typeName: (e) => this.setState({ typed: e && e.target ? e.target.value : '' }),
+      makeFolder: () => this.setState({ custom: { name: typed.trim() || '새 폴더', parent: newParent }, sel: 'custom', openBld: newParent === 'bld' ? true : openBld, sheet: null, typed: '' }),
+      hasSel: n > 0,
+      twBld: openBld ? 'open' : '',
+      kids: openBld ? '' : 'hide',
+      toggleBld: () => this.setState({ openBld: !openBld }),
+      selAll: () => this.setState({ sel: 'all' }),
+      selBld: () => this.setState({ sel: 'bld' }),
+      selAcc: () => this.setState({ sel: 'acc' }),
+      selFac: () => this.setState({ sel: 'fac' }),
+      selPay: () => this.setState({ sel: 'pay' }),
+      nBld: count('bld'), nAcc: count('acc'), nFac: count('fac'), nPay: count('pay'),
+      pipBld: attn('bld') ? '' : 'hide', pipAcc: attn('acc') ? '' : 'hide', pipFac: attn('fac') ? '' : 'hide',
+      title: titles[sel],
+      crumb: crumbs[sel] || '',
+      crumbHide: crumbs[sel] ? '' : 'hide',
+
+      anySheet: sheet !== null,
+      importOpen: sheet === 'import',
+      folderOpen: sheet === 'folder',
+      moveOpen: sheet === 'move',
+      newOpen: sheet === 'new',
+      providerOpen: sheet === 'provider',
+      openImport: () => this.setState({ sheet: 'import' }),
+      openProvider: () => this.setState({ sheet: 'provider' }),
+      closeSheet: () => this.setState({ sheet: null }),
+      pickAccount: () => this.setState({ prov: 'account' }),
+      pickKey: () => this.setState({ prov: 'key' }),
+      pickLocal: () => this.setState({ prov: 'local' }),
+
+      serverHide: hasServer ? '' : 'hide',
+      openFolderPc: () => this.setState({ sheet: 'folder', src: 'pc' }),
+      openFolderServer: () => this.setState({ sheet: 'folder', src: 'server' }),
+      segPc: src === 'pc' ? 'on' : '',
+      segServer: src === 'server' ? 'on' : '',
+      srcPc: () => this.setState({ src: 'pc' }),
+      srcServer: () => this.setState({ src: 'server' }),
+      srcPath,
+      twOut: openOut ? 'open' : '',
+      twFac: openFac ? 'open' : '',
+      hideOut: openOut ? '' : 'hide',
+      hideFac: openFac ? '' : 'hide',
+      toggleOut: () => this.setState({ openOut: !openOut }),
+      toggleFac: () => this.setState({ openFac: !openFac }),
+      cb1: f1 ? 'on' : '', cb2: f2 ? 'on' : '', cb3: f3 ? 'on' : '', cb4: f4 ? 'on' : '',
+      ariaF1: String(f1), ariaF2: String(f2), ariaF3: String(f3), ariaF4: String(f4),
+      tog1: () => this.setState({ f1: !f1 }),
+      tog2: () => this.setState({ f2: !f2 }),
+      tog3: () => this.setState({ f3: !f3 }),
+      tog4: () => this.setState({ f4: !f4 }),
+      cbKeep: keep ? 'on' : '',
+      ariaKeep: String(keep),
+      toggleKeep: () => this.setState({ keep: !keep }),
+      keepHint: keep ? '출입, 설비 폴더가 사양 폴더로 만들어져요.' : '모든 사양이 폴더 없이 들어가요.',
+      sumText,
+      noneSel: n === 0,
+
+      mvName: specNames[moving],
+      pkNone: pk('none'), pkBld: pk('bld'), pkAcc: pk('acc'), pkFac: pk('fac'), pkPay: pk('pay'),
+      pickNone: () => this.setState({ pick: 'none' }),
+      pickBld: () => this.setState({ pick: 'bld' }),
+      pickAcc: () => this.setState({ pick: 'acc' }),
+      pickFac: () => this.setState({ pick: 'fac' }),
+      pickPay: () => this.setState({ pick: 'pay' }),
+      applyMove: () => this.setState({ loc: { ...loc, [moving]: pick }, sheet: null }),
+
+      openNew: () => this.setState({ sheet: 'new', newParent: 'top' }),
+      npTop: np('top'), npBld: np('bld'), npPay: np('pay'),
+      newTop: () => this.setState({ newParent: 'top' }),
+      newBld: () => this.setState({ newParent: 'bld' }),
+      newPay: () => this.setState({ newParent: 'pay' }),
+    };
+    ids.forEach((i) => {
+      vals['h' + i] = within[sel](loc[i]) ? '' : 'hide';
+      vals['w' + i] = place[loc[i]];
+      vals['mv' + i] = () => this.setState({ sheet: 'move', moving: i, pick: loc[i] });
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

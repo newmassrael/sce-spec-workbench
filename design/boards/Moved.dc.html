@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>보던 사이에 바뀜</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+.pane{padding:22px 26px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);font:400 16px/28px "Noto Serif KR",serif;min-width:0}
+.cap{display:block;margin-bottom:8px;font:500 14px/22px var(--font);color:var(--ink-3)}
+@media (max-width:720px){.two{grid-template-columns:minmax(0,1fr)!important}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rise{animation:rise .45s ease-out both}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 800px">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+  <main style="width: 100%; max-width: 880px; margin: 0 auto; padding: 24px 24px 96px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; align-items: center; gap: 14px">
+      <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
+      <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">온도 조절기</h1>
+    </div>
+
+    <div class="rise" role="status" style="display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 16px; background: var(--attn-tint); color: var(--attn)">
+      <span class="ic ic-swap" style="width: 22px; height: 22px"></span>
+      <span style="font: 600 16px/24px var(--font)">검토하는 동안 서가 이 사양을 고쳤어요</span>
+    </div>
+
+    <div class="two" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px">
+      <div>
+        <span class="cap">내가 보던 것</span>
+        <div class="pane">켜진 뒤 30초가 지나면 스스로 꺼진다. 그 밖의 어떤 것도 램프 상태를 바꾸지 않는다.</div>
+      </div>
+      <div>
+        <span class="cap">지금 사양</span>
+        <div class="pane">켜진 뒤 <del>30</del><ins>45</ins>초가 지나면 스스로 꺼진다. 그 밖의 어떤 것도 램프 상태를 바꾸지 않는다.</div>
+      </div>
+    </div>
+
+    <div style="background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
+      <div class="item"><span class="dot"><span class="ic ic-check" style="width: 15px; height: 15px"></span></span><span style="font: 500 15px/22px var(--font)">내가 내린 결정 2개는 그대로 이어져요</span></div>
+      <div class="item"><span class="dot w"><span class="ic ic-alert" style="width: 15px; height: 15px"></span></span><span style="font: 500 15px/22px var(--font)">다시 확인할 부분 1곳</span><span style="margin-left: auto; font: 400 14px/22px var(--font); color: var(--ink-3)">꺼지는 시간</span></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px">
+      <a class="btn" href="Review.dc.html">다시 확인하기</a>
+      <button class="btn quiet" type="button">이 제안 버리기</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

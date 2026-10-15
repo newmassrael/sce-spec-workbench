@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>스캔 문서 확인</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+/* a picture of paper keeps its own colours in every theme */
+.scan{position:relative;padding:12px 56px 12px 16px;border-radius:8px;background:#F1EEE6;color:#2B2B2B;font:400 16px/28px "Noto Serif KR",serif;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.scan.h{font-weight:600;font-size:19px}
+.scan.blur{color:#8A8780;filter:blur(1.3px);user-select:none}
+.pg{position:absolute;top:8px;right:10px;font:500 12px/1 var(--font);color:#6B6860;background:rgba(0,0,0,.06);border-radius:999px;padding:4px 8px;filter:none}
+.unsure{background:var(--attn-tint);border-bottom:2px dotted var(--attn);border-radius:2px;padding:0 2px}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <div class="bar-top">
+    <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
+    <span style="font: 700 16px/24px var(--font)">엘리베이터 호출</span>
+    <span class="count {{countClass}}" style="margin-left: 8px">{{countText}}</span>
+    <span class="how">스캔한 문서 · 사진에서 글자를 읽었어요</span>
+    <span class="grow" style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px">
+      <sc-if value="{{canAccept}}" hint-placeholder-val="{{ false }}">
+        <a class="btn" href="Accepted.dc.html"><span class="ic ic-check"></span>수락</a>
+      </sc-if>
+      <sc-if value="{{cannotAccept}}" hint-placeholder-val="{{ true }}">
+        <button class="btn off" type="button" disabled aria-label="확인할 부분이 남아 있어요"><span class="ic ic-check"></span>수락</button>
+      </sc-if>
+    </span>
+  </div>
+
+  <div class="cols" style='--l1: "원본 (스캔)"; --l2: "AI가 옮겨 쓴 글"'>
+    <div class="colhead"><span class="ic ic-doc" style="width: 16px; height: 16px"></span>원본 · 엘리베이터-호출.pdf</div>
+    <div class="colhead ai"><span class="ic ic-pair" style="width: 16px; height: 16px"></span>AI가 옮겨 쓴 글 · 이 컴퓨터의 모델</div>
+
+    <div class="cell first"><div class="scan h">엘리베이터 호출 요구사항<span class="pg">1쪽</span></div></div>
+    <div class="cell h first">엘리베이터 호출 요구사항</div>
+
+    <div class="cell"><div class="scan">승강장의 버튼을 누르면 가장 가까운 엘리베이터가 배정된다.<span class="pg">1쪽</span></div></div>
+    <div class="cell">승강장의 버튼을 누르면 가장 가까운 엘리베이터가 배정된다.</div>
+
+    <sc-if value="{{u2}}" hint-placeholder-val="{{ true }}">
+      <div class="cell flag"><div class="scan">엘리베이터는 호출한 뒤 3O초 안에 도착한다.<span class="pg">2쪽</span></div></div>
+      <div class="cell flag">
+        <span class="tag"><span class="ic ic-alert" style="width: 13px; height: 13px"></span>읽은 글자가 확실하지 않아요</span>
+        <div>엘리베이터는 호출한 뒤 <span class="unsure">30</span>초 안에 도착한다.</div>
+        <span class="sub">원본의 "O"를 숫자 0으로 읽었어요.</span>
+        <div class="acts">
+          <button class="mini pri" type="button" onClick="{{ok2}}">30이 맞아요</button>
+          <button class="mini" type="button" onClick="{{edit2}}">직접 고치기</button>
+        </div>
+        <sc-if value="{{editing2}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 8px; margin-top: 10px">
+            <input class="field" type="text" value="30" aria-label="고친 숫자" style="height: 40px; max-width: 140px">
+            <button class="mini pri" type="button" onClick="{{save2}}">저장</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{d2}}" hint-placeholder-val="{{ false }}">
+      <div class="cell"><div class="scan">엘리베이터는 호출한 뒤 3O초 안에 도착한다.<span class="pg">2쪽</span></div></div>
+      <div class="cell">
+        <span class="tag ok"><span class="ic ic-check" style="width: 13px; height: 13px"></span>{{r2}}</span>
+        <div>엘리베이터는 호출한 뒤 30초 안에 도착한다.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{u3}}" hint-placeholder-val="{{ true }}">
+      <div class="cell flag"><div class="scan blur">고장 신호가 오면 해당 엘리베이터는 배정에서 빠진다.<span class="pg">2쪽</span></div></div>
+      <div class="cell empty flag" style="flex-direction: column; align-items: flex-start; justify-content: center">
+        <span class="tag"><span class="ic ic-alert" style="width: 13px; height: 13px"></span>읽지 못했어요</span>
+        <span style="font: 400 14px/22px var(--font); color: var(--ink-2)">번져서 글자를 알아볼 수 없어요.</span>
+        <div class="acts">
+          <button class="mini pri" type="button" onClick="{{type3}}">직접 입력하기</button>
+          <button class="mini" type="button" onClick="{{skip3}}">이 줄 빼기</button>
+        </div>
+        <sc-if value="{{editing3}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%">
+            <input class="field" type="text" placeholder="원본에 쓰인 글" aria-label="읽지 못한 줄" style="height: 40px">
+            <button class="mini pri" type="button" onClick="{{save3}}">저장</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{d3}}" hint-placeholder-val="{{ false }}">
+      <div class="cell"><div class="scan blur">고장 신호가 오면 해당 엘리베이터는 배정에서 빠진다.<span class="pg">2쪽</span></div></div>
+      <div class="cell {{c3}}">
+        <span class="tag ok"><span class="ic ic-check" style="width: 13px; height: 13px"></span>{{r3}}</span>
+        <div style="{{s3}}">고장 신호가 오면 해당 엘리베이터는 배정에서 빠진다.</div>
+      </div>
+    </sc-if>
+
+    <div class="cell last"><div class="scan">문이 열린 채로 20초가 지나면 문이 닫힌다.<span class="pg">3쪽</span></div></div>
+    <div class="cell last">문이 열린 채로 20초가 지나면 문이 닫힌다.</div>
+  </div>
+  <div style="height: 64px"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // 0 waiting, 1 decided one way, 2 typing, 3 decided the other way
+    this.state = { a2: 0, a3: 0 };
+  }
+  renderVals() {
+    const { a2, a3 } = this.state;
+    const left = [a2, a3].filter((x) => x === 0 || x === 2).length;
+    return {
+      countText: left > 0 ? '확인할 부분 ' + left + '곳' : '모두 확인했어요',
+      countClass: left > 0 ? '' : 'done',
+      canAccept: left === 0,
+      cannotAccept: left > 0,
+
+      u2: a2 === 0 || a2 === 2,
+      d2: a2 === 1 || a2 === 3,
+      editing2: a2 === 2,
+      r2: a2 === 1 ? '맞다고 확인함' : '직접 고침',
+      ok2: () => this.setState({ a2: 1 }),
+      edit2: () => this.setState({ a2: 2 }),
+      save2: () => this.setState({ a2: 3 }),
+
+      u3: a3 === 0 || a3 === 2,
+      d3: a3 === 1 || a3 === 3,
+      editing3: a3 === 2,
+      r3: a3 === 3 ? '직접 입력함' : '뺌',
+      c3: a3 === 1 ? 'empty' : '',
+      s3: a3 === 1 ? 'display: none' : '',
+      type3: () => this.setState({ a3: 2 }),
+      skip3: () => this.setState({ a3: 1 }),
+      save3: () => this.setState({ a3: 3 }),
+    };
+  }
+}
+</script>
+</body>
+</html>
