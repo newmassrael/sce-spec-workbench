@@ -37,6 +37,7 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
 | `MdReview` | A Markdown file compared with the current spec; no AI is involved |
 | `Waiting` | A request waiting for its connection: the reasons the application keeps, said plainly, and what to do |
+| `Request` | The other states of a request: running, interrupted, failed, cancelled, ended by a save, finished; asking while one is open; saving while one is running |
 | `Moved` | The spec changed while it was being checked |
 | `Accepted` | Saved as a spec, with the decisions that were made |
 
@@ -145,6 +146,16 @@ and Accept turns on at zero. A refusal is said in words and keeps what was alrea
 **Narrow screens.** Below 720px the two columns become one, with each original above what answers
 it and a small label on each; the folder tree becomes a row of chips; sheets rise from the bottom.
 
+**More specs than fit.** The list has a search by name and two orders: what needs the owner first (the
+default) or by name. A folder can be renamed, and removed only when it holds no spec and no folder
+(ADR 0030); asking to remove one that does says how many specs to move first and changes nothing.
+The preset folders are renamed and removed like the one a person made.
+
+**Rows that need the owner, and what they say.** A request that was interrupted (`AI가 멈췄어요`)
+or failed (`옮겨 쓰지 못했어요`) is amber with a line saying it can be asked again; the screen it opens is
+`Request`, which says in plain words what the application keeps: an interrupted request published
+nothing, a failed one carries the AI's own words, which are shown as written.
+
 **Folders group specs.** A spec is in one folder, two levels deep at most (ADR 0030). Importing a
 folder of sources lets the person pick files and choose whether to keep the structure; the source
 folder itself is not remembered.
@@ -164,9 +175,13 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
 - More connections than fit the list (it holds six), and grouping or searching them.
-- Reordering connections.
-- A request that was running when its lease ran out (`interrupted`) and one that `failed`: the
-  application has both states and this design draws neither.
+- Reordering connections, and more connections than the screen's six slots (a limit of the
+  prototype, which writes its rows out: it is not a limit of the application).
+- Sign-in to a team server and what a member may do: nothing to draw until authentication and
+  permissions are decided (ADR 0027, 0028).
+- Moving a folder into another folder, and the order of folders (they sort as made).
+- A conversation that is running when the person asks again: the application's screen offers only
+  "cancel" then, and so does this one.
 
 ## What was checked in the application about waiting
 

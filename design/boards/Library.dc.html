@@ -12,13 +12,22 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
 body{margin:0}
-.rw:not(.hide) ~ .rw:not(.hide){border-top:1px solid var(--line)}
+.list{display:flex;flex-direction:column}
+.rw{border-bottom:1px solid var(--line);margin-bottom:-1px}
+.tools{display:flex;align-items:center;gap:12px;margin-top:20px;flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:200px}
+.search .ic{position:absolute;left:14px;top:50%;margin-top:-8px;width:16px;height:16px;color:var(--ink-3)}
+.search .field{height:44px;padding-left:40px}
+.seg.sm{padding:3px}
+.seg.sm button{height:34px;padding:0 14px;flex:none}
+.acts-f{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap}
 .row{display:flex;align-items:center;gap:16px;padding:16px 20px;transition:background .15s}
 .row:hover,.row:focus-visible{background:var(--hover)}
 .row .go{color:var(--faint);transition:color .15s,transform .15s}
 .row:hover .go{color:var(--ink-3);transform:translateX(2px)}
 .t{display:block;font:600 16px/24px var(--font)}
-.s{display:block;font:400 14px/22px var(--font)}
+.s{display:flex;flex-wrap:wrap;column-gap:8px;font:400 14px/22px var(--font)}
+.s .when,.s .where,.s .who{margin-left:0}
 .avs,.who{display:none}
 .team .avs{display:inline-flex;align-items:center;padding-left:8px}
 .team .who{display:inline}
@@ -45,17 +54,17 @@ body{margin:0}
         <button class="tmain" type="button" onClick="{{selAll}}"><span class="ic ic-doc" style="width: 16px; height: 16px"></span>전체 사양<span class="tn">{{nAll}}</span></button>
       </div>
 
-      <div class="tr {{onBld}}">
+      <div class="tr {{onBld}} {{gBld}}">
         <button class="tw {{twBld}}" type="button" aria-label="건물 폴더 펼치기" onClick="{{toggleBld}}"><span class="ic ic-chev"></span></button>
-        <button class="tmain" type="button" onClick="{{selBld}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>건물<span class="tn"><span class="pip {{pipBld}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nBld}}</span></button>
+        <button class="tmain" type="button" onClick="{{selBld}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{nmBld}}<span class="tn"><span class="pip {{pipBld}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nBld}}</span></button>
       </div>
-      <div class="tr lv1 {{onAcc}} {{kids}}">
+      <div class="tr lv1 {{onAcc}} {{kids}} {{gAcc}}">
         <span class="tw none"><span class="ic ic-chev"></span></span>
-        <button class="tmain" type="button" onClick="{{selAcc}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>출입<span class="tn"><span class="pip {{pipAcc}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nAcc}}</span></button>
+        <button class="tmain" type="button" onClick="{{selAcc}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{nmAcc}}<span class="tn"><span class="pip {{pipAcc}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nAcc}}</span></button>
       </div>
-      <div class="tr lv1 {{onFac}} {{kids}}">
+      <div class="tr lv1 {{onFac}} {{kids}} {{gFac}}">
         <span class="tw none"><span class="ic ic-chev"></span></span>
-        <button class="tmain" type="button" onClick="{{selFac}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>설비<span class="tn"><span class="pip {{pipFac}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nFac}}</span></button>
+        <button class="tmain" type="button" onClick="{{selFac}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{nmFac}}<span class="tn"><span class="pip {{pipFac}}" role="img" aria-label="확인할 사양이 있어요"></span>{{nFac}}</span></button>
       </div>
 
       <div class="tr lv1 {{onCus}} {{hideCusBld}}">
@@ -63,9 +72,9 @@ body{margin:0}
         <button class="tmain" type="button" onClick="{{selCus}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{cName}}<span class="tn">{{nCus}}</span></button>
       </div>
 
-      <div class="tr {{onPay}}">
+      <div class="tr {{onPay}} {{gPay}}">
         <span class="tw none"><span class="ic ic-chev"></span></span>
-        <button class="tmain" type="button" onClick="{{selPay}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>정산<span class="tn">{{nPay}}</span></button>
+        <button class="tmain" type="button" onClick="{{selPay}}"><span class="ic ic-folder" style="width: 16px; height: 16px"></span>{{nmPay}}<span class="tn">{{nPay}}</span></button>
       </div>
       <div class="tr lv1 {{onCus}} {{hideCusPay}}">
         <span class="tw none"><span class="ic ic-chev"></span></span>
@@ -89,8 +98,26 @@ body{margin:0}
         <button class="btn" type="button" onClick="{{openImport}}"><span class="ic ic-upload"></span>문서 가져오기</button>
       </div>
 
-      <div style="margin-top: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
-        <div class="rw {{h1}}">
+      <div class="acts-f {{folderActsHide}}">
+        <button class="link" type="button" onClick="{{openRename}}" style="color: var(--ink-3)">이름 바꾸기</button>
+        <button class="link" type="button" onClick="{{tryDelFolder}}" style="color: var(--ink-3)">폴더 지우기</button>
+      </div>
+      <p class="note {{refuseHide}}" style="margin-top: 12px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{refuseText}}</span></p>
+      <div class="{{delFolderAskHide}}" style="margin-top: 12px; display: flex; align-items: center; gap: 10px; font: 400 14px/22px var(--font); color: var(--ink-2); flex-wrap: wrap">이 폴더를 지울까요? 사양은 들어 있지 않아요.
+        <button class="mini pri" type="button" onClick="{{doDelFolder}}">지우기</button>
+        <button class="mini" type="button" onClick="{{noDelFolder}}">그만두기</button>
+      </div>
+
+      <div class="tools">
+        <div class="search"><span class="ic ic-search"></span><input class="field" type="text" value="{{q}}" onInput="{{typeQ}}" placeholder="사양 이름으로 찾기" aria-label="사양 찾기"></div>
+        <div class="seg sm" role="tablist" aria-label="정렬">
+          <button type="button" class="{{sortState}}" onClick="{{byState}}">확인할 것 먼저</button>
+          <button type="button" class="{{sortName}}" onClick="{{byName}}">이름순</button>
+        </div>
+      </div>
+
+      <div class="list" style="margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
+        <div class="rw {{h1}}" style="order: {{ord1}}">
           <a class="row" href="Review.dc.html">
             <span class="badge b-attn" role="img" aria-label="확인이 필요함"><span class="ic ic-alert" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -102,7 +129,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="휴대전화 문 잠금을 다른 폴더로 옮기기" onClick="{{mv1}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h2}}">
+        <div class="rw {{h2}}" style="order: {{ord2}}">
           <a class="row" href="Moved.dc.html">
             <span class="badge b-attn" role="img" aria-label="원본이 바뀜"><span class="ic ic-swap" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -114,7 +141,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="온도 조절기를 다른 폴더로 옮기기" onClick="{{mv2}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h3}}">
+        <div class="rw {{h3}}" style="order: {{ord3}}">
           <a class="row" href="ScanReview.dc.html">
             <span class="badge b-attn" role="img" aria-label="확인이 필요함"><span class="ic ic-alert" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -126,7 +153,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="엘리베이터 호출을 다른 폴더로 옮기기" onClick="{{mv3}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h4}}">
+        <div class="rw {{h4}}" style="order: {{ord4}}">
           <a class="row" href="Accepted.dc.html">
             <span class="badge b-ok" role="img" aria-label="수락함"><span class="ic ic-check" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -138,7 +165,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="데스크톱 문 잠금을 다른 폴더로 옮기기" onClick="{{mv4}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h5}}">
+        <div class="rw {{h5}}" style="order: {{ord5}}">
           <a class="row" href="#">
             <span class="badge b-ok" role="img" aria-label="수락함"><span class="ic ic-check" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -150,8 +177,8 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="주차 요금 정산을 다른 폴더로 옮기기" onClick="{{mv5}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h6}}">
-          <a class="row" href="#">
+        <div class="rw {{h6}}" style="order: {{ord6}}">
+          <a class="row" href="Request.dc.html">
             <span class="badge b-ai" role="img" aria-label="AI가 옮겨 쓰는 중"><span class="spin"></span></span>
             <span style="flex: 1; min-width: 0">
               <span class="t">비상 호출 장치</span>
@@ -162,7 +189,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="비상 호출 장치를 다른 폴더로 옮기기" onClick="{{mv6}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h7}}">
+        <div class="rw {{h7}}" style="order: {{ord7}}">
           <a class="row" href="MdReview.dc.html">
             <span class="badge b-attn" role="img" aria-label="바뀌는 곳이 있음"><span class="ic ic-swap" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -174,7 +201,7 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="도어락 규칙을 다른 폴더로 옮기기" onClick="{{mv7}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="rw {{h8}}">
+        <div class="rw {{h8}}" style="order: {{ord8}}">
           <a class="row" href="Waiting.dc.html">
             <span class="badge b-attn" role="img" aria-label="연결을 기다리는 중"><span class="ic ic-clock" style="width: 20px; height: 20px"></span></span>
             <span style="flex: 1; min-width: 0">
@@ -187,7 +214,33 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="소방 점검을 다른 폴더로 옮기기" onClick="{{mv8}}"><span class="ic ic-folder"></span></button>
         </div>
-        <div class="{{emptyHide}}" style="padding: 40px 24px; text-align: center; font: 400 15px/24px var(--font); color: var(--ink-3)">이 폴더는 비어 있어요. 사양을 옮겨 오거나 문서를 가져오세요.</div>
+        <div class="rw {{h9}}" style="order: {{ord9}}">
+          <a class="row" href="Request.dc.html">
+            <span class="badge b-attn" role="img" aria-label="AI가 멈춤"><span class="ic ic-alert" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">승강기 점검 기록</span>
+              <span class="s"><span class="st st-attn">AI가 멈췄어요</span><span class="where">{{w9}}</span><span class="who">민이 올림</span></span>
+              <span class="s" style="color: var(--ink-3)">다시 요청할 수 있어요</span>
+            </span>
+            <span class="avs" role="img" aria-label="민"><span class="av pa">민</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="승강기 점검 기록을 다른 폴더로 옮기기" onClick="{{mv9}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="rw {{h10}}" style="order: {{ord10}}">
+          <a class="row" href="Request.dc.html">
+            <span class="badge b-attn" role="img" aria-label="옮겨 쓰지 못함"><span class="ic ic-x" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">주차 출입 규칙</span>
+              <span class="s"><span class="st st-attn">옮겨 쓰지 못했어요</span><span class="where">{{w10}}</span><span class="who">준이 올림</span></span>
+              <span class="s" style="color: var(--ink-3)">다시 요청할 수 있어요</span>
+            </span>
+            <span class="avs" role="img" aria-label="준"><span class="av pb">준</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="주차 출입 규칙을 다른 폴더로 옮기기" onClick="{{mv10}}"><span class="ic ic-folder"></span></button>
+        </div>
+        <div class="{{emptyHide}}" style="order: 99; margin-bottom: 0; padding: 40px 24px; text-align: center; font: 400 15px/24px var(--font); color: var(--ink-3)">{{emptyText}}</div>
       </div>
     </main>
   </div>
@@ -299,6 +352,25 @@ body{margin:0}
     </div>
   </sc-if>
 
+  <sc-if value="{{renameOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="sheet-wrap">
+      <div class="sheet" role="dialog" aria-label="폴더 이름 바꾸기">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">폴더 이름 바꾸기</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
+        </div>
+        <label class="lbl" for="rname">새 이름</label>
+        <input class="field" id="rname" type="text" value="{{renameText}}" onInput="{{typeRename}}">
+        <div class="err {{renameErrHide}}">{{renameErr}}</div>
+        <div class="hint">폴더 안의 사양은 그대로예요. 이름만 바뀌어요.</div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px">
+          <button class="btn quiet" type="button" onClick="{{closeSheet}}">취소</button>
+          <button class="btn" type="button" onClick="{{applyRename}}">바꾸기</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
   <sc-if value="{{moveOpen}}" hint-placeholder-val="{{ false }}">
     <div class="sheet-wrap">
       <div class="sheet" role="dialog" aria-label="폴더로 옮기기">
@@ -313,24 +385,24 @@ body{margin:0}
             <span><span class="opt-t">폴더 없이 맨 위에</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm {{pkBld}}" type="button" onClick="{{pickBld}}">
+          <button class="opt sm {{pkBld}} {{gBld}}"type="button" onClick="{{pickBld}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">건물</span></span>
+            <span><span class="opt-t">{{nmBld}}</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm sub {{pkAcc}}" type="button" onClick="{{pickAcc}}">
+          <button class="opt sm sub {{pkAcc}} {{gAcc}}"type="button" onClick="{{pickAcc}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">출입</span></span>
+            <span><span class="opt-t">{{nmAcc}}</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm sub {{pkFac}}" type="button" onClick="{{pickFac}}">
+          <button class="opt sm sub {{pkFac}} {{gFac}}"type="button" onClick="{{pickFac}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">설비</span></span>
+            <span><span class="opt-t">{{nmFac}}</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm {{pkPay}}" type="button" onClick="{{pickPay}}">
+          <button class="opt sm {{pkPay}} {{gPay}}"type="button" onClick="{{pickPay}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">정산</span></span>
+            <span><span class="opt-t">{{nmPay}}</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
           <button class="opt sm {{pkCus}} {{cusOptHide}}" type="button" onClick="{{pickCus}}">
@@ -364,14 +436,14 @@ body{margin:0}
             <span><span class="opt-t">맨 위</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm {{npBld}}" type="button" onClick="{{newBld}}">
+          <button class="opt sm {{npBld}} {{gBld}}"type="button" onClick="{{newBld}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">건물 안에</span></span>
+            <span><span class="opt-t">{{nmBld}} 안에</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
-          <button class="opt sm {{npPay}}" type="button" onClick="{{newPay}}">
+          <button class="opt sm {{npPay}} {{gPay}}"type="button" onClick="{{newPay}}">
             <span class="opt-ic"><span class="ic ic-folder" style="width: 18px; height: 18px"></span></span>
-            <span><span class="opt-t">정산 안에</span></span>
+            <span><span class="opt-t">{{nmPay}} 안에</span></span>
             <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
           </button>
         </div>
@@ -396,17 +468,20 @@ class Component extends DCLogic {
       sel: 'all', openBld: true,
       src: 'pc', openOut: true, openFac: false,
       f1: true, f2: true, f3: false, f4: false, keep: true,
-      loc: { 1: 'acc', 2: 'fac', 3: 'fac', 4: 'acc', 5: 'pay', 6: 'fac', 7: 'acc', 8: 'fac' },
+      loc: { 1: 'acc', 2: 'fac', 3: 'fac', 4: 'acc', 5: 'pay', 6: 'fac', 7: 'acc', 8: 'fac', 9: 'acc', 10: 'pay' },
       moving: 1, pick: 'none', newParent: 'top',
       // one folder made in this prototype; a real workspace holds any number
       custom: null, typed: '',
+      // the folders can be renamed and, when empty, removed; a search narrows the list and a sort orders it
+      names: { bld: '건물', acc: '출입', fac: '설비', pay: '정산' }, gone: {},
+      q: '', sort: 'state', renameText: '', refuse: '', delAsk: false,
       // which connection converts what is imported: the default unless the person chooses
       ai: props.noDefault ? -1 : 0, aiOpen: !!props.noDefault,
     };
   }
   renderVals() {
     const hasServer = !!this.props.team || !!this.props.multi;
-    const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed, ai, aiOpen } = this.state;
+    const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed, ai, aiOpen, names, gone, q, sort, renameText, refuse, delAsk } = this.state;
 
     // the connections, as the connection screen keeps them; this is what a person chooses among
     const AIS = [
@@ -417,8 +492,8 @@ class Component extends DCLogic {
     const chosen = ai >= 0 ? AIS[ai] : null;
 
     // specs 1, 2, 3, 7 and 8 need the owner (a look, or a connection to fix); the others do not
-    const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true, 8: true };
-    const ids = [1, 2, 3, 4, 5, 6, 7, 8];
+    const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true, 8: true, 9: true, 10: true };
+    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const cp = custom ? custom.parent : null;
     const cName = custom ? custom.name : '';
     const within = {
@@ -431,13 +506,22 @@ class Component extends DCLogic {
     };
     const count = (key) => ids.filter((i) => within[key](loc[i])).length;
     const attn = (key) => ids.some((i) => within[key](loc[i]) && needs[i]);
-    const customPath = cp === 'bld' ? '건물 / ' + cName : cp === 'pay' ? '정산 / ' + cName : cName;
-    const place = { none: '', bld: '건물', acc: '건물 / 출입', fac: '건물 / 설비', pay: '정산', custom: customPath };
-    const specNames = { 1: '휴대전화 문 잠금', 2: '온도 조절기', 3: '엘리베이터 호출', 4: '데스크톱 문 잠금', 5: '주차 요금 정산', 6: '비상 호출 장치', 7: '도어락 규칙', 8: '소방 점검' };
-    const visible = ids.filter((i) => within[sel](loc[i])).length;
+    const customPath = cp === 'bld' ? names.bld + ' / ' + cName : cp === 'pay' ? names.pay + ' / ' + cName : cName;
+    const place = { none: '', bld: names.bld, acc: names.bld + ' / ' + names.acc, fac: names.bld + ' / ' + names.fac, pay: names.pay, custom: customPath };
+    const specNames = { 1: '휴대전화 문 잠금', 2: '온도 조절기', 3: '엘리베이터 호출', 4: '데스크톱 문 잠금', 5: '주차 요금 정산', 6: '비상 호출 장치', 7: '도어락 규칙', 8: '소방 점검', 9: '승강기 점검 기록', 10: '주차 출입 규칙' };
+    const query = q.trim().toLowerCase();
+    const shown = (i) => within[sel](loc[i]) && (query === '' || specNames[i].toLowerCase().includes(query));
+    const visible = ids.filter(shown).length;
+    const inFolder = ids.filter((i) => within[sel](loc[i])).length;
+    // the order of the rows: what needs the owner first, or by name
+    const byNameRank = [...ids].sort((a, b) => specNames[a].localeCompare(specNames[b], 'ko'));
+    const orderOf = (i) => (sort === 'name' ? byNameRank.indexOf(i) : (needs[i] ? 0 : 100) + i);
 
-    const titles = { all: '사양', bld: '건물', acc: '출입', fac: '설비', pay: '정산', custom: cName };
-    const crumbs = { acc: '건물', fac: '건물', custom: cp === 'bld' ? '건물' : cp === 'pay' ? '정산' : '' };
+    const titles = { all: '사양', bld: names.bld, acc: names.acc, fac: names.fac, pay: names.pay, custom: cName };
+    const crumbs = { acc: names.bld, fac: names.bld, custom: cp === 'bld' ? names.bld : cp === 'pay' ? names.pay : '' };
+    const oneLineName = (t) => t.length >= 1 && t.length <= 80 && t === t.trim() && !/[\u0000-\u001f\u007f]/.test(t);
+    // what a folder holds, for removing it: specs, and folders inside it
+    const kidsOf = { bld: ['acc', 'fac'].filter((k) => !gone[k]).concat(cp === 'bld' ? ['custom'] : []), pay: cp === 'pay' ? ['custom'] : [] };
     const on = (k) => (sel === k ? 'on' : '');
     const pk = (k) => (pick === k ? 'sel' : '');
     const np = (k) => (newParent === k ? 'sel' : '');
@@ -472,11 +556,48 @@ class Component extends DCLogic {
       hideCusTop: cp === 'top' ? '' : 'hide',
       hideCusBld: cp === 'bld' && openBld ? '' : 'hide',
       hideCusPay: cp === 'pay' ? '' : 'hide',
-      selCus: () => this.setState({ sel: 'custom' }),
+      selCus: () => this.setState({ sel: 'custom', refuse: '', delAsk: false }),
       cusOptHide: custom ? '' : 'hide',
       pkCus: pk('custom'),
       pickCus: () => this.setState({ pick: 'custom' }),
       emptyHide: visible === 0 ? '' : 'hide',
+      emptyText: query !== '' && inFolder > 0 ? '"' + q.trim() + '"에 맞는 사양이 없어요.' : '이 폴더는 비어 있어요. 사양을 옮겨 오거나 문서를 가져오세요.',
+
+      // search and sort
+      q,
+      typeQ: (e) => this.setState({ q: e && e.target ? e.target.value : '' }),
+      sortState: sort === 'state' ? 'on' : '', sortName: sort === 'name' ? 'on' : '',
+      byState: () => this.setState({ sort: 'state' }), byName: () => this.setState({ sort: 'name' }),
+
+      // folder names, and what removing or renaming one does
+      nmBld: names.bld, nmAcc: names.acc, nmFac: names.fac, nmPay: names.pay,
+      gBld: gone.bld ? 'hide' : '', gAcc: gone.acc ? 'hide' : '', gFac: gone.fac ? 'hide' : '', gPay: gone.pay ? 'hide' : '',
+      folderActsHide: sel === 'all' ? 'hide' : '',
+      refuseHide: refuse ? '' : 'hide', refuseText: refuse,
+      delFolderAskHide: delAsk ? '' : 'hide',
+      tryDelFolder: () => {
+        const held = count(sel);
+        const inside = kidsOf[sel] || [];
+        if (held > 0) return this.setState({ refuse: '사양이 들어 있는 폴더는 지울 수 없어요. 사양 ' + held + '개를 먼저 다른 폴더로 옮겨 주세요.', delAsk: false });
+        if (inside.length > 0) return this.setState({ refuse: '안에 다른 폴더가 있는 폴더는 지울 수 없어요. 안의 폴더를 먼저 지워 주세요.', delAsk: false });
+        this.setState({ delAsk: true, refuse: '' });
+      },
+      noDelFolder: () => this.setState({ delAsk: false }),
+      doDelFolder: () => {
+        if (sel === 'custom') return this.setState({ custom: null, sel: 'all', delAsk: false, refuse: '' });
+        this.setState({ gone: { ...gone, [sel]: true }, sel: 'all', delAsk: false, refuse: '' });
+      },
+      renameOpen: sheet === 'rename',
+      openRename: () => this.setState({ sheet: 'rename', renameText: sel === 'custom' ? cName : names[sel] || '', refuse: '', delAsk: false }),
+      renameErr: renameText === '' ? '이름을 적어 주세요' : oneLineName(renameText) ? '' : '앞뒤 공백 없이 한 줄로, 80자 안으로 적어 주세요',
+      renameErrHide: oneLineName(renameText) ? 'hide' : '',
+      renameText,
+      typeRename: (e) => this.setState({ renameText: e && e.target ? e.target.value : '' }),
+      applyRename: () => {
+        if (!oneLineName(renameText)) return;
+        if (sel === 'custom') return this.setState({ custom: { ...custom, name: renameText }, sheet: null });
+        this.setState({ names: { ...names, [sel]: renameText }, sheet: null });
+      },
       typeName: (e) => this.setState({ typed: e && e.target ? e.target.value : '' }),
       makeFolder: () => this.setState({ custom: { name: typed.trim() || '새 폴더', parent: newParent }, sel: 'custom', openBld: newParent === 'bld' ? true : openBld, sheet: null, typed: '' }),
       hasSel: canImport,
@@ -494,11 +615,11 @@ class Component extends DCLogic {
       twBld: openBld ? 'open' : '',
       kids: openBld ? '' : 'hide',
       toggleBld: () => this.setState({ openBld: !openBld }),
-      selAll: () => this.setState({ sel: 'all' }),
-      selBld: () => this.setState({ sel: 'bld' }),
-      selAcc: () => this.setState({ sel: 'acc' }),
-      selFac: () => this.setState({ sel: 'fac' }),
-      selPay: () => this.setState({ sel: 'pay' }),
+      selAll: () => this.setState({ sel: 'all', refuse: '', delAsk: false }),
+      selBld: () => this.setState({ sel: 'bld', refuse: '', delAsk: false }),
+      selAcc: () => this.setState({ sel: 'acc', refuse: '', delAsk: false }),
+      selFac: () => this.setState({ sel: 'fac', refuse: '', delAsk: false }),
+      selPay: () => this.setState({ sel: 'pay', refuse: '', delAsk: false }),
       nBld: count('bld'), nAcc: count('acc'), nFac: count('fac'), nPay: count('pay'),
       pipBld: attn('bld') ? '' : 'hide', pipAcc: attn('acc') ? '' : 'hide', pipFac: attn('fac') ? '' : 'hide',
       title: titles[sel],
@@ -556,7 +677,8 @@ class Component extends DCLogic {
       newPay: () => this.setState({ newParent: 'pay' }),
     };
     ids.forEach((i) => {
-      vals['h' + i] = within[sel](loc[i]) ? '' : 'hide';
+      vals['h' + i] = shown(i) ? '' : 'hide';
+      vals['ord' + i] = orderOf(i);
       vals['w' + i] = place[loc[i]];
       vals['mv' + i] = () => this.setState({ sheet: 'move', moving: i, pick: loc[i] });
     });

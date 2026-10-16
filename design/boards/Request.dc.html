@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>요청의 상태</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+.ban{display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-radius:16px}
+.ban.attn{background:var(--attn-tint);color:var(--attn)}
+.ban.ai{background:var(--ai-tint);color:var(--ai)}
+.ban.ok{background:var(--accent-tint);color:var(--accent-ink)}
+.ban.mute{background:var(--chip);color:var(--ink-2)}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+  <main style="width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 24px 96px; display: flex; flex-direction: column; gap: 22px">
+    <div class="demo" style="max-width: none; margin: 0">
+      <span>시안용 · 요청의 상태</span>
+      <button type="button" class="{{dc1}}" onClick="{{dp1}}">{{dl1}}</button>
+      <button type="button" class="{{dc2}}" onClick="{{dp2}}">{{dl2}}</button>
+      <button type="button" class="{{dc3}}" onClick="{{dp3}}">{{dl3}}</button>
+      <button type="button" class="{{dc4}}" onClick="{{dp4}}">{{dl4}}</button>
+      <button type="button" class="{{dc5}}" onClick="{{dp5}}">{{dl5}}</button>
+      <button type="button" class="{{dc6}}" onClick="{{dp6}}">{{dl6}}</button>
+      <button type="button" class="{{dc7}}" onClick="{{dp7}}">{{dl7}}</button>
+      <button type="button" class="{{dc8}}" onClick="{{dp8}}">{{dl8}}</button>
+      <button type="button" class="{{dc9}}" onClick="{{dp9}}">{{dl9}}</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px">
+      <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
+      <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">{{title}}</h1>
+    </div>
+
+    <div role="status" class="ban {{tone}}">
+      <span class="{{spinHide}}" style="flex: none; margin-top: 2px"><span class="spin"></span></span>
+      <span class="ic {{icon}} {{iconHide}}" style="width: 22px; height: 22px; margin-top: 1px"></span>
+      <span>
+        <span style="display: block; font: 600 16px/24px var(--font)">{{head}}</span>
+        <span style="display: block; margin-top: 2px; font: 400 15px/24px var(--font)">{{sub}}</span>
+      </span>
+    </div>
+
+    <div style="padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow)">
+      <div style="font: 400 15px/24px var(--font); color: var(--ink)">{{body}}</div>
+      <div class="{{rawHide}}" style="margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--page); font: 400 13px/20px var(--font); color: var(--ink-2)"><span style="display: block; color: var(--ink-3)">AI가 남긴 말 (원문)</span>{{raw}}</div>
+      <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{meta}}</div>
+    </div>
+
+    <div class="{{asked}}" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <a class="btn {{reviewHide}}" href="Review.dc.html"><span class="ic ic-check"></span>확인하러 가기</a>
+      <button class="btn {{againHide}}" type="button" onClick="{{ask}}">다시 요청</button>
+      <button class="btn quiet {{cancelHide}}" type="button" onClick="{{askCancel}}">요청 취소</button>
+    </div>
+
+    <p class="note {{runNoteHide}}"><span class="ic ic-alert" style="margin-top: 2px"></span><span>진행 중인 요청은 다시 요청할 수 없어요. 바꾸려면 먼저 취소하세요. 사양이나 답을 저장해도 이 요청은 끝나요.</span></p>
+
+    <div class="{{cancelAskHide}}" style="display: flex; align-items: center; gap: 10px; font: 400 14px/22px var(--font); color: var(--ink-2)">이 요청을 취소할까요? 지금까지 쓴 것은 공개되지 않아요.
+      <button class="mini pri" type="button" onClick="{{doCancel}}">취소하기</button>
+      <button class="mini" type="button" onClick="{{noCancel}}">그만두기</button>
+    </div>
+
+    <div class="{{choiceHide}}" style="padding: 18px 20px; background: var(--card); border: 1.5px solid var(--attn-icon); border-radius: 16px">
+      <div style="font: 600 15px/24px var(--font)">{{choiceTitle}}</div>
+      <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{choiceBody}}</div>
+      <div style="display: flex; gap: 10px; margin-top: 14px">
+        <button class="btn" type="button" onClick="{{choiceYes}}">{{choiceYesLabel}}</button>
+        <button class="btn quiet" type="button" onClick="{{choiceNo}}">그만두기</button>
+      </div>
+    </div>
+
+    <p class="note {{doneHide}}" style="background: var(--accent-tint); color: var(--accent-ink)"><span class="ic ic-check" style="margin-top: 2px"></span><span>{{doneText}}</span></p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { r: 'running', confirm: false, done: '', dismissed: false };
+  }
+
+  // The states of a request that the application has, and what the person may do in each
+  // (ui/src/generation_model.ts: statusOf, controlsOf). Waiting for a connection is its own screen.
+  states() {
+    return {
+      running: {
+        label: '실행 중', tone: 'ai', spin: true, head: 'AI가 옮겨 쓰는 중', sub: '2번째 시도 · Claude Code',
+        body: '쓰는 동안 이 사양은 그대로예요. 끝나면 원본과 나란히 놓고 확인할 수 있어요.', meta: '민이 어제 올림',
+        cancel: true, runNote: true,
+      },
+      interrupted: {
+        label: '중단됨', tone: 'attn', icon: 'ic-alert', head: 'AI가 응답을 멈췄어요', sub: '공개된 것은 없어요',
+        body: '모델을 쓰던 AI가 응답을 멈췄어요. 컴퓨터가 잠들었거나 프로그램이 끝났을 수 있어요. 다시 요청하면 처음부터 새로 써요.', meta: '민이 어제 올림 · 마지막 응답 12분 전',
+        again: true, cancel: true,
+      },
+      failed: {
+        label: '실패', tone: 'attn', icon: 'ic-alert', head: 'AI가 옮겨 쓰지 못했어요', sub: 'AI가 이유를 남겼어요',
+        body: '이유를 보고 고친 뒤 다시 요청해 보세요. 같은 요청을 그대로 다시 보내도 돼요.', raw: 'the model asked for a tool this server does not offer', meta: '민이 어제 올림',
+        again: true,
+      },
+      unsaid: {
+        label: '실패 · 이유 없음', tone: 'attn', icon: 'ic-alert', head: 'AI가 옮겨 쓰지 못했어요', sub: '이유를 말하지 않았어요',
+        body: 'AI가 이유를 남기지 않았어요. 연결 화면에서 상태를 확인한 뒤 다시 요청해 보세요.', meta: '민이 어제 올림',
+        again: true,
+      },
+      cancelled: {
+        label: '취소함', tone: 'mute', icon: 'ic-x', head: '요청을 취소했어요', sub: '공개된 것은 없어요',
+        body: '다시 하려면 새로 요청하세요.', meta: '준이 어제 취소',
+        again: true,
+      },
+      superseded: {
+        label: '저장되어 끝남', tone: 'mute', icon: 'ic-swap', head: '사양이 바뀌어 요청이 끝났어요', sub: '요청이 기준으로 삼은 사양이나 답이 저장됐어요',
+        body: '쓰던 내용은 공개되지 않았어요. 지금 저장된 내용으로 다시 요청하세요.', meta: '서가 수정함',
+        again: true,
+      },
+      completed: {
+        label: '끝남', tone: 'ok', icon: 'ic-check', head: 'AI가 다 옮겨 썼어요', sub: '확인할 차례예요',
+        body: '원본과 나란히 놓고 확인한 뒤 수락하면 사양으로 저장돼요.', meta: '민이 어제 올림', review: true,
+      },
+      active: {
+        label: '이미 열린 요청', tone: 'ai', spin: true, head: 'AI가 옮겨 쓰는 중', sub: '2번째 시도 · Claude Code',
+        body: '이 사양에는 이미 열린 요청이 있어요.', meta: '민이 어제 올림', cancel: true,
+        choice: { title: '새 요청으로 바꿀까요?', body: '바꾸면 지금 쓰는 중인 요청은 끝나고, 지금까지 쓴 것은 공개되지 않아요.', yes: '바꾸기' },
+      },
+      save: {
+        label: '저장하려고 할 때', tone: 'ai', spin: true, head: 'AI가 옮겨 쓰는 중', sub: '2번째 시도 · Claude Code',
+        body: '쓰는 동안 사양을 고치고 있어요.', meta: '민이 어제 올림', cancel: true,
+        choice: { title: '저장하면 진행 중인 요청이 끝나요', body: '요청이 쓰던 내용은 공개되지 않아요. 저장한 뒤 다시 요청할 수 있어요.', yes: '저장하기', done: '저장했어요. 진행 중이던 요청은 끝났어요.' },
+      },
+    };
+  }
+
+  renderVals() {
+    const { r, confirm, done, dismissed } = this.state;
+    const S = this.states();
+    const cur = S[r];
+    const order = ['running', 'interrupted', 'failed', 'unsaid', 'cancelled', 'superseded', 'completed', 'active', 'save'];
+    const idle = !done;
+    const vals = {
+      title: '소방 점검',
+      tone: cur.tone, spinHide: cur.spin ? '' : 'hide', iconHide: cur.spin ? 'hide' : '', icon: cur.icon || '',
+      head: cur.head, sub: cur.sub, body: cur.body, meta: cur.meta,
+      rawHide: cur.raw ? '' : 'hide', raw: cur.raw || '',
+      asked: done ? 'hide' : '',
+      reviewHide: cur.review ? '' : 'hide',
+      againHide: cur.again ? '' : 'hide',
+      cancelHide: cur.cancel && (!cur.choice || dismissed) ? '' : 'hide',
+      runNoteHide: cur.runNote ? '' : 'hide',
+      ask: () => this.setState({ done: '다시 요청했어요.' }),
+      askCancel: () => this.setState({ confirm: true }),
+      cancelAskHide: confirm ? '' : 'hide',
+      noCancel: () => this.setState({ confirm: false }),
+      doCancel: () => this.setState({ r: 'cancelled', confirm: false }),
+      choiceHide: cur.choice && idle && !dismissed ? '' : 'hide',
+      choiceTitle: cur.choice ? cur.choice.title : '', choiceBody: cur.choice ? cur.choice.body : '',
+      choiceYesLabel: cur.choice ? cur.choice.yes : '',
+      choiceYes: () => this.setState({ done: cur.choice && cur.choice.done ? cur.choice.done : '새 요청으로 바꿨어요. 이전 요청은 끝났어요.' }),
+      choiceNo: () => this.setState({ dismissed: true }),
+      doneHide: done ? '' : 'hide', doneText: done,
+    };
+    order.forEach((k, i) => {
+      vals['dl' + (i + 1)] = S[k].label;
+      vals['dc' + (i + 1)] = k === r ? 'on' : '';
+      vals['dp' + (i + 1)] = () => this.setState({ r: k, confirm: false, done: '', dismissed: false });
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
