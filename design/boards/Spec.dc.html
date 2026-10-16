@@ -14,6 +14,7 @@
 body{margin:0}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
+.sentb{border:0;background:transparent;text-align:left;cursor:pointer}
 </style>
 </helmet>
 <div class="app" style="width: 100%; min-height: 900px">
@@ -23,7 +24,7 @@ body{margin:0}
 
   <main style="width: 100%; max-width: 1040px; margin: 0 auto; padding: 4px 24px 96px; display: flex; flex-direction: column; gap: 18px">
     <div class="demo" style="max-width: none; margin: 0">
-      <span>시안용 · 수도코드</span>
+      <span>시안용 · 설계</span>
       <button type="button" class="{{mc1}}" onClick="{{m1}}">없음</button>
       <button type="button" class="{{mc2}}" onClick="{{m2}}">쓰는 중</button>
       <button type="button" class="{{mc3}}" onClick="{{m3}}">최신</button>
@@ -31,8 +32,9 @@ body{margin:0}
       <button type="button" class="{{mc5}}" onClick="{{m5}}">SCE가 거절</button>
       <span style="margin-left: 8px">그 밖에</span>
       <button type="button" class="{{dirtyOn}}" onClick="{{toggleDirty}}">저장 안 한 글 변경</button>
-      <button type="button" onClick="{{arrive}}">새 수도코드가 도착함</button>
+      <button type="button" onClick="{{arrive}}">새 설계가 도착함</button>
       <button type="button" class="{{orphanOn}}" onClick="{{toggleOrphan}}">묻지 않는 질문의 답</button>
+      <button type="button" class="{{refusedOn}}" onClick="{{toggleRefused}}">SCE가 눌러 보기를 거절</button>
     </div>
 
     <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
@@ -41,6 +43,7 @@ body{margin:0}
       <span class="how">건물 / 출입</span>
       <span class="tag {{modelTone}}" style="margin: 0">{{modelChip}}</span>
       <span class="tag {{accTone}} {{accHide}}" style="margin: 0">{{accChip}}</span>
+      <a class="btn quiet {{reportHide}}" href="Report.dc.html" style="margin-left: auto"><span class="ic ic-doc"></span>AI 보고서</a>
     </div>
 
     <div class="{{dirtyHide}}">
@@ -49,7 +52,7 @@ body{margin:0}
 
     <nav class="tabs" role="tablist" aria-label="사양의 단계">
       <button type="button" class="{{t1}}" onClick="{{g1}}">1 글</button>
-      <button type="button" class="{{t2}}" onClick="{{g2}}">2 수도코드<span class="n {{pseudoNOk}} {{pseudoNHide}}">{{pseudoN}}</span></button>
+      <button type="button" class="{{t2}}" onClick="{{g2}}">2 설계 읽기<span class="n {{pseudoNOk}} {{pseudoNHide}}">{{pseudoN}}</span></button>
       <button type="button" class="{{t3}}" onClick="{{g3}}">3 질문과 답<span class="n {{qNHide}}">{{qN}}</span></button>
       <button type="button" class="{{t4}}" onClick="{{g4}}">4 요구사항<span class="n {{rNHide}}">{{rN}}</span></button>
       <button type="button" class="{{t5}}" onClick="{{g5}}">5 수락<span class="n {{aNOk}} {{aNHide}}">{{aN}}</span></button>
@@ -57,7 +60,7 @@ body{margin:0}
 
     <!-- 1 글 -->
     <section class="{{p1}}" style="display: flex; flex-direction: column; gap: 6px">
-      <div style="font: 400 14px/22px var(--font); color: var(--ink-2); margin-bottom: 6px">이 글이 사양이에요. AI는 이 글을 읽고 수도코드를 써요. 글을 저장하면 쓰고 있던 요청은 끝나요.</div>
+      <div style="font: 400 14px/22px var(--font); color: var(--ink-2); margin-bottom: 6px">이 글이 사양이에요. AI는 이 글을 읽고 설계를 만들어요. 글을 저장하면 쓰고 있던 요청은 끝나요.</div>
       <div class="sent"><span class="rid">R1</span><span style="flex: 1">휴대전화 앱으로 현관 문을 잠그거나 열 수 있다.</span></div>
       <div class="sent"><span class="rid">R2</span><span style="flex: 1">잠금을 푼 뒤 30초가 지나면 문이 자동으로 다시 잠긴다.</span><button class="mini {{qHide}}" type="button" onClick="{{g3}}">질문 1</button></div>
       <div class="sent"><span class="rid">R3</span><span style="flex: 1">잠금 상태는 앱에 바로 표시된다.</span></div>
@@ -66,7 +69,7 @@ body{margin:0}
       <div class="hint" style="margin-left: 16px">R1~R5는 SCE가 글을 요구사항으로 나눈 번호예요. 글과 목록이 맞는지는 4단계에서 봐요.</div>
     </section>
 
-    <!-- 2 수도코드 -->
+    <!-- 2 설계 읽기 -->
     <section class="{{p2}}" style="display: flex; flex-direction: column; gap: 16px">
       <div class="ban {{bTone}}" role="status" style="display: flex; gap: 14px; padding: 16px 20px; border-radius: 16px; align-items: flex-start">
         <span class="{{bSpinHide}}" style="flex: none; margin-top: 2px"><span class="spin"></span></span>
@@ -81,58 +84,162 @@ body{margin:0}
         <button class="btn {{makeHide}}" type="button" onClick="{{make}}">{{makeLabel}}</button>
         <a class="btn quiet {{reqHide}}" href="Request.dc.html">요청 보기</a>
         <button class="btn quiet {{cancelHide}}" type="button" onClick="{{cancel}}">요청 취소</button>
-        <button class="btn quiet {{figBtnHide}}" type="button" onClick="{{toggleFig}}">{{figLabel}}</button>
-      </div>
-
-      <div class="{{figHide}}">
-        <div style="font: 500 13px/20px var(--font); color: var(--ink-3); margin-bottom: 8px">SCE가 이 모델을 그린 모델 그림이에요{{figStale}}</div>
-        <div class="fig" role="img" aria-label="Locked 상태에서 unlock_request로 Unlocked로, 30초 뒤 또는 lock_request로 다시 Locked로">
-          <span class="st-box">Locked</span>
-          <span class="st-arr"><span>unlock_request</span><b></b><span class="back" style="visibility: hidden">.</span></span>
-          <span class="st-box">Unlocked</span>
-          <span class="st-arr back"><span style="visibility: hidden">.</span><b></b><span>30초 뒤 · lock_request</span></span>
-        </div>
       </div>
 
       <div class="{{codeHide}}" style="display: flex; flex-direction: column; gap: 14px">
-        <p class="note" style="background: var(--accent-tint); color: var(--accent-ink)"><span class="ic ic-check" style="margin-top: 2px"></span><span>SCE는 이 모델이 상태 기계로 형식에 맞다고 했어요. <b>글과 맞는지는 말하지 않아요.</b> 아래에서 수도코드를 글과 나란히 읽어 보세요.</span></p>
+        <p class="note" style="background: var(--accent-tint); color: var(--accent-ink)"><span class="ic ic-check" style="margin-top: 2px"></span><span>SCE는 이 모델이 상태 기계로 형식에 맞다고 했어요. <b>글과 맞는지는 말하지 않아요.</b> 아래 여러 보기로 설계를 읽고, 글과 맞는지 직접 판단하세요.</span></p>
 
-        <div class="two">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+          <div class="seg sm" role="tablist" aria-label="설계를 보는 방법" style="flex-wrap: wrap">
+            <button type="button" class="{{vb1}}" onClick="{{v1c}}">표</button>
+            <button type="button" class="{{vb2}}" onClick="{{v2c}}">시간순</button>
+            <button type="button" class="{{vb3}}" onClick="{{v3c}}">눌러 보기</button>
+            <button type="button" class="{{vb4}}" onClick="{{v4c}}">그림</button>
+            <button type="button" class="{{vb5}}" onClick="{{v5c}}">말로</button>
+            <button type="button" class="{{vb6}}" onClick="{{v6c}}">수도코드</button>
+          </div>
+          <button class="link" type="button" onClick="{{toggleNames}}" style="margin-left: auto">{{namesLabel}}</button>
+        </div>
+        <div class="hint" style="margin: 0">{{viewHint}}</div>
+
+        <div class="{{namesHide}}" style="padding: 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px">
+          <div style="font: 600 15px/24px var(--font)">이름 붙이기</div>
+          <div style="margin: 4px 0 12px; font: 400 13px/20px var(--font); color: var(--ink-3)">설계 속 이름에 내 말을 붙여요. 이 말은 위 보기들에 나오고, 원래 이름은 글자 위에 마우스를 올리면 보여요. 비워 두면 원래 이름이 나와요.</div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+            <div><label class="cmd-l">상태 · Locked</label><input class="field" type="text" value="{{lv1}}" onInput="{{li1}}" placeholder="Locked" style="height: 42px"><div class="{{lp1h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp1}}</span><button class="link" type="button" onClick="{{lu1}}">사용</button></div></div>
+            <div><label class="cmd-l">상태 · Unlocked</label><input class="field" type="text" value="{{lv2}}" onInput="{{li2}}" placeholder="Unlocked" style="height: 42px"><div class="{{lp2h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp2}}</span><button class="link" type="button" onClick="{{lu2}}">사용</button></div></div>
+            <div><label class="cmd-l">신호 · unlock_request</label><input class="field" type="text" value="{{lv3}}" onInput="{{li3}}" placeholder="unlock_request" style="height: 42px"><div class="{{lp3h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp3}}</span><button class="link" type="button" onClick="{{lu3}}">사용</button></div></div>
+            <div><label class="cmd-l">신호 · lock_request</label><input class="field" type="text" value="{{lv4}}" onInput="{{li4}}" placeholder="lock_request" style="height: 42px"><div class="{{lp4h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp4}}</span><button class="link" type="button" onClick="{{lu4}}">사용</button></div></div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap">
+            <button class="btn" type="button" onClick="{{saveNames}}" disabled="{{namesSaveOff}}">이름 저장</button>
+            <button class="btn quiet" type="button" onClick="{{askNames}}">AI에게 이름 제안받기</button>
+            <span class="tag n {{namesSavedHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>저장했어요</span>
+          </div>
+          <div class="hint" style="margin-left: 0">AI가 제안한 이름은 내가 "사용"을 누르고 저장하기 전에는 어느 화면에도 나오지 않아요.</div>
+        </div>
+
+        <!-- table, words, pseudocode: beside the text -->
+        <div class="two {{twoHide}}">
           <div>
-            <div class="lbl" style="margin: 0 0 8px">글 · 문장을 누르면 수도코드에 표시해요</div>
+            <div class="lbl" style="margin: 0 0 8px">글 · 문장을 누르면 설계에 표시해요</div>
             <div style="display: flex; flex-direction: column; gap: 6px">
-              <button class="sent {{s1}}" type="button" onClick="{{k1}}" style="border: 0; background: transparent; text-align: left; cursor: pointer"><span class="rid">R1</span><span style="flex: 1">휴대전화 앱으로 현관 문을 잠그거나 열 수 있다.</span></button>
-              <button class="sent {{s2}}" type="button" onClick="{{k2}}" style="border: 0; background: transparent; text-align: left; cursor: pointer"><span class="rid">R2</span><span style="flex: 1">잠금을 푼 뒤 30초가 지나면 문이 자동으로 다시 잠긴다.</span></button>
-              <button class="sent {{s3}}" type="button" onClick="{{k3}}" style="border: 0; background: transparent; text-align: left; cursor: pointer"><span class="rid">R3</span><span style="flex: 1">잠금 상태는 앱에 바로 표시된다.</span></button>
-              <button class="sent {{s4}}" type="button" onClick="{{k4}}" style="border: 0; background: transparent; text-align: left; cursor: pointer"><span class="rid">R4</span><span style="flex: 1">배터리가 20% 이하이면 알림을 보낸다.</span></button>
-              <button class="sent {{s5}}" type="button" onClick="{{k5}}" style="border: 0; background: transparent; text-align: left; cursor: pointer"><span class="rid">R5</span><span style="flex: 1">연결이 끊기면 마지막 상태를 표시하고 다시 연결을 시도한다.</span></button>
+              <button class="sent sentb {{s1}}" type="button" onClick="{{k1}}"><span class="rid">R1</span><span style="flex: 1">휴대전화 앱으로 현관 문을 잠그거나 열 수 있다.</span></button>
+              <button class="sent sentb {{s2}}" type="button" onClick="{{k2}}"><span class="rid">R2</span><span style="flex: 1">잠금을 푼 뒤 30초가 지나면 문이 자동으로 다시 잠긴다.</span></button>
+              <button class="sent sentb {{s3}}" type="button" onClick="{{k3}}"><span class="rid">R3</span><span style="flex: 1">잠금 상태는 앱에 바로 표시된다.</span></button>
+              <button class="sent sentb {{s4}}" type="button" onClick="{{k4}}"><span class="rid">R4</span><span style="flex: 1">배터리가 20% 이하이면 알림을 보낸다.</span></button>
+              <button class="sent sentb {{s5}}" type="button" onClick="{{k5}}"><span class="rid">R5</span><span style="flex: 1">연결이 끊기면 마지막 상태를 표시하고 다시 연결을 시도한다.</span></button>
             </div>
           </div>
-          <div>
-            <div class="lbl" style="margin: 0 0 8px">수도코드 · SCE가 쓴 것</div>
-            <div class="code" role="group" aria-label="수도코드">
-              <div class="cl {{c1}}"><i>1</i>name: door_lock</div>
-              <div class="cl {{c2}}"><i>2</i>first state: Locked</div>
-              <div class="cl {{c3}}"><i>3</i> </div>
-              <div class="cl {{c4}}"><i>4</i>state Locked</div>
-              <div class="cl {{c5}}"><i>5</i>  show status "locked"</div>
-              <div class="cl {{c6}}"><i>6</i>  when unlock_request → Unlocked</div>
-              <div class="cl {{c7}}"><i>7</i> </div>
-              <div class="cl {{c8}}"><i>8</i>state Unlocked</div>
-              <div class="cl {{c9}}"><i>9</i>  show status "unlocked"</div>
-              <div class="cl {{c10}}"><i>10</i>  after 30s → Locked</div>
-              <div class="cl {{c11}}"><i>11</i>  when lock_request → Locked</div>
-              <div class="cl {{c12}}"><i>12</i> </div>
-              <div class="cl {{c13}}"><i>13</i>? open q1: does the 30s start again while the door is open</div>
-              <div class="cl {{c14}}"><i>14</i>? open q2: is the 20% the phone's or the lock's battery</div>
+          <div style="min-width: 0">
+            <div class="{{vtable}}" style="background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto">
+              <table class="rt">
+                <thead><tr><th>지금 상태</th><th>이 신호가 오면</th><th>가는 곳</th><th>가면서 하는 일</th></tr></thead>
+                <tbody>
+                  <tr class="{{r1l}}"><td><span title="{{tLocked}}">{{nLocked}}</span></td><td><span title="{{tUnlock}}">{{nUnlock}}</span></td><td><span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td>상태를 "locked"로 표시해요</td></tr>
+                  <tr class="{{r2l}}"><td><span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td>30초가 지나면 <span class="nm">(시간)</span></td><td><span title="{{tLocked}}">{{nLocked}}</span></td><td>상태를 "locked"로 표시해요</td></tr>
+                  <tr class="{{r3l}}"><td><span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td><span title="{{tLock}}">{{nLock}}</span></td><td><span title="{{tLocked}}">{{nLocked}}</span></td><td>상태를 "locked"로 표시해요</td></tr>
+                </tbody>
+              </table>
+              <div class="hint" style="margin: 0; padding: 10px 12px 12px">조건이 붙은 줄은 없어요. 아무것도 하지 않는 칸은 조용하게, 상태가 바뀌는 칸은 눈에 띄게 보여 드려요.</div>
+            </div>
+
+            <div class="{{vwords}}" style="display: flex; flex-direction: column; gap: 8px">
+              <div class="sent {{r1l}}" style="font: 400 15px/26px var(--font)"><span style="flex: 1">「<span title="{{tLocked}}">{{nLocked}}</span>」일 때 「<span title="{{tUnlock}}">{{nUnlock}}</span>」가 오면 「<span title="{{tUnlocked}}">{{nUnlocked}}</span>」로 가요. 가면서 상태를 "locked"로 표시해요.</span></div>
+              <div class="sent {{r2l}}" style="font: 400 15px/26px var(--font)"><span style="flex: 1">「<span title="{{tUnlocked}}">{{nUnlocked}}</span>」인 채로 30초가 지나면 「<span title="{{tLocked}}">{{nLocked}}</span>」로 다시 가요.</span></div>
+              <div class="sent {{r3l}}" style="font: 400 15px/26px var(--font)"><span style="flex: 1">「<span title="{{tUnlocked}}">{{nUnlocked}}</span>」일 때 「<span title="{{tLock}}">{{nLock}}</span>」가 오면 「<span title="{{tLocked}}">{{nLocked}}</span>」로 가요.</span></div>
+              <div class="hint" style="margin: 0">설계에서 읽을 수 있는 것만 말로 옮겼어요. 설계에 없는 것(예: 배터리)은 말하지 않아요. 말이 이상하면 이름 붙이기에서 내 말로 고치세요.</div>
+            </div>
+
+            <div class="{{vcode}}">
+              <div class="code" role="group" aria-label="수도코드">
+                <div class="cl {{c1}}"><i>1</i>name: door_lock</div>
+                <div class="cl {{c2}}"><i>2</i>first state: Locked</div>
+                <div class="cl {{c3}}"><i>3</i> </div>
+                <div class="cl {{c4}}"><i>4</i>state Locked</div>
+                <div class="cl {{c5}}"><i>5</i>  show status "locked"</div>
+                <div class="cl {{c6}}"><i>6</i>  when unlock_request → Unlocked</div>
+                <div class="cl {{c7}}"><i>7</i> </div>
+                <div class="cl {{c8}}"><i>8</i>state Unlocked</div>
+                <div class="cl {{c9}}"><i>9</i>  show status "unlocked"</div>
+                <div class="cl {{c10}}"><i>10</i>  after 30s → Locked</div>
+                <div class="cl {{c11}}"><i>11</i>  when lock_request → Locked</div>
+                <div class="cl {{c12}}"><i>12</i> </div>
+                <div class="cl {{c13}}"><i>13</i>? open q1: does the 30s start again while the door is open</div>
+                <div class="cl {{c14}}"><i>14</i>? open q2: is the 20% the phone's or the lock's battery</div>
+              </div>
+              <div class="hint" style="margin: 8px 0 0">수도코드는 SCE가 정한 낱말로 쓰여요. 프로그래머가 읽는 보기예요. 노란 줄(?)은 SCE가 "모델이 열어 둔 것"이라고 적은 곳이에요: 2개.</div>
             </div>
           </div>
         </div>
         <p class="note {{markHide}}" style="{{markStyle}}"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{markNote}}</span><button class="link" type="button" onClick="{{clearMark}}" style="color: inherit; margin-left: auto; white-space: nowrap">표시 지우기</button></p>
-        <div class="hint" style="margin: 0">수도코드는 SCE가 정한 낱말로 쓰여요. 노란 줄(?)은 SCE가 "모델이 열어 둔 것"이라고 적은 곳이에요: 2개.</div>
+
+        <!-- timeline -->
+        <div class="{{vtimeline}}" style="display: flex; flex-direction: column; gap: 14px">
+          <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">내가 정한 시나리오를 실제 엔진에서 한 걸음씩 돌린 결과예요. 위의 문장은 그 걸음의 근거가 되는 사양의 글이에요.</div>
+          <div style="padding: 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px">
+            <div style="font: 600 15px/24px var(--font)">시나리오 1 · 문을 풀고 30초를 기다린다</div>
+            <div class="stp" style="margin-top: 10px">
+              <div class="sx"><div class="sq">처음</div><span class="sc" title="{{tLocked}}">{{nLocked}}</span></div>
+              <div class="sx"><div class="sq">휴대전화 앱으로 현관 문을 잠그거나 열 수 있다.</div><div class="sn">신호 「<span title="{{tUnlock}}">{{nUnlock}}</span>」가 와요</div><span class="sc" title="{{tUnlocked}}">{{nUnlocked}}</span></div>
+              <div class="sx"><div class="sq">잠금을 푼 뒤 30초가 지나면 문이 자동으로 다시 잠긴다.</div><div class="sn">30초가 지나요</div><span class="sc" title="{{tLocked}}">{{nLocked}}</span></div>
+            </div>
+          </div>
+          <div style="padding: 16px 18px; background: var(--card); border: 1px dashed var(--line-strong); border-radius: 14px">
+            <div style="font: 600 15px/24px var(--font)">시나리오 2 · 문이 열려 있는 동안에도 30초가 다시 시작된다</div>
+            <p class="note" style="margin-top: 10px"><span class="ic ic-alert" style="margin-top: 2px"></span><span style="flex: 1">정해지지 않은 동작이라 그리지 않았어요. 질문 1에 답하면 그릴 수 있어요. 정해지지 않은 동작을 그림으로 그리면 아무도 정하지 않은 일을 기계가 하는 것처럼 보이기 때문이에요.</span><button class="link" type="button" onClick="{{g3}}" style="color: inherit; white-space: nowrap">질문 1로</button></p>
+          </div>
+        </div>
+
+        <!-- simulator -->
+        <div class="{{vsim}}" style="display: flex; flex-direction: column; gap: 14px">
+          <p class="note {{simRefHide}}"><span class="ic ic-alert" style="margin-top: 2px"></span><span>SCE가 눌러 보기를 만들지 못했어요: 미리 계산한 표가 실제 엔진과 한 걸음에서 달랐어요(disagreed). 틀린 화면을 보여 드리지 않으려고 만들지 않았어요. 설계가 기록을 기억하는 상태(history)를 쓰면 이럴 수 있어요.</span></p>
+          <div class="{{simOkHide}}" style="display: flex; flex-direction: column; gap: 14px">
+            <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">설계를 직접 눌러 보세요. 버튼은 사람이 보낼 수 있는 신호예요. 기계가 스스로 만드는 신호는 버튼이 아니라 결과로만 나와요.</div>
+            <div style="padding: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; text-align: center">
+              <div style="font: 400 13px/20px var(--font); color: var(--ink-3)">지금 상태 · {{simTime}}</div>
+              <div class="big" style="margin-top: 8px" title="{{simTitle}}">{{simNow}}</div>
+              <div style="display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap">
+                <button class="btn" type="button" onClick="{{simA}}">{{nUnlock}} 보내기</button>
+                <button class="btn" type="button" onClick="{{simB}}">{{nLock}} 보내기</button>
+                <button class="btn quiet" type="button" onClick="{{simT}}">30초 지나기</button>
+                <button class="btn quiet" type="button" onClick="{{simR}}">처음으로</button>
+              </div>
+            </div>
+            <div style="padding: 14px 18px; background: var(--page); border: 1px solid var(--line); border-radius: 14px; font: 400 14px/24px var(--font)">
+              <div style="font: 500 12px/18px var(--font); color: var(--ink-3); margin-bottom: 4px">일어난 일 · 위가 가장 최근이에요</div>
+              <div>{{simL1}}</div><div>{{simL2}}</div><div>{{simL3}}</div><div>{{simL4}}</div>
+            </div>
+            <div class="hint" style="margin: 0">SCE가 실제 엔진의 동작을 미리 계산하고, 엔진과 표가 한 걸음도 다르지 않은지 무작위로 여러 번 비교한 뒤에만 이 화면을 보여 줘요. 맞지 않으면 만들지 않아요.</div>
+          </div>
+        </div>
+
+        <!-- picture -->
+        <div class="{{vpic}}" style="display: flex; flex-direction: column; gap: 14px">
+          <div>
+            <div style="font: 500 13px/20px var(--font); color: var(--ink-3); margin-bottom: 8px">SCE가 이 모델을 그린 모델 그림이에요{{figStale}}</div>
+            <div class="fig" role="img" aria-label="Locked 상태에서 unlock_request로 Unlocked로, 30초 뒤 또는 lock_request로 다시 Locked로">
+              <span class="st-box" title="{{tLocked}}">{{nLocked}}</span>
+              <span class="st-arr"><span>{{nUnlock}}</span><b></b><span style="visibility: hidden">.</span></span>
+              <span class="st-box" title="{{tUnlocked}}">{{nUnlocked}}</span>
+              <span class="st-arr back"><span style="visibility: hidden">.</span><b></b><span>30초 뒤 · {{nLock}}</span></span>
+            </div>
+          </div>
+          <div>
+            <div style="font: 500 13px/20px var(--font); color: var(--ink-3); margin-bottom: 8px">SCE가 그린 요구사항 점검표예요 · 요구사항 5개</div>
+            <div style="padding: 16px 18px; background: var(--page); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 10px" role="img" aria-label="요구사항 점검표: 구현됨 2, 시나리오 통과 1, 빠짐 1, 열려 있음 1">
+              <div style="display: flex; gap: 12px; align-items: center"><b style="width: 28px">R1</b><span class="bar2"><i style="width: 100%; background: var(--accent)"></i></span><span style="width: 96px; font: 400 13px/20px var(--font)">구현됨</span></div>
+              <div style="display: flex; gap: 12px; align-items: center"><b style="width: 28px">R2</b><span class="bar2"><i style="width: 100%; background: var(--accent)"></i></span><span style="width: 96px; font: 400 13px/20px var(--font)">구현됨</span></div>
+              <div style="display: flex; gap: 12px; align-items: center"><b style="width: 28px">R3</b><span class="bar2"><i style="width: 100%; background: var(--accent)"></i></span><span style="width: 96px; font: 400 13px/20px var(--font)">시나리오 통과</span></div>
+              <div style="display: flex; gap: 12px; align-items: center"><b style="width: 28px">R4</b><span class="bar2"><i style="width: 0; background: var(--attn-icon)"></i></span><span style="width: 96px; font: 400 13px/20px var(--font); color: var(--attn)">빠짐</span></div>
+              <div style="display: flex; gap: 12px; align-items: center"><b style="width: 28px">R5</b><span class="bar2"><i style="width: 35%; background: var(--attn-icon)"></i></span><span style="width: 96px; font: 400 13px/20px var(--font); color: var(--attn)">열려 있음</span></div>
+            </div>
+          </div>
+          <div class="hint" style="margin: 0">그림이 한 쪽에 들어가지 않으면 SCE는 그리기를 거절하고 이유를 알려 줘요. 그때는 이 자리에 그 말이 나와요.</div>
+        </div>
 
         <div class="{{diffHide}}" style="padding: 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px">
-          <div style="font: 600 15px/24px var(--font)">이전 모델에서 바뀐 곳 (2줄 늘고 1줄 줄었어요)</div>
+          <div style="font: 600 15px/24px var(--font)">이전 설계에서 바뀐 곳 (2줄 늘고 1줄 줄었어요)</div>
           <div style="margin: 4px 0 10px; font: 400 13px/20px var(--font); color: var(--ink-3)">달라진 줄이에요. 조건, 신호, 값, 시간이 바뀐 곳이 여기 있으니 글과 맞는지 읽어 보세요.</div>
           <div class="code">
             <div class="cl del"><i>-</i>  after 20s → Locked</div>
@@ -146,13 +253,13 @@ body{margin:0}
     <!-- 3 질문과 답 -->
     <section class="{{p3}}" style="display: flex; flex-direction: column; gap: 14px">
       <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">질문은 글이 말하지 않은 것이에요. 답은 AI가 다음에 이 사양을 읽을 때 모델에 반영해요. <b>답한다고 모델이 바로 바뀌지는 않아요.</b></div>
-      <div class="{{noQHide}}"><p class="note" style="background: var(--chip); color: var(--ink-2)"><span class="ic ic-alert" style="margin-top: 2px"></span><span>아직 질문이 없어요. 수도코드가 만들어지면 글이 말하지 않은 것을 AI가 여기에 물어요.</span></p></div>
+      <div class="{{noQHide}}"><p class="note" style="background: var(--chip); color: var(--ink-2)"><span class="ic ic-alert" style="margin-top: 2px"></span><span>아직 질문이 없어요. 설계가 만들어지면 글이 말하지 않은 것을 AI가 여기에 물어요.</span></p></div>
 
       <div class="{{qListHide}}">
         <div class="qcard">
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span class="rid" style="font: 600 11px/18px var(--font); padding: 0 7px; border-radius: 999px; background: var(--chip)">질문 1</span><span class="qq">문이 열려 있는 동안에도 30초 시간이 다시 시작되나요?</span></div>
           <div class="qg">잠금을 푼 뒤 30초가 지나면 문이 자동으로 다시 잠긴다.</div>
-          <div style="display: flex; gap: 14px; margin-top: 8px"><button class="link" type="button" onClick="{{g1}}">글에서 보기</button></div>
+          <div style="display: flex; gap: 14px; margin-top: 8px"><button class="link" type="button" onClick="{{g1}}">글에서 보기</button><a class="link" href="Report.dc.html">보고서에서 이 부분 보기</a></div>
           <textarea class="area" aria-label="질문 1의 답" onInput="{{in1}}" placeholder="답을 적어 주세요">{{v1}}</textarea>
           <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap"><span class="tag {{st1c}}" style="margin: 0">{{st1}}</span><span style="font: 400 13px/20px var(--font); color: var(--ink-3)">{{st1n}}</span><button class="link {{add1}}" type="button" onClick="{{addText}}">글에 추가</button></div>
         </div>
@@ -160,7 +267,7 @@ body{margin:0}
         <div class="qcard">
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span class="rid" style="font: 600 11px/18px var(--font); padding: 0 7px; border-radius: 999px; background: var(--chip)">질문 2</span><span class="qq">20%는 휴대전화 배터리인가요, 도어락 배터리인가요?</span></div>
           <div class="qg">배터리가 20% 이하이면 알림을 보낸다.</div>
-          <div style="display: flex; gap: 14px; margin-top: 8px"><button class="link" type="button" onClick="{{g1}}">글에서 보기</button></div>
+          <div style="display: flex; gap: 14px; margin-top: 8px"><button class="link" type="button" onClick="{{g1}}">글에서 보기</button><a class="link" href="Report.dc.html">보고서에서 이 부분 보기</a></div>
           <textarea class="area" aria-label="질문 2의 답" onInput="{{in2}}" placeholder="답을 적어 주세요">{{v2}}</textarea>
           <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap"><span class="tag {{st2c}}" style="margin: 0">{{st2}}</span><span style="font: 400 13px/20px var(--font); color: var(--ink-3)">{{st2n}}</span><button class="link {{add2}}" type="button" onClick="{{addText}}">글에 추가</button></div>
         </div>
@@ -168,7 +275,7 @@ body{margin:0}
 
       <div class="{{orphanHide}}" style="padding: 16px 18px; border: 1px dashed var(--line-strong); border-radius: 14px">
         <div style="font: 600 15px/24px var(--font)">지금 모델이 묻지 않는 질문의 답</div>
-        <div style="margin: 4px 0 8px; font: 400 14px/22px var(--font); color: var(--ink-2)">이 모델은 더 묻지 않지만 답은 남겨 둬요. 다음 수도코드가 다시 물을 수 있어서예요. 답을 지우고 저장하면 가져갈 수 있어요.</div>
+        <div style="margin: 4px 0 8px; font: 400 14px/22px var(--font); color: var(--ink-2)">이 모델은 더 묻지 않지만 답은 남겨 둬요. 다음 설계가 다시 물을 수 있어서예요. 답을 지우고 저장하면 가져갈 수 있어요.</div>
         <div style="font: 500 14px/22px var(--font)">질문 0 · 문이 잠기는 속도는 몇 초인가요?</div>
         <textarea class="area" aria-label="묻지 않는 질문의 답" style="min-height: 56px">1초 안에</textarea>
       </div>
@@ -176,7 +283,7 @@ body{margin:0}
       <div class="{{qListHide}}" style="display: flex; flex-direction: column; gap: 10px; padding-top: 4px">
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
           <button class="btn" type="button" onClick="{{saveAnswers}}" disabled="{{saveOff}}">답 저장</button>
-          <button class="btn quiet" type="button" onClick="{{regen}}" disabled="{{regenOff}}">이 답으로 수도코드 다시 만들기</button>
+          <button class="btn quiet" type="button" onClick="{{regen}}" disabled="{{regenOff}}">이 답으로 설계 다시 만들기</button>
           <span class="tag n {{savedFlashHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>저장했어요</span>
         </div>
         <button class="keep" type="button" role="switch" aria-checked="{{freshAria}}" onClick="{{toggleFresh}}" style="margin: 0"><span class="cb {{freshOn}}"><span class="ic ic-check"></span></span>요구사항 번호를 모두 새로 매기기</button>
@@ -194,11 +301,11 @@ body{margin:0}
           <table class="rt">
             <thead><tr><th>요구사항</th><th>SCE가 본 결과</th><th>글에서</th><th>설계에서 담은 곳</th><th></th></tr></thead>
             <tbody>
-              <tr><td><b>R1</b></td><td><span class="tag n" style="margin: 0">구현됨</span><div class="hint" style="margin: 4px 0 0">설계의 자리가 담고 있어요</div></td><td>문장 1</td><td>Locked, Unlocked</td><td><button class="mini" type="button" onClick="{{rm1}}">수도코드에 표시</button></td></tr>
-              <tr><td><b>R2</b></td><td><span class="tag n" style="margin: 0">구현됨</span><div class="hint" style="margin: 4px 0 0">설계의 자리가 담고 있어요</div></td><td>문장 2</td><td>Unlocked</td><td><button class="mini" type="button" onClick="{{rm2}}">수도코드에 표시</button></td></tr>
-              <tr><td><b>R3</b></td><td><span class="tag n" style="margin: 0">시나리오 통과</span><div class="hint" style="margin: 4px 0 0">이 요구사항을 다룬 시나리오가 모두 통과했어요</div></td><td>문장 3</td><td>Locked, Unlocked</td><td><button class="mini" type="button" onClick="{{rm3}}">수도코드에 표시</button></td></tr>
-              <tr><td><b>R4</b></td><td><span class="tag" style="margin: 0">빠짐</span><div class="hint" style="margin: 4px 0 0">설계 어디에도 없어요</div></td><td>문장 4</td><td>없음</td><td><button class="mini" type="button" onClick="{{rm4}}">수도코드에 표시</button></td></tr>
-              <tr><td><b>R5</b></td><td><span class="tag" style="margin: 0">열려 있음</span><div class="hint" style="margin: 4px 0 0">열려 있다고 표시된 자리만 담고 있어요</div></td><td>문장 5</td><td>열린 자리만</td><td><button class="mini" type="button" onClick="{{rm5}}">수도코드에 표시</button></td></tr>
+              <tr><td><b>R1</b></td><td><span class="tag n" style="margin: 0">구현됨</span><div class="hint" style="margin: 4px 0 0">설계의 자리가 담고 있어요</div></td><td>문장 1</td><td><span title="{{tLocked}}">{{nLocked}}</span>, <span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td><button class="mini" type="button" onClick="{{rm1}}">설계에 표시</button></td></tr>
+              <tr><td><b>R2</b></td><td><span class="tag n" style="margin: 0">구현됨</span><div class="hint" style="margin: 4px 0 0">설계의 자리가 담고 있어요</div></td><td>문장 2</td><td><span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td><button class="mini" type="button" onClick="{{rm2}}">설계에 표시</button></td></tr>
+              <tr><td><b>R3</b></td><td><span class="tag n" style="margin: 0">시나리오 통과</span><div class="hint" style="margin: 4px 0 0">이 요구사항을 다룬 시나리오가 모두 통과했어요</div></td><td>문장 3</td><td><span title="{{tLocked}}">{{nLocked}}</span>, <span title="{{tUnlocked}}">{{nUnlocked}}</span></td><td><button class="mini" type="button" onClick="{{rm3}}">설계에 표시</button></td></tr>
+              <tr><td><b>R4</b></td><td><span class="tag" style="margin: 0">빠짐</span><div class="hint" style="margin: 4px 0 0">설계 어디에도 없어요</div></td><td>문장 4</td><td>없음</td><td><button class="mini" type="button" onClick="{{rm4}}">설계에 표시</button></td></tr>
+              <tr><td><b>R5</b></td><td><span class="tag" style="margin: 0">열려 있음</span><div class="hint" style="margin: 4px 0 0">열려 있다고 표시된 자리만 담고 있어요</div></td><td>문장 5</td><td>열린 자리만</td><td><button class="mini" type="button" onClick="{{rm5}}">설계에 표시</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -248,76 +355,106 @@ body{margin:0}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
+    const labels = { Locked: '잠겨 있음', Unlocked: '', unlock_request: '잠금 풀기 요청', lock_request: '' };
     this.state = {
-      tab: 'pseudo', model: 'fresh', acc: 'none', dirty: false, marked: '', fig: false, orphan: false,
+      tab: 'pseudo', model: 'fresh', acc: 'none', dirty: false, marked: '', orphan: false,
       ans: { q1: '', q2: '' }, saved: { q1: '', q2: '' }, stage: { q1: 'idle', q2: 'idle' },
       freshIds: false, flash: false, lapse: '',
+      view: 'table', namesOpen: false, labels, draft: { ...labels }, prop: {}, namesFlash: false,
+      sim: { cur: 'Locked', t: 0, log: [] }, simRefused: false,
     };
   }
 
-  // Which lines of the page name the states a requirement is carried by. Only SCE knows; these are the
-  // example's. A requirement carried by no state names none, and the screen says why, not "nothing".
+  // Which lines of the page, and which rows of the table, name the states a requirement is carried by.
+  // Only SCE knows; these are the example's. A requirement carried by no state lights nothing, and says why.
   marks() {
     return {
-      R1: { lines: [6, 11], why: '' },
-      R2: { lines: [8, 10], why: '' },
-      R3: { lines: [5, 9], why: '' },
-      R4: { lines: [], why: '수도코드에 이 요구사항을 담은 줄이 없어요. 요구사항이 빠져 있어요.' },
-      R5: { lines: [], why: '이 요구사항은 열려 있다고 표시된 자리만 담고 있어서, 수도코드의 줄과 이어 줄 수 없어요.' },
+      R1: { lines: [6, 11], rows: [1, 3], why: '' },
+      R2: { lines: [8, 10], rows: [2], why: '' },
+      R3: { lines: [5, 9], rows: [1, 2, 3], why: '' },
+      R4: { lines: [], rows: [], why: '설계에 이 요구사항을 담은 곳이 없어요. 요구사항이 빠져 있어요.' },
+      R5: { lines: [], rows: [], why: '이 요구사항은 열려 있다고 표시된 자리만 담고 있어서, 설계의 줄이나 칸과 이어 줄 수 없어요.' },
     };
   }
 
   renderVals() {
-    const { tab, model, acc, dirty, marked, fig, orphan, ans, saved, stage, freshIds, flash, lapse } = this.state;
+    const { tab, model, acc, dirty, marked, orphan, ans, saved, stage, freshIds, flash, lapse, view, namesOpen, labels, draft, prop, namesFlash, sim, simRefused } = this.state;
     const hasCode = model === 'fresh' || model === 'behind';
     const anyTyped = ['q1', 'q2'].some((q) => ans[q] !== saved[q]);
     const savedCount = ['q1', 'q2'].filter((q) => saved[q] !== '').length;
     const lapseTo = (why) => (acc === 'holds' ? { acc: 'lapsed', lapse: why } : {});
 
-    // what the answer to each question is doing
     const answerState = (q) => {
       if (ans[q] !== saved[q]) return ['typed', '입력함', '', '입력했어요. 아직 저장하지 않았어요.'];
       if (saved[q] === '') return ['idle', '', 'hide', ''];
       const s = stage[q];
-      if (s === 'writing') return ['writing', 'AI가 쓰는 중', 'ai', '저장했어요. AI가 새 수도코드에 반영하는 중이에요.'];
-      if (s === 'inModel') return ['inModel', '반영됨', 'ok', '보이는 수도코드에 반영됐어요. 이 질문은 더 하지 않아요. 답이 만든 동작을 읽어 보세요.'];
-      if (s === 'ignored') return ['ignored', '아직 물어요', '', '보이는 수도코드는 답한 뒤에 만들어졌는데 이 질문을 또 해요. 무엇을 했는지 읽거나 다시 만드세요.'];
-      return ['saved', '저장함', 'n', '저장했어요. 보이는 수도코드에는 아직 없어요.'];
+      if (s === 'writing') return ['writing', 'AI가 쓰는 중', 'ai', '저장했어요. AI가 새 설계에 반영하는 중이에요.'];
+      if (s === 'inModel') return ['inModel', '반영됨', 'ok', '보이는 설계에 반영됐어요. 이 질문은 더 하지 않아요. 답이 만든 동작을 읽어 보세요.'];
+      if (s === 'ignored') return ['ignored', '아직 물어요', '', '보이는 설계는 답한 뒤에 만들어졌는데 이 질문을 또 해요. 무엇을 했는지 읽거나 다시 만드세요.'];
+      return ['saved', '저장함', 'n', '저장했어요. 보이는 설계에는 아직 없어요.'];
     };
     const a1 = answerState('q1'), a2 = answerState('q2');
 
-    // why accepting is withheld, in the order a person can fix them
     const why = [];
     if (dirty || anyTyped) why.push('먼저 글과 답을 저장하세요. 수락되는 것은 저장한 것이에요.');
-    if (model === 'none') why.push('수락할 수도코드가 아직 없어요.');
-    if (model === 'writing') why.push('AI가 수도코드를 쓰는 중이에요. 끝난 뒤에 수락할 수 있어요.');
+    if (model === 'none') why.push('수락할 설계가 아직 없어요.');
+    if (model === 'writing') why.push('AI가 설계를 쓰는 중이에요. 끝난 뒤에 수락할 수 있어요.');
     if (model === 'refused') why.push('SCE가 이 설계를 거절해서, 수락할 내용을 보여 드리지 못해요.');
-    if (model === 'behind') why.push('수도코드가 이전 글에 맞춰 만들어졌어요. 지금 글에 대한 답으로 수락할 수 없어요.');
+    if (model === 'behind') why.push('설계가 이전 글에 맞춰 만들어졌어요. 지금 글에 대한 답으로 수락할 수 없어요.');
     const holds = acc === 'holds' && !why.length;
     const canAccept = !why.length && acc !== 'holds';
 
     const mark = this.marks()[marked] || null;
     const lit = new Set(mark ? mark.lines : []);
+    const litRows = new Set(mark ? mark.rows : []);
     const openLines = new Set([13, 14]);
+
+    // names: the owner's label when there is one, else the document's own name. A proposal is never shown here.
+    const NAMES = ['Locked', 'Unlocked', 'unlock_request', 'lock_request'];
+    const disp = (n) => labels[n] || n;
+    const tip = (n) => (labels[n] ? n : '');
+    const draftDirty = NAMES.some((n) => (draft[n] || '') !== (labels[n] || ''));
+
+    const sCur = sim.cur;
+    const moves = { Locked: { unlock: 'Unlocked' }, Unlocked: { lock: 'Locked', time: 'Locked' } };
+    const press = (what) => {
+      const to = (moves[sim.cur] || {})[what];
+      const said = what === 'unlock' ? '「' + disp('unlock_request') + '」를 보냈어요' : what === 'lock' ? '「' + disp('lock_request') + '」를 보냈어요' : '30초가 지났어요';
+      const line = to ? said + ' → 「' + disp(to) + '」로 갔어요' : said + ' → 아무 일도 일어나지 않았어요';
+      this.setState({ sim: { cur: to || sim.cur, t: sim.t + (what === 'time' ? 30 : 0), log: [...sim.log, line].slice(-4) } });
+    };
+
+    const views = ['table', 'timeline', 'sim', 'pic', 'words', 'code'];
+    const viewHints = {
+      table: '상태마다 어떤 신호가 오면 어디로 가는지를 표로 봐요. 설계 자체에서 읽은 것이에요.',
+      timeline: '내가 정한 시나리오를 실제 엔진에서 한 걸음씩 돌려 본 결과예요.',
+      sim: '버튼을 눌러 설계를 직접 움직여 봐요. 실제 엔진의 동작을 기반으로 해요.',
+      pic: '상태와 화살표로 그린 그림, 그리고 요구사항 점검표예요. SCE가 그려요.',
+      words: '표를 문장으로 옮겼어요. 설계에 있는 것만 말해요.',
+      code: 'SCE가 쓴 수도코드예요. 프로그래머가 읽는 보기라서 다른 보기를 먼저 권해요.',
+    };
+
     const vals = {
       mc1: model === 'none' ? 'on' : '', mc2: model === 'writing' ? 'on' : '', mc3: model === 'fresh' ? 'on' : '', mc4: model === 'behind' ? 'on' : '', mc5: model === 'refused' ? 'on' : '',
       m1: () => this.setState({ model: 'none', marked: '' }), m2: () => this.setState({ model: 'writing', marked: '' }), m3: () => this.setState({ model: 'fresh' }),
       m4: () => this.setState({ model: 'behind' }), m5: () => this.setState({ model: 'refused', marked: '' }),
       dirtyOn: dirty ? 'on' : '', toggleDirty: () => this.setState({ dirty: !dirty }),
       orphanOn: orphan ? 'on' : '', toggleOrphan: () => this.setState({ orphan: !orphan }),
+      refusedOn: simRefused ? 'on' : '', toggleRefused: () => this.setState({ simRefused: !simRefused }),
       arrive: () => {
         if (model !== 'writing') return;
         this.setState({
           model: 'fresh', stage: { q1: saved.q1 ? 'inModel' : stage.q1, q2: saved.q2 ? 'ignored' : stage.q2 },
-          ...(acc === 'holds' ? { acc: 'lapsed', lapse: '수도코드가 새로 만들어졌어요.' } : {}),
+          ...(acc === 'holds' ? { acc: 'lapsed', lapse: '설계가 새로 만들어졌어요.' } : {}),
         });
       },
 
-      modelChip: { none: '수도코드 없음', writing: '수도코드를 쓰는 중', fresh: '수도코드가 최신이에요', behind: '수도코드가 글보다 오래됐어요', refused: 'SCE가 거절했어요' }[model],
+      modelChip: { none: '설계 없음', writing: '설계를 쓰는 중', fresh: '설계가 최신이에요', behind: '설계가 글보다 오래됐어요', refused: 'SCE가 거절했어요' }[model],
       modelTone: { none: '', writing: 'ai', fresh: 'n', behind: '', refused: '' }[model],
+      reportHide: hasCode ? '' : 'hide',
       accHide: acc === 'none' ? 'hide' : '', accChip: acc === 'holds' ? '수락함 · 유효해요' : '수락이 풀렸어요', accTone: acc === 'holds' ? 'n' : '',
       dirtyHide: dirty ? '' : 'hide',
-      dirtyNote: model === 'writing' ? '저장하면 AI가 쓰고 있는 요청이 끝나고, 쓰던 것은 공개되지 않아요.' : '저장하면 지금 수도코드는 이전 글에 맞춘 것이 돼요.',
+      dirtyNote: model === 'writing' ? '저장하면 AI가 쓰고 있는 요청이 끝나고, 쓰던 것은 공개되지 않아요.' : '저장하면 지금 설계는 이전 글에 맞춘 것이 돼요.',
       saveText: () => {
         const patch = { dirty: false };
         if (model === 'fresh') patch.model = 'behind';
@@ -335,35 +472,57 @@ class Component extends DCLogic {
       aN: holds ? '✓' : acc === 'lapsed' ? '!' : '', aNHide: holds || acc === 'lapsed' ? '' : 'hide', aNOk: holds ? 'ok' : '',
       qHide: hasCode ? '' : 'hide',
 
-      // the pseudocode tab
+      // reading the design
       bTone: { none: 'mute', writing: 'ai', fresh: 'ok', behind: 'attn', refused: 'attn' }[model],
       bSpinHide: model === 'writing' ? '' : 'hide', bIconHide: model === 'writing' ? 'hide' : '',
       bIcon: { none: 'ic-doc', fresh: 'ic-check', behind: 'ic-alert', refused: 'ic-alert', writing: 'ic-doc' }[model],
-      bHead: { none: '아직 수도코드가 없어요', writing: 'AI가 수도코드를 쓰는 중이에요', fresh: '이 수도코드는 지금 글에 맞춰 썼어요', behind: '이 수도코드는 이전 글(r6)에 맞춰 썼어요', refused: 'SCE가 이 모델을 거절했어요' }[model],
+      bHead: { none: '아직 설계가 없어요', writing: 'AI가 설계를 쓰는 중이에요', fresh: '이 설계는 지금 글에 맞춰 썼어요', behind: '이 설계는 이전 글(r6)에 맞춰 썼어요', refused: 'SCE가 이 모델을 거절했어요' }[model],
       bBody: {
-        none: '글을 AI가 읽고 쓰게 하세요. AI는 글에서 요구사항을 나누고, 글이 말하지 않은 것은 질문으로 남겨요.',
-        writing: '쓰는 동안 이 사양은 그대로예요. 끝나면 수도코드를 글과 나란히 읽을 수 있어요.',
-        fresh: '글은 r7이고 수도코드도 r7을 읽고 썼어요.',
-        behind: '글은 지금 r7이에요. AI에게 글을 다시 읽고 수도코드를 새로 쓰게 하세요. 그전에는 이 수도코드를 지금 글과 대조해 읽지 마세요.',
-        refused: '그래서 수도코드 페이지가 없어요. 이건 SCE의 판단이고 이 화면의 문제가 아니에요. 모델은 저장되어 있어요.',
+        none: '글을 AI가 읽고 설계를 만들게 하세요. AI는 글에서 요구사항을 나누고, 글이 말하지 않은 것은 질문으로 남겨요.',
+        writing: '쓰는 동안 이 사양은 그대로예요. 끝나면 설계를 여러 방법으로 읽을 수 있어요.',
+        fresh: '글은 r7이고 설계도 r7을 읽고 썼어요.',
+        behind: '글은 지금 r7이에요. AI에게 글을 다시 읽고 설계를 새로 쓰게 하세요. 그전에는 이 설계를 지금 글과 대조해 읽지 마세요.',
+        refused: '그래서 읽을 수 있는 페이지가 없어요. 이건 SCE의 판단이고 이 화면의 문제가 아니에요. 모델은 저장되어 있어요.',
       }[model],
       bRawHide: model === 'refused' ? '' : 'hide',
       makeHide: model === 'none' || model === 'behind' || model === 'refused' ? '' : 'hide',
-      makeLabel: model === 'none' ? '수도코드 만들기' : '수도코드 다시 만들기',
+      makeLabel: model === 'none' ? '설계 만들기' : '설계 다시 만들기',
       make: () => this.setState({ model: 'writing', marked: '' }),
       reqHide: model === 'writing' ? '' : 'hide', cancelHide: model === 'writing' ? '' : 'hide',
       cancel: () => this.setState({ model: 'none' }),
-      figBtnHide: hasCode ? '' : 'hide', figLabel: fig ? '그림 닫기' : '모델 그림으로 보기',
-      toggleFig: () => this.setState({ fig: !fig }),
-      figHide: hasCode && fig ? '' : 'hide', figStale: model === 'behind' ? ' · 이전 글에 맞춘 모델이에요' : '',
+      figStale: model === 'behind' ? ' · 이전 글에 맞춘 모델이에요' : '',
       codeHide: hasCode ? '' : 'hide',
-      diffHide: model === 'fresh' ? '' : 'hide',
-      markHide: mark ? '' : 'hide',
-      markStyle: mark && mark.lines.length ? 'background: var(--ins-bg); color: var(--ins-ink)' : '',
-      markNote: mark ? (mark.lines.length ? '표시한 줄이에요: ' + marked + '를 담은 상태 ' + (marked === 'R1' ? '(Locked, Unlocked)' : marked === 'R2' ? '(Unlocked)' : '(Locked, Unlocked)') + '의 이름이 들어 있는 줄이에요.' : mark.why) : '',
+      diffHide: model === 'fresh' && view === 'code' ? '' : 'hide',
+      markHide: mark && (view === 'table' || view === 'words' || view === 'code') ? '' : 'hide',
+      markStyle: mark && (mark.lines.length) ? 'background: var(--ins-bg); color: var(--ins-ink)' : '',
+      markNote: mark ? (mark.lines.length ? '표시했어요: ' + marked + '를 담은 상태 ' + (marked === 'R1' ? '(' + disp('Locked') + ', ' + disp('Unlocked') + ')' : marked === 'R2' ? '(' + disp('Unlocked') + ')' : '(' + disp('Locked') + ', ' + disp('Unlocked') + ')') + '와 관련된 곳이에요.' : mark.why) : '',
       clearMark: () => this.setState({ marked: '' }),
       rm1: () => this.setState({ marked: 'R1', tab: 'pseudo' }), rm2: () => this.setState({ marked: 'R2', tab: 'pseudo' }), rm3: () => this.setState({ marked: 'R3', tab: 'pseudo' }),
       rm4: () => this.setState({ marked: 'R4', tab: 'pseudo' }), rm5: () => this.setState({ marked: 'R5', tab: 'pseudo' }),
+
+      // the views
+      viewHint: viewHints[view],
+      twoHide: view === 'table' || view === 'words' || view === 'code' ? '' : 'hide',
+      vtable: view === 'table' ? '' : 'hide', vwords: view === 'words' ? '' : 'hide', vcode: view === 'code' ? '' : 'hide',
+      vtimeline: view === 'timeline' ? '' : 'hide', vsim: view === 'sim' ? '' : 'hide', vpic: view === 'pic' ? '' : 'hide',
+      r1l: litRows.has(1) ? 'lit' : '', r2l: litRows.has(2) ? 'lit' : '', r3l: litRows.has(3) ? 'lit' : '',
+      nLocked: disp('Locked'), nUnlocked: disp('Unlocked'), nUnlock: disp('unlock_request'), nLock: disp('lock_request'),
+      tLocked: tip('Locked'), tUnlocked: tip('Unlocked'), tUnlock: tip('unlock_request'), tLock: tip('lock_request'),
+
+      // naming
+      namesHide: namesOpen ? '' : 'hide', namesLabel: namesOpen ? '이름 붙이기 닫기' : '이름 붙이기',
+      toggleNames: () => this.setState({ namesOpen: !namesOpen, namesFlash: false }),
+      namesSaveOff: !draftDirty,
+      saveNames: () => this.setState({ labels: { ...draft }, namesFlash: true }),
+      namesSavedHide: namesFlash && !draftDirty ? '' : 'hide',
+      askNames: () => this.setState({ prop: { Locked: '잠김', Unlocked: '잠금 해제됨', unlock_request: '잠금 풀기 요청', lock_request: '잠그기 요청' }, namesFlash: false }),
+
+      // the simulator
+      simOkHide: simRefused ? 'hide' : '', simRefHide: simRefused ? '' : 'hide',
+      simNow: disp(sCur), simTitle: tip(sCur), simTime: '지난 시간 ' + sim.t + '초',
+      simA: () => press('unlock'), simB: () => press('lock'), simT: () => press('time'),
+      simR: () => this.setState({ sim: { cur: 'Locked', t: 0, log: [] } }),
+      simL1: sim.log[sim.log.length - 1] || '아직 아무것도 하지 않았어요.', simL2: sim.log[sim.log.length - 2] || '', simL3: sim.log[sim.log.length - 3] || '', simL4: sim.log[sim.log.length - 4] || '',
 
       // the questions tab
       noQHide: hasCode ? 'hide' : '', qListHide: hasCode ? '' : 'hide',
@@ -391,7 +550,7 @@ class Component extends DCLogic {
 
       // the requirements tab
       noReqHide: hasCode || model === 'refused' ? 'hide' : '',
-      noReqText: model === 'writing' ? 'AI가 수도코드와 요구사항 목록을 쓰는 중이에요.' : '요구사항 목록이 아직 없어요. AI가 글을 읽고 목록을 저장하면, 설계가 요구사항을 얼마나 담는지 여기서 볼 수 있어요.',
+      noReqText: model === 'writing' ? 'AI가 설계와 요구사항 목록을 쓰는 중이에요.' : '요구사항 목록이 아직 없어요. AI가 글을 읽고 목록을 저장하면, 설계가 요구사항을 얼마나 담는지 여기서 볼 수 있어요.',
       reqBehindHide: model === 'behind' ? '' : 'hide',
       reqListHide: hasCode ? '' : 'hide',
 
@@ -399,7 +558,7 @@ class Component extends DCLogic {
       aTone: holds ? 'ok' : acc === 'lapsed' ? 'attn' : 'mute',
       aIcon: holds ? 'ic-check' : acc === 'lapsed' ? 'ic-alert' : 'ic-doc',
       aHead: holds ? '수락했어요 · 지금도 유효해요' : acc === 'lapsed' ? '수락했지만 지금은 유효하지 않아요' : '아직 수락한 것이 없어요',
-      aBody: holds ? '어제 14:20에 여기서 수락했어요. 글, 목록, 설계, 답이 그때와 같아요.' : acc === 'lapsed' ? '어제 14:20에 수락했어요. SCE가 말하길: ' + (lapse || '글이 바뀌었어요.') : '수도코드를 글과 대조해 읽은 뒤, 이 설계를 수락할 수 있어요.',
+      aBody: holds ? '어제 14:20에 여기서 수락했어요. 글, 목록, 설계, 답이 그때와 같아요.' : acc === 'lapsed' ? '어제 14:20에 수락했어요. SCE가 말하길: ' + (lapse || '글이 바뀌었어요.') : '설계를 글과 대조해 읽은 뒤, 이 설계를 수락할 수 있어요.',
       savedCount,
       whyHide: why.length ? '' : 'hide',
       w1: why[0] || '', w2: why[1] || '', w3: why[2] || '', w1h: why[0] ? '' : 'hide', w2h: why[1] ? '' : 'hide', w3h: why[2] ? '' : 'hide',
@@ -412,10 +571,18 @@ class Component extends DCLogic {
       sinceHead: acc === 'holds' ? '바뀐 곳이 글이 바뀐 범위 안에 있어요: 설계는 글이 바뀐 곳에서만 바뀌었어요.' : '설계가 글이 바뀌지 않은 곳에서도 바뀌었어요. 아래 보고서를 보세요.',
       sinceBody: acc === 'holds' ? '요구사항 5개 중 4개를 비교했어요. 범위 밖 0, 다시 볼 것 0.' : '요구사항 5개 중 4개를 비교했어요. 범위 밖 1, 다시 볼 것 1.',
     };
-    // the five sentences of the text, lit when marked
+    views.forEach((n, i) => { vals['vb' + (i + 1)] = view === n ? 'on' : ''; vals['v' + (i + 1) + 'c'] = () => this.setState({ view: n }); });
     [1, 2, 3, 4, 5].forEach((n) => { vals['s' + n] = marked === 'R' + n ? 'hot' : ''; vals['k' + n] = () => this.setState({ marked: marked === 'R' + n ? '' : 'R' + n }); });
-    // the fourteen lines of the page
     for (let i = 1; i <= 14; i++) vals['c' + i] = lit.has(i) ? 'lit' : openLines.has(i) ? 'open' : '';
+    NAMES.forEach((n, i) => {
+      const k = i + 1;
+      vals['lv' + k] = draft[n] || '';
+      vals['li' + k] = (e) => this.setState({ draft: { ...draft, [n]: e && e.target ? e.target.value : '' }, namesFlash: false });
+      const p = prop[n];
+      const show = p && !(draft[n] || '').trim();
+      vals['lp' + k] = p || ''; vals['lp' + k + 'h'] = show ? '' : 'hide';
+      vals['lu' + k] = () => this.setState({ draft: { ...draft, [n]: p }, prop: { ...prop, [n]: '' } });
+    });
     return vals;
   }
 }

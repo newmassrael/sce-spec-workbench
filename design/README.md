@@ -20,10 +20,20 @@ not in this repository. To open the boards, publish `boards/` as a Design artifa
 is the page); an artifact lives in one account, so treat the files here as the original and the
 published copy as a view of it.
 
-To look at a screen without the canvas: `python3 -I tools/render.py boards/Library.dc.html out.png 1280 800`.
-The preview does not run the board's script. A value the script would compute is passed as
-`key=value`, and a nested `<sc-if>` shows both branches. `THEME=dark` renders the dark theme. A change to
-the logic of a board is checked by running its `<script>` against a stub `DCLogic`, not by this preview.
+To look at a screen without the canvas, two small tools, kept separate because one runs a board's script
+and the other draws:
+
+```
+node tools/vals.js boards/Spec.dc.html v3c simA li4=잠그기 > /tmp/spec.json   # press things, print the values
+python3 -I tools/render.py boards/Spec.dc.html out.png 1280 900 @/tmp/spec.json
+```
+
+`vals.js` runs the board's own `<script>` against a stub runtime and presses what it is told to (a name, or
+`name=text` for an input), so the screen is drawn in the state a person would have made. `render.py`
+expands `{{holes}}`, `<sc-if>` and `<sc-for>` (nested to any depth) from those values and has headless
+Chrome take the picture; `THEME=dark` renders the dark theme. This checks the logic and the look of a
+board; it is not the canvas runtime, which has not been run on any of them. Render one board at a time: each
+starts a browser.
 
 ## The screens
 
@@ -36,7 +46,8 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
 | `MdReview` | A Markdown file compared with the current spec; no AI is involved |
-| `Spec` | One spec after it is saved: the text, the pseudocode read against it, the AI's questions and the owner's answers, the requirements, accepting the design |
+| `Spec` | One spec after it is saved: the text, the design read six ways (table, scenarios, simulator, picture, words, pseudocode) in the owner's words, the AI's questions and the owner's answers, the requirements, accepting the design |
+| `Report` | The AI's report on the design, with pictures (Mermaid, SVG), each statement marked checked, not checked or opinion, and a conversation with the AI about it |
 | `Pictures` | The pictures of an original: what is read, seen, sent and decided, one row each, with the one switch that lets an AI read them |
 | `Waiting` | A request waiting for its connection: the reasons the application keeps, said plainly, and what to do |
 | `Request` | The other states of a request: running, interrupted, failed, cancelled, ended by a save, finished; asking while one is open; saving while one is running |
@@ -170,14 +181,26 @@ parts as panels on one page, `ui/src/app.ts`):
 1. **Text.** The spec itself, split into the requirements SCE read from it (R1...), with a mark where the
    AI asked something. Saving the text ends a request that is being written and makes the pseudocode
    older than the text.
-2. **Pseudocode.** The page SCE writes of the AI's model, beside the text. SCE says the model is well
-   formed; the screen says in the same place that this is *not* a claim that it agrees with the text,
-   because only the owner's reading can say that. Pressing a sentence lights the lines that name the
-   states its requirement is carried by; a requirement carried by no state lights nothing and says why
-   (missing, or only open places), not "nothing found". Lines SCE marks as left open are yellow. The
-   model drawn as a state picture and what changed from the model before sit here too. An older
-   pseudocode says it was written for the earlier text and asks to be written again before it is read
-   against the present text.
+2. **Reading the design.** The owner does not read pseudocode (ADR 0033), so the design is shown six ways,
+   pseudocode last. Five are SCE's own pages, which the application chooses between and does not
+   re-draw: a **table** (the state you are in, the signal that arrives, where it goes, what entering
+   does), the owner's **scenarios** played step by step on the real engine, a **simulator** with a button
+   for each signal a person can send, a **picture** (states and arrows, and SCE's requirement checklist),
+   and the table put into **words**. SCE says the model is well formed; the screen says in the same place
+   that this is *not* a claim that it agrees with the text, because only the owner's reading can say that.
+   Pressing a sentence lights the rows (or lines) that name the states its requirement is carried by; a
+   requirement carried by no state lights nothing and says why (missing, or only open places), not
+   "nothing found". Lines SCE marks as left open are yellow, and what changed from the model before is
+   shown with the pseudocode. A design older than the text says so and asks to be written again before
+   it is read against the present text. Things that cannot be drawn are said, in SCE's own words: a
+   scenario that waits on a decision is not drawn (and names the question that would settle it), a
+   simulator SCE refused (the table and the engine disagreed) is a sentence and no screen, a figure that
+   does not fit is refused.
+   **Naming.** The words in these views are the document's own names, plus **the owner's labels**: a
+   panel ("이름 붙이기") where each state and signal can be given a word of the owner's. A label never
+   replaces a name, which stays as the tooltip, and a cleared label goes back to the name. The AI may
+   propose names; a proposal is marked as the AI's and appears in no view until the owner presses "use" and
+   saves, because SCE does not put a reading of its own into the owner's picture.
 3. **Questions and answers.** What the text does not say. An answer does not change the model: the screen
    says so at the top, and each answer says where it is: typed, saved, being written into a new model,
    in the model shown (the question is no longer asked), or still asked after the new model. Answers to
@@ -189,6 +212,25 @@ parts as panels on one page, `ui/src/app.ts`):
    can fix them (unsaved text or answers, no pseudocode, being written, refused, older than the text),
    the acceptance's state (holds, lapsed and why, as SCE said it) and, after one, what changed since.
    Saving text or answers, or a new pseudocode, lapses an acceptance; the screen shows it at once.
+
+**The AI's report, and a conversation about it** (`Report`; ADR 0033, proposed). A report is a document an
+AI writes from the text, the design, SCE's pages and the answers, and it is in the AI's voice, in the
+AI's colour, with the provider and the recipe version beside it. It is pinned to the revisions it was
+written for and says when it is older. **Every statement about the design cites what it is about** (a
+requirement, a line, a scenario, a question), and SCE checks the citation: a statement is marked
+*SCE가 확인함* when what it cites exists, *확인하지 못함* with what SCE looked for when it does not (the
+example cites a line that is not in the pseudocode), and *AI의 의견* when it cites nothing. The counts at
+the top are SCE's, and a report cannot call itself verified. Its pictures are drawn in the page for the
+prototype; in the application a **provider's picture is untrusted**: SVG is cleaned against an allowlist
+and shown as an image (never as markup), Mermaid is a source the product renders itself, offline and
+without scripts, and a picture that cannot be made safe or drawn is a sentence plus its source, never
+a blank. **The chat** reads the same material through read tools and cannot change the text, an answer,
+a name or an acceptance: what it may offer is a *draft*, shown as a draft, which becomes real only when
+the owner moves it to the answer box and saves it there. Pressing "이 부분 물어보기" on a statement
+attaches it to the question and shows it as context. The panel says what is sent and to whom, answers
+carry the same three marks, a thread says which revision it was about when the spec has moved, and a
+provider that cannot converse, or an organisation that does not allow it, shows why in place of the box.
+The replies in the prototype are scripted examples; the real ones are the provider's.
 
 `Request` and `Waiting` now say which of the two requests they are about: converting a document, or
 writing the pseudocode. Their states are the same and the words differ.
@@ -230,6 +272,10 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
   its lines as paper), a zoom on a picture, and the pictures of an attachment (a workbook inside a
   document). The ADR leaves open the renderer, the size above which a picture is reduced, and whether
   text in a picture is read by OCR first.
+- For the report and the chat: the recipe that writes a report and which sections every report has, the
+  Mermaid diagram kinds that are allowed, how long a conversation runs, exporting or sharing a report,
+  older reports and older threads opened one by one (a line says they exist), and the labels editor's
+  notes (a line saying what being in a state means) which SCE reads and the panel does not offer yet.
 - Parts of a spec the application has and `Spec` does not draw: the text editor itself (the text is shown,
   not edited), the history of saved revisions and loading one back, removing a spec, the model's SCXML
   as text, the pages SCE writes (acceptance page, change report) opened in full, and the state of

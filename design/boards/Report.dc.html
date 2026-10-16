@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>AI 보고서</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+
+  <main style="width: 100%; max-width: 1180px; margin: 0 auto; padding: 4px 24px 96px; display: flex; flex-direction: column; gap: 18px">
+    <div class="demo" style="max-width: none; margin: 0">
+      <span>시안용 · 보고서</span>
+      <button type="button" class="{{rb1}}" onClick="{{rs1}}">없음</button>
+      <button type="button" class="{{rb2}}" onClick="{{rs2}}">쓰는 중</button>
+      <button type="button" class="{{rb3}}" onClick="{{rs3}}">최신</button>
+      <button type="button" class="{{rb4}}" onClick="{{rs4}}">이전 글 기준</button>
+      <span style="margin-left: 8px">대화하는 AI</span>
+      <button type="button" class="{{pb1}}" onClick="{{ps1}}">대화 가능</button>
+      <button type="button" class="{{pb2}}" onClick="{{ps2}}">대화 못 함</button>
+      <button type="button" class="{{pb3}}" onClick="{{ps3}}">회사 정책</button>
+      <span style="margin-left: 8px">그림</span>
+      <button type="button" class="{{mmOn}}" onClick="{{toggleMm}}">Mermaid 그리기 실패</button>
+      <button type="button" class="{{svgOn}}" onClick="{{toggleSvg}}">SVG 정리 못 함</button>
+      <button type="button" class="{{thinkOn}}" onClick="{{toggleThink}}">AI가 답하는 중</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
+      <a class="btn quiet icon" href="Spec.dc.html" aria-label="사양으로"><span class="ic ic-back"></span></a>
+      <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">AI 보고서</h1>
+      <span class="how">휴대전화 문 잠금</span>
+      <span class="tag ai {{aiTagHide}}" style="margin: 0">AI가 썼어요</span>
+    </div>
+
+    <!-- there is no report, or it is being written -->
+    <div class="{{emptyHide}}">
+      <div class="ban {{eTone}}" role="status">
+        <span class="{{eSpinHide}}" style="flex: none; margin-top: 2px"><span class="spin"></span></span>
+        <span class="ic ic-doc {{eIconHide}}" style="width: 22px; height: 22px; margin-top: 1px"></span>
+        <span style="flex: 1; min-width: 0">
+          <span style="display: block; font: 600 16px/24px var(--font)">{{eHead}}</span>
+          <span style="display: block; margin-top: 2px; font: 400 15px/24px var(--font)">{{eBody}}</span>
+        </span>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 14px">
+        <button class="btn {{eMakeHide}}" type="button" onClick="{{makeReport}}">AI에게 보고서 쓰게 하기</button>
+        <button class="btn quiet {{eCancelHide}}" type="button" onClick="{{cancelReport}}">요청 취소</button>
+      </div>
+    </div>
+
+    <div class="rep {{repHide}}">
+      <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+        <div class="{{behindHide}}">
+          <p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span style="flex: 1">이 보고서는 글 r6에 맞춰 썼어요. 글은 지금 r7이에요. 숫자와 그림이 지금 사양과 다를 수 있어요.</span><button class="link" type="button" onClick="{{makeReport}}" style="color: inherit; white-space: nowrap">새 보고서 쓰기</button></p>
+        </div>
+
+        <div style="padding: 14px 18px; background: var(--ai-tint); border-radius: 14px; color: var(--ai); font: 400 13px/20px var(--font)">
+          <b style="font-weight: 600">이 보고서는 AI가 쓴 글이에요.</b> SCE의 판단이 아니에요. 글에 붙은 근거(R2, 줄 10 같은 표시)를 SCE가 하나씩 확인해서, 맞으면 "SCE가 확인함", 찾지 못하면 "확인하지 못함", 근거가 없으면 "AI의 의견"이라고 붙여요.
+          <div style="margin-top: 6px; color: var(--ink-2)">{{pinned}}</div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font: 500 14px/22px var(--font)">
+          <span>문장 {{nAll}}개</span>
+          <span class="tag n" style="margin: 0">SCE가 확인함 {{nOk}}</span>
+          <span class="tag {{badTone}}" style="margin: 0">확인하지 못함 {{nBad}}</span>
+          <span class="tag op" style="margin: 0">AI의 의견 {{nOp}}</span>
+          <span style="margin-left: auto; font: 400 13px/20px var(--font); color: var(--ink-3)">이전 보고서 2개 · 새로 쓰면 이전 것은 남아 있어요</span>
+        </div>
+
+        <section class="rsec">
+          <h2>한눈에</h2>
+          <sc-for list="{{sec1}}" as="st" hint-placeholder-count="3">
+            <div class="stm">
+              <div class="stt">{{st.text}}</div>
+              <div class="stc">
+                <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="2"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                <button class="link" type="button" onClick="{{st.ask}}">이 부분 물어보기</button>
+              </div>
+              <div class="why {{st.reasonHide}}">{{st.reason}}</div>
+            </div>
+          </sc-for>
+        </section>
+
+        <section class="rsec">
+          <h2>동작 흐름</h2>
+          <sc-for list="{{sec2}}" as="st" hint-placeholder-count="1">
+            <div class="stm">
+              <div class="stt">{{st.text}}</div>
+              <div class="stc">
+                <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="2"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                <button class="link" type="button" onClick="{{st.ask}}">이 부분 물어보기</button>
+              </div>
+            </div>
+          </sc-for>
+          <div class="figc">
+            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">동작 흐름</b><span>Mermaid로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleMmSrc}}">{{mmSrcLabel}}</button><button class="link" type="button">그림 저장</button></span></div>
+            <div class="figc-b {{mmDrawnHide}}">
+              <div class="fig" role="img" aria-label="Locked에서 unlock_request로 Unlocked로, 30초 뒤 또는 lock_request로 다시 Locked로">
+                <span class="st-box">Locked</span>
+                <span class="st-arr"><span>unlock_request</span><b></b><span style="visibility: hidden">.</span></span>
+                <span class="st-box">Unlocked</span>
+                <span class="st-arr back"><span style="visibility: hidden">.</span><b></b><span>30s / lock_request</span></span>
+              </div>
+            </div>
+            <div class="figc-b {{mmFailHide}}">
+              <p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span>이 그림은 그려지지 않았어요. Mermaid 원문에 모르는 낱말이 있어요(줄 3). 원문을 그대로 보여 드려요.</span></p>
+            </div>
+            <pre class="src {{mmSrcHide}}">stateDiagram-v2
+  [*] --> Locked
+  Locked --> Unlocked: unlock_request
+  Unlocked --> Locked: 30s / lock_request</pre>
+          </div>
+          <div class="hint" style="margin: 6px 0 0">Mermaid는 AI가 쓴 원문이에요. 제품이 스크립트도 인터넷도 없는 상자 안에서 그리고, 그림으로만 보여 줘요. 그려지지 않으면 이 원문이 그대로 나와요.</div>
+        </section>
+
+        <section class="rsec">
+          <h2>시간 흐름</h2>
+          <sc-for list="{{sec3}}" as="st" hint-placeholder-count="1">
+            <div class="stm">
+              <div class="stt">{{st.text}}</div>
+              <div class="stc">
+                <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="1"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                <button class="link" type="button" onClick="{{st.ask}}">이 부분 물어보기</button>
+              </div>
+            </div>
+          </sc-for>
+          <div class="figc">
+            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">시나리오 1의 시간</b><span>SVG로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleSvgSrc}}">{{svgSrcLabel}}</button><button class="link" type="button">그림 저장</button></span></div>
+            <div class="figc-b {{svgDrawnHide}}">
+              <svg viewBox="0 0 560 130" width="100%" role="img" aria-label="0초에 풀림, 30초에 다시 잠김" style="display: block; max-width: 560px; margin: 0 auto">
+                <line x1="30" y1="70" x2="530" y2="70" stroke="#667085" stroke-width="2"/>
+                <rect x="30" y="52" width="500" height="36" rx="8" fill="#EDF1FE"/>
+                <rect x="30" y="52" width="500" height="36" rx="8" fill="none" stroke="#2F5BEA" stroke-width="2"/>
+                <circle cx="30" cy="70" r="6" fill="#141922"/>
+                <circle cx="530" cy="70" r="6" fill="#141922"/>
+                <text x="22" y="34" text-anchor="start" font-size="13" fill="#444D5C" font-family="sans-serif">0초 · 풀림</text>
+                <text x="538" y="34" text-anchor="end" font-size="13" fill="#444D5C" font-family="sans-serif">30초 · 다시 잠김</text>
+                <text x="280" y="75" text-anchor="middle" font-size="14" font-weight="600" fill="#1D3FB8" font-family="sans-serif">잠금 해제 상태</text>
+                <text x="280" y="112" text-anchor="middle" font-size="12" fill="#667085" font-family="sans-serif">30초 동안 문은 풀려 있어요</text>
+              </svg>
+            </div>
+            <div class="figc-b {{svgFailHide}}">
+              <p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span>이 그림은 보여 드리지 못해요. AI가 쓴 SVG에 바깥 주소(href)가 들어 있어서 제품이 거절했어요. 이 보고서의 다른 부분은 그대로 읽을 수 있어요.</span></p>
+            </div>
+            <pre class="src {{svgSrcHide}}">&lt;svg viewBox="0 0 560 130"&gt;
+  &lt;line .../&gt;  &lt;rect .../&gt;  &lt;circle .../&gt;  &lt;text&gt;0초 · 풀림&lt;/text&gt; ...
+&lt;/svg&gt;   (정리한 뒤의 1.2KB · 스크립트, 바깥 주소, 포함된 그림, 이벤트는 없음)</pre>
+          </div>
+          <div class="hint" style="margin: 6px 0 0">AI가 쓴 SVG는 제품이 허용한 것만 남기고 정리해요. 스크립트, 바깥 주소, 그림 안의 그림은 지워요. 정리할 수 없으면 거절하고 이유를 알려요.</div>
+        </section>
+
+        <section class="rsec">
+          <h2>빠진 것과 열린 것</h2>
+          <sc-for list="{{sec4}}" as="st" hint-placeholder-count="4">
+            <div class="stm">
+              <div class="stt">{{st.text}}</div>
+              <div class="stc">
+                <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="2"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                <button class="link" type="button" onClick="{{st.ask}}">이 부분 물어보기</button>
+              </div>
+              <div class="why {{st.reasonHide}}">{{st.reason}}</div>
+            </div>
+          </sc-for>
+        </section>
+
+        <section class="rsec">
+          <h2>물어볼 것</h2>
+          <sc-for list="{{sec5}}" as="st" hint-placeholder-count="2">
+            <div class="stm">
+              <div class="stt">{{st.text}}</div>
+              <div class="stc">
+                <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="1"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                <button class="link" type="button" onClick="{{st.ask}}">이 부분 물어보기</button>
+              </div>
+            </div>
+          </sc-for>
+          <div style="margin-top: 12px"><a class="btn quiet" href="Spec.dc.html">질문과 답으로</a></div>
+        </section>
+      </div>
+
+      <!-- the chat -->
+      <aside class="chat" aria-label="AI와 대화">
+        <div class="chat-h">
+          <span style="font: 700 16px/24px var(--font)">AI와 대화</span>
+          <span class="tag ai" style="margin: 0">{{aiName}}</span>
+          <button class="link" type="button" onClick="{{togglePrivacy}}" style="margin-left: auto">{{privacyLabel}}</button>
+        </div>
+        <div class="{{privacyHide}}" style="padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--page); font: 400 13px/20px var(--font); color: var(--ink-2)">
+          <b style="font-weight: 600">보내는 것</b>: 내 질문과, AI가 읽는 이 사양의 글·설계·보고서<br>
+          <b style="font-weight: 600">보내는 곳</b>: {{aiName}}의 AI 서비스<br>
+          그림은 보내지 않아요(원본의 그림 화면에서 켠 경우만). 대화는 이 사양과 함께 보관돼요.
+        </div>
+        <div style="padding: 10px 16px; border-bottom: 1px solid var(--line); font: 400 13px/20px var(--font); color: var(--ink-3)">대화로는 글, 답, 이름, 수락을 바꿀 수 없어요. AI가 제안하면 "초안"으로만 나오고, 저장은 내가 직접 해요.</div>
+
+        <div class="{{chatBehindHide}}" style="padding: 10px 16px; background: var(--attn-tint); color: var(--attn); font: 400 13px/20px var(--font)">이 대화는 r6 보고서에 대한 거예요. 지금 글은 r7이에요. <button class="link" type="button" onClick="{{newThread}}" style="color: inherit">새 대화로 시작</button></div>
+
+        <div class="chat-m">
+          <div class="{{noMsgHide}}" style="color: var(--ink-3); font: 400 14px/22px var(--font)">보고서에서 궁금한 부분의 "이 부분 물어보기"를 누르거나, 아래에 직접 적어 보세요.</div>
+          <sc-for list="{{msgs}}" as="m" hint-placeholder-count="2">
+            <div class="bub {{m.cls}}">
+              <div class="bub-w {{m.whoHide}}">AI · {{aiName}}</div>
+              <div class="ctx {{m.ctxHide}}" style="margin-bottom: 6px"><span class="ic ic-doc" style="width: 14px; height: 14px; margin-top: 3px"></span><span>묻는 부분: {{m.ctx}}</span></div>
+              <div class="{{m.textHide}}">{{m.text}}</div>
+              <sc-for list="{{m.stmts}}" as="st" hint-placeholder-count="2">
+                <div class="stm">
+                  <div class="stt">{{st.text}}</div>
+                  <div class="stc">
+                    <sc-for list="{{st.cites}}" as="ct" hint-placeholder-count="1"><a class="cite" href="Spec.dc.html">{{ct.label}}</a></sc-for>
+                    <span class="tag {{st.tone}}" style="margin: 0">{{st.markText}}</span>
+                  </div>
+                  <div class="why {{st.reasonHide}}">{{st.reason}}</div>
+                </div>
+              </sc-for>
+              <div class="draft {{m.draftHide}}">
+                <div style="font: 500 12px/18px var(--font); color: var(--ai)">초안 · {{m.draftFor}} · 아직 저장되지 않았어요</div>
+                <div style="margin-top: 4px">{{m.draftText}}</div>
+                <div class="{{m.draftOpenHide}}" style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap"><button class="mini pri" type="button" onClick="{{m.draftMove}}">답칸에 옮기기</button><button class="mini" type="button" onClick="{{m.draftDrop}}">버리기</button></div>
+                <div class="{{m.draftDoneHide}}" style="margin-top: 8px; font: 400 13px/20px var(--font); color: var(--ink-2)">{{m.draftDone}} <a class="link" href="Spec.dc.html" style="margin-left: 4px">질문과 답으로</a></div>
+              </div>
+            </div>
+          </sc-for>
+          <div class="bub ai {{thinkHide}}"><div class="bub-w">AI · {{aiName}}</div><span style="display: inline-flex; align-items: center; gap: 10px"><span class="spin" style="width: 16px; height: 16px; border-width: 2px"></span>답을 쓰는 중이에요</span></div>
+        </div>
+
+        <div class="chat-i">
+          <div class="{{lockHide}}"><p class="note"><span class="ic ic-lock" style="margin-top: 2px"></span><span>{{lockText}}</span></p></div>
+          <div class="ctx {{ctxHide}}"><span class="ic ic-doc" style="width: 14px; height: 14px; margin-top: 3px"></span><span style="flex: 1; min-width: 0">묻는 부분: {{ctxText}}</span><button class="link" type="button" onClick="{{clearCtx}}" aria-label="묻는 부분 지우기">지우기</button></div>
+          <div class="chips {{chipsHide}}">
+            <sc-for list="{{sugs}}" as="sg" hint-placeholder-count="3"><button type="button" onClick="{{sg.go}}">{{sg.text}}</button></sc-for>
+          </div>
+          <textarea class="area" aria-label="AI에게 물어볼 것" placeholder="{{inPlaceholder}}" onInput="{{typeMsg}}" disabled="{{inOff}}" style="min-height: 64px; margin-top: 0">{{draftMsg}}</textarea>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <button class="btn" type="button" onClick="{{send}}" disabled="{{sendOff}}">보내기</button>
+            <span style="font: 400 12px/18px var(--font); color: var(--ink-3)">{{sendNote}}</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      rep: 'fresh', prov: 'chat', mmFail: false, svgFail: false, mmSrc: false, svgSrc: false, think: false,
+      privacy: false, msgs: [], ctx: null, draftMsg: '', stale: false,
+    };
+  }
+
+  // A statement is what the AI said plus what it cited. SCE checks the citation: the thing cited exists, a
+  // quoted sentence is in the text, a state named is in the model. `ok` = checked, `bad` = a citation SCE could
+  // not find (with what it looked for), `op` = it cites nothing, so it is the AI's opinion. A report cannot mark
+  // itself checked; these marks are examples of SCE's.
+  stmt(text, cites, kind, reason) {
+    return {
+      text, cites: cites.map((label) => ({ label })), kind, reason: reason || '',
+    };
+  }
+
+  report() {
+    const S = (t, c, k, r) => this.stmt(t, c, k, r);
+    return {
+      sec1: [
+        S('문은 잠겨 있다가 "잠금 풀기 요청"이 오면 풀리고, 30초가 지나면 스스로 다시 잠겨요.', ['R1', 'R2', '줄 6', '줄 10'], 'ok'),
+        S('요구사항 5개 중 3개는 설계에 담겨 있어요(R1, R2, R3).', ['점검표'], 'ok'),
+        S('배터리 알림(R4)은 설계 어디에도 없어요.', ['R4', '점검표'], 'ok'),
+        S('현관문이라서 R4가 빠진 것은 가볍게 넘기기 어려워 보여요.', [], 'op'),
+      ],
+      sec2: [S('그림의 상태 두 개와 화살표 세 개는 설계의 표와 같아요.', ['R1', 'R2', '표'], 'ok')],
+      sec3: [S('시나리오 1에서 문은 0초에 풀리고 30초에 다시 잠겨요.', ['시나리오 1'], 'ok')],
+      sec4: [
+        S('R4는 설계에 담긴 곳이 없어요. SCE 점검표는 "빠짐"이라고 해요.', ['R4', '점검표'], 'ok'),
+        S('R5는 열려 있다고 표시된 자리만 담고 있어요.', ['R5', '줄 14'], 'ok'),
+        S('30초는 문이 닫힌 뒤부터 세는 것 같아요.', ['줄 20'], 'bad', '줄 20은 수도코드에 없는 줄이에요(수도코드는 14줄이에요). AI가 가리킨 곳을 찾지 못했어요.'),
+        S('배터리 알림이 빠진 것이 일부러일 수도 있어요. 사양 글에는 그 이유가 없어요.', [], 'op'),
+      ],
+      sec5: [
+        S('문이 열려 있는 동안에도 30초가 다시 시작되는지가 정해져야 시나리오 2를 그릴 수 있어요.', ['질문 1', '시나리오 2'], 'ok'),
+        S('20%가 휴대전화 배터리인지 도어락 배터리인지 글이 말하지 않아요.', ['질문 2', 'R4'], 'ok'),
+      ],
+    };
+  }
+
+  // what the chat answers, by what was asked; a real answer is whatever the provider writes
+  reply(text, ctx) {
+    const S = (t, c, k, r) => this.stmt(t, c, k, r);
+    const q = text + ' ' + (ctx ? ctx.text : '');
+    if (/배터리|R4/.test(q)) {
+      return { stmts: [S('R4는 설계 어디에도 없어서, 지금 설계대로 만들면 배터리가 20% 이하여도 알림이 가지 않아요.', ['R4', '점검표'], 'ok'), S('배터리가 방전되면 문을 못 열 수 있어서, 현관문에서는 위험이 큰 편이에요.', [], 'op')] };
+    }
+    if (/30초/.test(q)) {
+      return { stmts: [S('설계에서 30초는 "잠금 해제됨" 상태에 들어간 순간부터 세요.', ['줄 10'], 'ok'), S('문이 열려 있는 동안 다시 시작하는지는 설계가 정하지 않았어요.', ['질문 1'], 'ok')] };
+    }
+    if (/질문 1|답/.test(q)) {
+      return {
+        stmts: [S('문이 열려 있는 동안 시간을 다시 시작할지는 안전 문제라서 사람이 정해야 해요. 두 가지로 답할 수 있어요: 열려 있는 동안은 시작하지 않거나, 문이 닫힌 순간부터 새로 세거나.', [], 'op')],
+        draft: { text: '문이 열려 있는 동안에는 30초가 다시 시작하지 않고, 문이 닫힌 뒤 30초가 지나면 잠긴다.', forWhat: '질문 1의 답', state: 'open' },
+      };
+    }
+    return { stmts: [S('이 부분은 보고서에 있는 내용만으로는 말하기 어려워요. 다른 근거를 찾아 다시 물어봐 주세요.', [], 'op')] };
+  }
+
+  renderVals() {
+    const { rep, prov, mmFail, svgFail, mmSrc, svgSrc, think, privacy, msgs, ctx, draftMsg, stale } = this.state;
+    const has = rep === 'fresh' || rep === 'behind';
+    const R = this.report();
+    const marks = { ok: ['n', 'SCE가 확인함'], bad: ['', 'SCE가 확인하지 못함'], op: ['op', 'AI의 의견'] };
+    const show = (s) => ({
+      text: s.text, cites: s.cites, tone: marks[s.kind][0], markText: marks[s.kind][1], reason: s.reason, reasonHide: s.reason ? '' : 'hide',
+      ask: () => this.setState({ ctx: { text: s.text.length > 40 ? s.text.slice(0, 40) + '…' : s.text }, draftMsg: '' }),
+    });
+    const all = [].concat(R.sec1, R.sec2, R.sec3, R.sec4, R.sec5);
+    const count = (k) => all.filter((s) => s.kind === k).length;
+    const canChat = prov === 'chat' && has;
+    const behindChat = rep === 'behind' && msgs.length > 0 && !stale;
+
+    const send = (text) => {
+      const t = (text || '').trim();
+      if (!t || !canChat) return;
+      const r = this.reply(t, ctx);
+      this.setState({
+        msgs: [...msgs, { who: 'me', text: t, ctx: ctx ? ctx.text : '' }, { who: 'ai', stmts: r.stmts, draft: r.draft || null }],
+        ctx: null, draftMsg: '',
+      });
+    };
+    const setDraft = (i, state) => this.setState({ msgs: msgs.map((m, j) => (j === i ? { ...m, draft: { ...m.draft, state } } : m)) });
+
+    const vals = {
+      rb1: rep === 'none' ? 'on' : '', rb2: rep === 'writing' ? 'on' : '', rb3: rep === 'fresh' ? 'on' : '', rb4: rep === 'behind' ? 'on' : '',
+      rs1: () => this.setState({ rep: 'none' }), rs2: () => this.setState({ rep: 'writing' }), rs3: () => this.setState({ rep: 'fresh' }), rs4: () => this.setState({ rep: 'behind' }),
+      pb1: prov === 'chat' ? 'on' : '', pb2: prov === 'nochat' ? 'on' : '', pb3: prov === 'policy' ? 'on' : '',
+      ps1: () => this.setState({ prov: 'chat' }), ps2: () => this.setState({ prov: 'nochat' }), ps3: () => this.setState({ prov: 'policy' }),
+      mmOn: mmFail ? 'on' : '', toggleMm: () => this.setState({ mmFail: !mmFail }),
+      svgOn: svgFail ? 'on' : '', toggleSvg: () => this.setState({ svgFail: !svgFail }),
+      thinkOn: think ? 'on' : '', toggleThink: () => this.setState({ think: !think }),
+
+      aiTagHide: has ? '' : 'hide',
+      emptyHide: has ? 'hide' : '', repHide: has ? '' : 'hide',
+      eTone: rep === 'writing' ? 'ai' : 'mute', eSpinHide: rep === 'writing' ? '' : 'hide', eIconHide: rep === 'writing' ? 'hide' : '',
+      eHead: rep === 'writing' ? 'AI가 보고서를 쓰는 중이에요' : '아직 보고서가 없어요',
+      eBody: rep === 'writing' ? '글, 설계, SCE가 쓴 페이지와 내 답을 읽고 써요. 끝나면 여기에 나와요.' : '설계를 AI가 읽고, 그림과 함께 쉬운 말로 정리해 줘요. 보고서의 문장은 근거를 달고, SCE가 그 근거를 하나씩 확인해요.',
+      eMakeHide: rep === 'none' ? '' : 'hide', eCancelHide: rep === 'writing' ? '' : 'hide',
+      makeReport: () => this.setState({ rep: 'writing' }), cancelReport: () => this.setState({ rep: 'none' }),
+      behindHide: rep === 'behind' ? '' : 'hide',
+      pinned: (rep === 'behind' ? '글 r6' : '글 r7') + ' · 설계 ' + (rep === 'behind' ? 'r6' : 'r7') + ' · 답 2개 · Claude Code (모델 claude-…) · 보고서 만드는 방법 v3 · 어제 14:30',
+      nAll: all.length, nOk: count('ok'), nBad: count('bad'), nOp: count('op'), badTone: count('bad') ? '' : 'op',
+      sec1: R.sec1.map(show), sec2: R.sec2.map(show), sec3: R.sec3.map(show), sec4: R.sec4.map(show), sec5: R.sec5.map(show),
+      mmDrawnHide: mmFail ? 'hide' : '', mmFailHide: mmFail ? '' : 'hide', mmSrcHide: mmSrc || mmFail ? '' : 'hide',
+      mmSrcLabel: mmSrc ? '원문 닫기' : '원문 보기', toggleMmSrc: () => this.setState({ mmSrc: !mmSrc }),
+      svgDrawnHide: svgFail ? 'hide' : '', svgFailHide: svgFail ? '' : 'hide', svgSrcHide: svgSrc && !svgFail ? '' : 'hide',
+      svgSrcLabel: svgSrc ? '원문 닫기' : '원문 보기', toggleSvgSrc: () => this.setState({ svgSrc: !svgSrc }),
+
+      // the chat
+      aiName: prov === 'nochat' ? '사무실 서버' : 'Claude Code',
+      privacyHide: privacy ? '' : 'hide', privacyLabel: privacy ? '닫기' : '무엇이 보내져요?', togglePrivacy: () => this.setState({ privacy: !privacy }),
+      chatBehindHide: behindChat ? '' : 'hide', newThread: () => this.setState({ msgs: [], ctx: null, stale: true }),
+      noMsgHide: msgs.length || think ? 'hide' : '',
+      msgs: msgs.map((m, i) => {
+        if (m.who === 'me') return { cls: 'me', whoHide: 'hide', ctx: m.ctx, ctxHide: m.ctx ? '' : 'hide', text: m.text, textHide: '', stmts: [], draftHide: 'hide', draftFor: '', draftText: '', draftOpenHide: 'hide', draftDoneHide: 'hide', draftDone: '', draftMove: () => null, draftDrop: () => null };
+        const d = m.draft;
+        return {
+          cls: 'ai', whoHide: '', ctx: '', ctxHide: 'hide', text: '', textHide: 'hide', stmts: m.stmts.map(show),
+          draftHide: d ? '' : 'hide', draftFor: d ? d.forWhat : '', draftText: d ? d.text : '',
+          draftOpenHide: d && d.state === 'open' ? '' : 'hide', draftDoneHide: d && d.state !== 'open' ? '' : 'hide',
+          draftDone: d && d.state === 'moved' ? '답칸에 옮겼어요. 저장은 질문과 답에서 직접 눌러 주세요.' : d && d.state === 'dropped' ? '버렸어요.' : '',
+          draftMove: () => setDraft(i, 'moved'), draftDrop: () => setDraft(i, 'dropped'),
+        };
+      }),
+      thinkHide: think ? '' : 'hide',
+      lockHide: prov === 'chat' ? 'hide' : '',
+      lockText: prov === 'policy' ? '회사 정책으로 이 작업 공간에서는 AI와 대화할 수 없어요. 보고서는 읽을 수 있어요.' : '이 AI(사무실 서버)는 대화를 한다고 알리지 않았어요. 보고서는 읽을 수 있어요. 대화하려면 AI 연결에서 다른 연결을 기본으로 정하세요.',
+      ctxHide: ctx ? '' : 'hide', ctxText: ctx ? ctx.text : '', clearCtx: () => this.setState({ ctx: null }),
+      chipsHide: canChat && !think ? '' : 'hide',
+      sugs: [
+        { text: 'R4가 빠진 건 얼마나 위험해요?', go: () => send('R4가 빠진 건 얼마나 위험해요?') },
+        { text: '30초는 언제부터 세요?', go: () => send('30초는 언제부터 세요?') },
+        { text: '질문 1에 어떻게 답하면 좋을까요?', go: () => send('질문 1에 어떻게 답하면 좋을까요?') },
+      ],
+      draftMsg,
+      typeMsg: (e) => this.setState({ draftMsg: e && e.target ? e.target.value : '' }),
+      inOff: !canChat,
+      inPlaceholder: canChat ? '궁금한 것을 적어 주세요' : has ? '지금은 대화할 수 없어요' : '보고서가 있어야 물어볼 수 있어요',
+      sendOff: !canChat || !draftMsg.trim() || think,
+      send: () => send(draftMsg),
+      sendNote: ctx ? '위의 묻는 부분과 함께 보내요' : '',
+    };
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

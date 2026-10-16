@@ -14,12 +14,13 @@
     "MdReview.dc.html": { "x": 0, "y": 2040, "w": 1280, "h": 900, "title": "7  Markdown import: compare with the current spec (no AI)", "expand": "fill", "is_interactive": true },
     "ScanReview.dc.html": { "x": 1360, "y": 2040, "w": 1280, "h": 900, "title": "8  Scanned PDF: what was read from the picture", "expand": "fill", "is_interactive": true },
     "Waiting.dc.html": { "x": 0, "y": 3560, "w": 1280, "h": 900, "title": "10  A spec waiting for its connection, and why", "expand": "fill", "is_interactive": true },
-    "Spec.dc.html": { "x": 0, "y": 4620, "w": 1280, "h": 1400, "title": "13  A spec: text, pseudocode read against it, questions, requirements, accepting", "expand": "fill", "is_interactive": true },
+    "Spec.dc.html": { "x": 0, "y": 4620, "w": 1280, "h": 1400, "title": "13  A spec: text, the design read six ways, questions, requirements, accepting", "expand": "fill", "is_interactive": true },
+    "Report.dc.html": { "x": 1360, "y": 4620, "w": 1280, "h": 1700, "title": "14  The AI's report with pictures, citations checked by SCE, and a chat about it", "expand": "fill", "is_interactive": true },
     "Pictures.dc.html": { "x": 2720, "y": 3740, "w": 1280, "h": 1500, "title": "12  The original's pictures: what is read, seen, sent and decided", "expand": "fill", "is_interactive": true },
     "Request.dc.html": { "x": 1360, "y": 3560, "w": 1280, "h": 900, "title": "11  A request: running, interrupted, failed, cancelled, ended, replaced", "expand": "fill", "is_interactive": true },
     "Connect.dc.html": { "x": 2720, "y": 2140, "w": 1280, "h": 1500, "title": "9  AI connections: a list, add a kind, sign-in, where a client is, settings (Tweaks: policy)", "expand": "fill", "is_interactive": true }
   },
-  "order": ["Main.dc.html", "Library.dc.html", "ImportStates.dc.html", "Review.dc.html", "Accepted.dc.html", "Moved.dc.html", "MdReview.dc.html", "ScanReview.dc.html", "Connect.dc.html", "Waiting.dc.html", "Request.dc.html", "Pictures.dc.html", "Spec.dc.html"],
+  "order": ["Main.dc.html", "Library.dc.html", "ImportStates.dc.html", "Review.dc.html", "Accepted.dc.html", "Moved.dc.html", "MdReview.dc.html", "ScanReview.dc.html", "Connect.dc.html", "Waiting.dc.html", "Request.dc.html", "Pictures.dc.html", "Spec.dc.html", "Report.dc.html"],
   "notes": {
     "flow": { "x": 0, "y": -280, "text": "처음 사용 - 가져오기 - 확인 - 저장", "kind": "title1", "maxW": 4000 }
   },
