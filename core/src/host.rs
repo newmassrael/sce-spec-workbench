@@ -84,7 +84,19 @@ pub struct HostSettings {
     /// install the client, or what the authoring server needs, while the window is open, and the
     /// executor must not wait for the window to be opened again to notice.
     pub retry: Duration,
+    /// How many requests this shell runs at once, whatever connections they are for: the ceiling
+    /// of the machine it runs on, which does not grow with the connections a person has. A
+    /// connection has places of its own (`Generator::places`) and the store keeps to them; this
+    /// is the number of workers that look for a request with a place free.
+    pub workers: usize,
 }
+
+/// How many requests a shell runs at once unless it is told otherwise: enough that a request for
+/// one connection does not wait behind a long one for another, few enough that a machine that
+/// runs a client for each of them (a process and its authoring server) is not carrying more than
+/// a person's own computer can.
+const WORKERS_DEFAULT: usize = 4;
+const WORKERS_ENV: &str = "SCE_EXECUTOR_WORKERS";
 
 /// How often a shell that could not host looks again: seldom enough that a missing program is
 /// not a process started every moment, often enough that a person who has just installed it
@@ -130,6 +142,12 @@ impl HostSettings {
             codegen: path(GENERATOR_ENV),
             config,
             retry: RETRY_EVERY,
+            // At least one: a number that is not one is "I did not say", not a shell that runs
+            // nothing.
+            workers: text(WORKERS_ENV)
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|workers| *workers >= 1)
+                .unwrap_or(WORKERS_DEFAULT),
         }
     }
 }
@@ -455,6 +473,15 @@ fn supervise<C>(
             RunnerConfig::named(&settings.name),
         )
         .with_shutdown(shutdown);
+        // Requests that were made for a connection are taken by as many workers as the shell
+        // runs at once, so that one that waits for a place of its own connection does not hold
+        // up a request of another. A request nobody chose a connection for has no lane to
+        // count, and a runner that knows no connections takes them one at a time, as it did.
+        let workers = if directory.is_some() {
+            settings.workers
+        } else {
+            1
+        };
         if let Some(directory) = directory {
             runner = runner.with_connections(directory);
         }
@@ -463,7 +490,7 @@ fn supervise<C>(
             let runner = Arc::clone(&runner);
             move || waiting_words(&runner.waiting())
         });
-        runner.run();
+        runner.run_with(workers);
         return;
     }
 }

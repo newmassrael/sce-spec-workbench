@@ -65,6 +65,7 @@ import {
   type HistoryEntry,
   type HostListing,
   type Listing,
+  type Queue,
   type Refusal,
   type RequestHead,
   type RequirementOutcome,
@@ -95,6 +96,7 @@ import {
   connectedNames,
   controlsOf,
   hostsKey,
+  queueKey,
   isConnected,
   pressKey,
   savingEndsARequest,
@@ -266,6 +268,8 @@ export class App {
   /** Which AI adapters are there, and whether the shells host one and why not, as last read. */
   private adapters: AdapterListing | null = null;
   private hosts: HostListing | null = null;
+  /** Which queued requests wait for a place of their connection, as the store last said. */
+  private queue: Queue | null = null;
   /** A request being made or called off now: a second press would be a second request. */
   private requestBusy: "making" | "cancelling" | null = null;
   /** Why the last attempt to ask was not made, in words; and whether a request that is open may be replaced. */
@@ -485,6 +489,15 @@ export class App {
       if (session !== this.session) return;
       this.askForToken(error);
     }
+    try {
+      const queue = await this.api.readQueue();
+      if (session !== this.session) return;
+      if (queueKey(this.queue) !== queueKey(queue)) changed = true;
+      this.queue = queue;
+    } catch (error) {
+      if (session !== this.session) return;
+      this.askForToken(error);
+    }
     if (await this.noteBundle(id, session, heads.bundle)) changed = true;
     if (session !== this.session) return;
     if (changed) this.render();
@@ -535,7 +548,7 @@ export class App {
     if (spec === null || this.requestBusy !== null) return;
     // A request that waits for a connection is replaced by one made for a connection: with none
     // chosen there is nothing to replace it with, and asking would make the same request again.
-    const current = statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts);
+    const current = statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts, this.queue);
     if (replace && current.kind === "queued" && this.ai !== null && this.ai.connectionForRequest() === null) {
       this.ai.openPanel();
       this.requestNotice = this.t("generationChooseFirst");
@@ -1985,7 +1998,7 @@ export class App {
    * is working, and a request nobody is there to take is not shown as running.
    */
   private generationSection(): HTMLElement {
-    const status = statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts);
+    const status = statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts, this.queue);
     const controls = controlsOf(status, this.requestBusy !== null);
     const text = this.editor !== null && this.editor.base !== null;
     const modelHere = this.model !== null && (this.model.phase === "drawn" || this.model.phase === "not-drawn" || this.model.phase === "drawing");
@@ -2060,6 +2073,12 @@ export class App {
         return modelHere ? "" : this.t("generationIdle");
       case "queued":
         if (status.waiting !== null) return this.t("generationWaitingFor", { reason: status.waiting });
+        if (status.lane !== null) {
+          const { connection, ahead } = status.lane;
+          return ahead === 0
+            ? this.t("generationBehindNext", { connection })
+            : this.t("generationBehind", { connection, ahead: String(ahead) });
+        }
         if (status.unchosen) return this.t("generationUnchosen");
         return this.t(status.connected ? "generationQueued" : "generationQueuedNoAi");
       case "running":
@@ -2947,7 +2966,7 @@ export class App {
    */
   private regenerateButton(): HTMLElement | null {
     const controls = controlsOf(
-      statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts),
+      statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts, this.queue),
       this.requestBusy !== null,
     );
     if (!controls.canGenerate) return null;

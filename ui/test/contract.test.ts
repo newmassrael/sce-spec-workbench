@@ -31,6 +31,7 @@ import {
   parseDescribed,
   parseGenerationRequest,
   parseHostListing,
+  parseQueue,
   parseRequestCandidateTexts,
   parseRegisteredRequest,
   parseRequestList,
@@ -112,6 +113,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   report_adapter: parseAdapterReport,
   read_adapter_status: parseAdapterListing,
   read_host_status: parseHostListing,
+  read_queue: parseQueue,
   read_bundle: parseBundleRead,
   bundle_history: parseHistory,
   list_connections: parseConnectionListing,
@@ -434,6 +436,22 @@ describe("the replies the core gives", () => {
     expect(listing.hosts).toHaveLength(1);
     expect(listing.hosts[0]).toMatchObject({ name: "desktop", hosting: false, client_version: null, live: true });
     expect(listing.hosts[0]?.reason).toContain("SCE_CLAUDE");
+  });
+
+  it("say which request waits for a place of its connection, and behind how many", () => {
+    expect(parseQueue(replies.answers["read_queue_none"]).waiting).toEqual([]);
+    const queue = parseQueue(replies.answers["read_queue_waiting"]);
+    expect(queue.waiting).toEqual([
+      {
+        spec: "<waiting-spec-id>",
+        request: "<waiting-request-id>",
+        connection: "pc2-qwen",
+        running: 1,
+        places: 1,
+        ahead: 0,
+      },
+    ]);
+    expect(() => parseQueue({ waiting: [{ spec: "s", request: "r", connection: "c" }] })).toThrow(ContractError);
   });
 
   it("say what an executor wrote for a request, and that it is not the spec's until it completes", () => {

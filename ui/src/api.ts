@@ -21,6 +21,7 @@ import {
   parseHostListing,
   parseJudgment,
   parseListing,
+  parseQueue,
   parseReadConnection,
   parseReadRevisionReport,
   parseRegisteredRequest,
@@ -54,6 +55,7 @@ import {
   type HostListing,
   type Judgment,
   type Listing,
+  type Queue,
   type ReadRevisionReport,
   type RegisteredRequest,
   type Review,
@@ -178,6 +180,11 @@ export interface Api {
    * (what to install, what to set). Said by the shells themselves, and counted while recent.
    */
   readHostStatus(): Promise<HostListing>;
+  /**
+   * The queued requests that wait for a place of their connection, and behind how many. Counted
+   * by the store, so every shell says the same of the same wait.
+   */
+  readQueue(): Promise<Queue>;
   /**
    * Take a spec out of the list. Its files stay in the specs folder, so this can be
    * undone by hand; every later read or save of it is refused as `not-found`.
@@ -356,6 +363,9 @@ export function apiOver(transport: Transport): Api {
     },
     async readHostStatus() {
       return parseHostListing(await transport.call("read_host_status"));
+    },
+    async readQueue() {
+      return parseQueue(await transport.call("read_queue"));
     },
     async removeSpec(id) {
       return parseRemoved(await transport.call("remove_spec", { id }));

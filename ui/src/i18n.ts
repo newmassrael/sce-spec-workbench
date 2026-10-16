@@ -234,6 +234,10 @@ const en = {
   generationConnectionMoved:
     "The AI connection was changed after this screen read it, so nothing was asked. What is kept now is shown; press the button again.",
   generationWaitingFor: "The request waits for its AI connection: {reason}",
+  generationBehindNext:
+    "The AI connection `{connection}` is busy with another request. This one is next, and starts when it ends.",
+  generationBehind:
+    "The AI connection `{connection}` is busy with another request. {ahead} more are ahead of this one.",
   generationUnchosen:
     "This request was made without choosing an AI connection, so the application does not run it. An authoring client of your own can still take it; or choose a connection under AI connection and generate again.",
   generateWithConnection: "Generate again with the chosen connection",
@@ -643,6 +647,10 @@ const ko: Record<Key, string> = {
   generationConnectionMoved:
     "화면이 AI 연결을 읽은 뒤에 연결이 바뀌어 아무것도 요청하지 않았습니다. 지금 저장된 연결을 보여 드렸으니 버튼을 다시 누르세요.",
   generationWaitingFor: "요청이 AI 연결을 기다리고 있습니다: {reason}",
+  generationBehindNext:
+    "AI 연결 `{connection}`이 다른 요청을 처리하고 있습니다. 이 요청이 다음 차례이고, 앞의 요청이 끝나면 시작합니다.",
+  generationBehind:
+    "AI 연결 `{connection}`이 다른 요청을 처리하고 있습니다. 이 요청 앞에 {ahead}개가 더 있습니다.",
   generationUnchosen:
     "이 요청은 AI 연결을 고르지 않고 만들어져 앱이 실행하지 않습니다. 직접 쓰는 작성 클라이언트가 가져갈 수는 있고, 아니면 AI 연결에서 연결을 골라 다시 생성하세요.",
   generateWithConnection: "선택한 연결로 다시 생성",

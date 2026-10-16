@@ -853,6 +853,76 @@ fn replies() -> Value {
         "read_host_status_waiting".into(),
         answer(&store, "read_host_status", json!({})),
     );
+    // Who waits for a place of their connection: nobody, then one request behind the other of a
+    // connection that runs one at a time.
+    answers.insert(
+        "read_queue_none".into(),
+        answer(&store, "read_queue", json!({})),
+    );
+    let lanes = SpecStore::with_clock(
+        common::scratch("contract-lanes"),
+        FixedClock("2026-10-03T09:00:00Z".to_string()),
+    );
+    let pinned = sce_spec_workbench_core::PinnedRun {
+        adapter: sce_spec_workbench_core::AdapterKind::Local,
+        model: Some("qwen".to_string()),
+        limits: sce_spec_workbench_core::Limits::default(),
+    }
+    .pin(
+        sce_specs::ConnectionId::parse("pc2-qwen").unwrap(),
+        sce_specs::Revision::of(b"settings"),
+    );
+    let in_lane: Vec<(sce_specs::SpecId, String)> = ["Door lane one", "Door lane two"]
+        .iter()
+        .map(|title| {
+            let spec = lanes.create_spec(title).unwrap().id;
+            lanes.save_source(&spec, "The lock opens.", None).unwrap();
+            let request = lanes
+                .register_request_for(
+                    &spec,
+                    sce_specs::Registration {
+                        key: "press",
+                        origin: "gui",
+                        expect: sce_specs::requests::Inputs {
+                            source: lanes.head(&spec).unwrap().unwrap(),
+                            answers: None,
+                        },
+                        supersede: false,
+                    },
+                    Some(pinned.clone()),
+                )
+                .unwrap()
+                .request
+                .id;
+            (spec, request)
+        })
+        .collect();
+    lanes
+        .claim_request_within(
+            &in_lane[0].0,
+            &in_lane[0].1,
+            "desktop",
+            None,
+            false,
+            Some(&pinned.reference()),
+            1,
+        )
+        .unwrap();
+    let _ = lanes.claim_request_within(
+        &in_lane[1].0,
+        &in_lane[1].1,
+        "desktop",
+        None,
+        false,
+        Some(&pinned.reference()),
+        1,
+    );
+    answers.insert(
+        "read_queue_waiting".into(),
+        answer(&lanes, "read_queue", json!({})),
+    );
+    let waiting_spec = in_lane[1].0.as_str().to_string();
+    let waiting_request = in_lane[1].1.clone();
     refusals.insert(
         "bad-adapter".into(),
         refusal(
@@ -1548,6 +1618,8 @@ fn replies() -> Value {
     name_the_unstable(&mut document, &pinned_id, "<pinned-spec-id>");
     name_the_unstable(&mut document, &fresh_request_id, "<fresh-request-id>");
     name_the_unstable(&mut document, &fresh_spec_id, "<fresh-spec-id>");
+    name_the_unstable(&mut document, &waiting_spec, "<waiting-spec-id>");
+    name_the_unstable(&mut document, &waiting_request, "<waiting-request-id>");
     // A revision stays the shape of one, so that the screen's guard reads the file as it
     // would read the core.
     name_the_unstable(&mut document, &bundle_revision, &"b".repeat(64));

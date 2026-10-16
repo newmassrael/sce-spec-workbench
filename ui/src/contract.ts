@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 26;
+export const SUPPORTED_COMMAND_SET_VERSION = 27;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -787,6 +787,25 @@ export interface HostStatus {
   readonly seen_at: string;
   /** The shell said it recently: one that went is not hosting, whatever it last said. */
   readonly live: boolean;
+}
+
+/**
+ * A queued request that waits for a place of its connection: how many requests of the connection
+ * run now, how many it runs at once, and how many queued ones will be taken before this one
+ * (0 is the next). Said by the store, which counts, and the same to every shell.
+ */
+export interface QueueWait {
+  readonly spec: string;
+  readonly request: string;
+  readonly connection: string;
+  readonly running: number;
+  readonly places: number;
+  readonly ahead: number;
+}
+
+/** `read_queue`. */
+export interface Queue {
+  readonly waiting: readonly QueueWait[];
 }
 
 /** `read_host_status`: every shell that reported, and every record that could not be read. */
@@ -1579,6 +1598,26 @@ export function parseHostListing(value: unknown): HostListing {
       const at = `${where}.unreadable[${i}]`;
       const entry = record(u, at);
       return { id: text(entry, "id", at), reason: text(entry, "reason", at) };
+    }),
+  };
+}
+
+/** `read_queue`. */
+export function parseQueue(value: unknown): Queue {
+  const where = "read_queue";
+  const r = record(value, where);
+  return {
+    waiting: list(r, "waiting", where).map((entry, i) => {
+      const at = `${where}.waiting[${i}]`;
+      const wait = record(entry, at);
+      return {
+        spec: text(wait, "spec", at),
+        request: text(wait, "request", at),
+        connection: text(wait, "connection", at),
+        running: count(wait, "running", at),
+        places: count(wait, "places", at),
+        ahead: count(wait, "ahead", at),
+      };
     }),
   };
 }

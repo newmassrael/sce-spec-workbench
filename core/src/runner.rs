@@ -139,6 +139,15 @@ pub trait Generator: Send + Sync {
         vec!["generate".to_string(), "cancel".to_string()]
     }
 
+    /// How many requests of one connection of this kind run at once. One unless the kind says it
+    /// takes more: a model on the person's own computer given two documents at once writes both
+    /// slower, until both run out their time. The store counts the running requests of a
+    /// connection and refuses a claim past this (`lane-full`); a kind never raises it past what it
+    /// can bear, and a person may lower it.
+    fn places(&self) -> usize {
+        1
+    }
+
     /// Write a draft for `job`, looking at `cancel` as often as it can: a run that goes on
     /// after the request ended is spent for nothing.
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError>;
@@ -373,17 +382,33 @@ where
                         }
                     }
                 };
-            match self.store.claim_request_for(
-                &spec,
-                &view.request.id,
-                &self.config.name,
-                Some(self.config.lease_seconds),
-                false,
-                offered.as_ref(),
-            ) {
+            // A request of a connection is taken only while the connection has a place free, which
+            // the store counts across every spec; a request of none has no lane.
+            let claimed = match &offered {
+                Some(_) => self.store.claim_request_within(
+                    &spec,
+                    &view.request.id,
+                    &self.config.name,
+                    Some(self.config.lease_seconds),
+                    false,
+                    offered.as_ref(),
+                    generator.places(),
+                ),
+                None => self.store.claim_request_for(
+                    &spec,
+                    &view.request.id,
+                    &self.config.name,
+                    Some(self.config.lease_seconds),
+                    false,
+                    None,
+                ),
+            };
+            match claimed {
                 Ok(claimed) => return Ok(Some((spec, claimed, generator))),
-                // Somebody else took it, or the owner called it off, between looking and
-                // taking: it is not this runner's, and the next one may be.
+                // Somebody else took it, the owner called it off, or the connection has no place
+                // free, between looking and taking: it is not this runner's now, and the next
+                // request may be (one of another connection, which is why a full lane does not
+                // stop the look).
                 Err(StoreError::Refused { .. }) => continue,
                 Err(other) => return Err(other),
             }
@@ -403,6 +428,19 @@ where
                 self.wait(self.config.poll);
             }
         }
+    }
+
+    /// The same, with `workers` looking at once: each takes the oldest request that has a place
+    /// free, and a request whose connection is full is left for the next look, so that one
+    /// connection's long run does not hold up another's. The store keeps each connection to its
+    /// places, so the workers need not agree among themselves. At least one.
+    pub fn run_with(&self, workers: usize) {
+        thread::scope(|scope| {
+            for _ in 1..workers.max(1) {
+                scope.spawn(|| self.run());
+            }
+            self.run();
+        });
     }
 
     /// Wait for `span`, or until told to stop.

@@ -14,6 +14,8 @@ import {
   type AdapterListing,
   type GenerationRequest,
   type HostListing,
+  type Queue,
+  type QueueWait,
   type RequestHead,
 } from "./contract";
 
@@ -31,6 +33,12 @@ export type Status =
       readonly connected: boolean;
       readonly waiting: string | null;
       readonly unchosen: boolean;
+      /**
+       * Behind another request of its own connection, which has no place free: the store's word,
+       * and not one of the screen's. The request is being served, not left, so this is no reason
+       * to offer asking again.
+       */
+      readonly lane: QueueWait | null;
     }
   | { readonly kind: "running"; readonly attempt: number; readonly holder: string | null }
   /** The one that held it stopped answering. Nothing was published. */
@@ -71,6 +79,20 @@ export function hostsKey(hosts: HostListing | null): string {
   return [...whyNoAi(hosts), ...waiting].join("\n");
 }
 
+/**
+ * What the screen reads of the queue, as one string, so that a queue that said the same again is
+ * not a change.
+ */
+export function queueKey(queue: Queue | null): string {
+  if (queue === null) return "";
+  return queue.waiting.map((w) => `${w.request}=${w.running}/${w.places}+${w.ahead}`).join("\n");
+}
+
+/** Why the request `request` waits for a place of its connection, as the store says; `null` when it does not. */
+export function laneOf(queue: Queue | null, request: string): QueueWait | null {
+  return queue?.waiting.find((w) => w.request === request) ?? null;
+}
+
 /** The names of the adapters that are there now. */
 export function connectedNames(adapters: AdapterListing | null): string[] {
   return adapters === null ? [] : adapters.adapters.filter((a) => a.live).map((a) => a.name);
@@ -100,6 +122,7 @@ export function statusOf(
   detail: GenerationRequest | null,
   adapters: AdapterListing | null,
   hosts: HostListing | null = null,
+  queue: Queue | null = null,
 ): Status {
   if (head === null) return { kind: "idle" };
   const about = detail !== null && detail.id === head.id ? detail : null;
@@ -112,6 +135,7 @@ export function statusOf(
         // Made in the application, for no connection: the application does not choose one for it.
         // What was not read of the request is not guessed at.
         unchosen: about !== null && about.pin === null && about.origin === "gui",
+        lane: laneOf(queue, head.id),
       };
     case "running":
       return { kind: "running", attempt: head.attempt, holder: about?.lease?.holder ?? null };

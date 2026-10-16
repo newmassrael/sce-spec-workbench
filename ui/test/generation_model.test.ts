@@ -10,6 +10,7 @@ import type {
   GenerationRequest,
   HostListing,
   HostStatus,
+  Queue,
   RequestHead,
   RequestState,
 } from "../src/contract";
@@ -19,6 +20,7 @@ import {
   hostsKey,
   isConnected,
   pressKey,
+  queueKey,
   savingEndsARequest,
   statusOf,
   whyNoAi,
@@ -143,10 +145,51 @@ describe("where the latest request stands", () => {
   });
 
   it("says whether an AI is there to take a request that waits", () => {
-    const queued = (connected: boolean) => ({ kind: "queued", connected, waiting: null, unchosen: false });
+    const queued = (connected: boolean) => ({
+      kind: "queued",
+      connected,
+      waiting: null,
+      unchosen: false,
+      lane: null,
+    });
     expect(statusOf(head("queued", 0), null, listing(adapter()))).toEqual(queued(true));
     expect(statusOf(head("queued", 0), null, listing())).toEqual(queued(false));
     expect(statusOf(head("queued", 0), null, null)).toEqual(queued(false));
+  });
+
+  describe("a request that waits for a place of its connection", () => {
+    const queue = (...waiting: Queue["waiting"][number][]): Queue => ({ waiting });
+    const wait = (request: string, ahead: number): Queue["waiting"][number] => ({
+      spec: "door",
+      request,
+      connection: "pc2-qwen",
+      running: 1,
+      places: 1,
+      ahead,
+    });
+
+    it("says behind which connection it waits and how many are ahead, as the store counted", () => {
+      const status = statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-1", 2)));
+      expect(status).toMatchObject({ kind: "queued", lane: { connection: "pc2-qwen", ahead: 2 } });
+    });
+
+    it("does not take the place of another request, and says nothing when nothing is counted", () => {
+      expect(statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-9", 0)))).toMatchObject({
+        lane: null,
+      });
+      expect(statusOf(head("queued", 0), null, listing(adapter()), null, null)).toMatchObject({ lane: null });
+    });
+
+    it("is served, not left: asking again would only put a request behind the one it replaces", () => {
+      const status = statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-1", 0)));
+      expect(controlsOf(status, false)).toMatchObject({ canGenerate: false, replaces: false, canCancel: true });
+    });
+
+    it("is a change of the queue only when what it says changed", () => {
+      expect(queueKey(queue(wait("req-1", 1)))).toBe(queueKey(queue(wait("req-1", 1))));
+      expect(queueKey(queue(wait("req-1", 1)))).not.toBe(queueKey(queue(wait("req-1", 0))));
+      expect(queueKey(null)).toBe("");
+    });
   });
 
   describe("a request that waits", () => {
