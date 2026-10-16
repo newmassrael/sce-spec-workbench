@@ -63,6 +63,18 @@ The screen follows what the application does (`core/src/auth_policy.rs`, `claude
   cannot be used yet.
 - **Subscription or usage is said once, in words** ("월 정액", "사용량 요금"), where the person
   chooses how to sign in and where the sign-in is shown.
+- **Where a client is.** The application searches for it. When it does not find it, or the person
+  wants another copy, they give the full path (`/…`, `C:\…` or `\\…`); the screen judges the spelling
+  at once and then says what asking the program came to: found with its version, a file that does
+  not answer `--version`, no program there. A path the person chose can be given up for the search.
+- **Settings of a connection** are under "자세한 설정", closed until wanted, and are checked as the
+  application checks them: a name of one line and at most 80 characters (a server must have one, so
+  the person can tell where a spec goes when the address says nothing, as a tunnel is `127.0.0.1`); a
+  model named as the client names it, or left to the client (a server's model is the one picked from
+  its list); limits that are empty for none: turns 1 to 500, time 1 to 1,440 minutes, and for a server
+  the context it reads (4,096 to 4,000,000 tokens), how full it may get (10 to 95 percent) and how many
+  times a conversation may begin again (0 to 10). A request keeps the settings it started with, so a
+  change applies to the next one, and the screen says so.
 - The exact words of a sign-in command come from the application. `codex login -c …` is shortened
   on the screen; the application shows the whole of it.
 
@@ -111,10 +123,10 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
   server takes over (ADR 0027 and 0028 leave authentication open).
 - Search and sort, for a workspace with more specs than fit on a screen.
 - Renaming and removing a folder; the prototype makes one folder to show the flow.
-- Choosing the model of Claude Code or Codex, the limits of a connection (turns, seconds), the name
-  a person gives a connection, and the application's own Codex login folder.
-- Pointing at a Claude Code or Codex that is installed somewhere the search does not look (the
-  button is drawn and does nothing).
+- The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
+  person's, and the choice between that and the client's own login.
+- Several connections of one kind, and removing a connection; the screen holds one per kind.
+- What happens to a spec being converted when its connection is changed or removed.
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts

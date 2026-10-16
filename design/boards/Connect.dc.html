@@ -55,6 +55,10 @@ body{margin:0}
             <span style="flex: 1; min-width: 0"><span class="opt-t">{{pName}}</span><span class="meta {{metaHide}}">{{pMeta}}</span></span>
             <span class="tag {{pillClass}}" style="margin: 0">{{pPill}}</span>
           </div>
+          <div class="{{pathLinksHide}}" style="display: flex; gap: 14px; margin: 8px 0 0 52px">
+            <button class="link" type="button" onClick="{{openPath}}">위치 바꾸기</button>
+            <button class="link {{autoHide}}" type="button" onClick="{{autoPath}}">자동으로 찾기</button>
+          </div>
 
           <div class="{{localHide}}" style="margin-top: 16px">
             <label class="lbl" for="addr">서버 주소</label>
@@ -99,7 +103,82 @@ body{margin:0}
 
           <div class="acts {{btnsHide}}" style="margin-top: 16px">
             <button class="mini pri" type="button" onClick="{{recheck}}">{{b1Label}}</button>
-            <button class="mini {{b2Hide}}" type="button">위치 직접 지정</button>
+            <button class="mini {{b2Hide}}" type="button" onClick="{{openPath}}">위치 직접 지정</button>
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line)">
+            <button class="more" type="button" onClick="{{toggleMore}}" aria-expanded="{{ariaMore}}"><span class="ic ic-chev" style="width: 14px; height: 14px; transform: rotate({{moreDeg}}deg)"></span>자세한 설정</button>
+
+            <div class="{{moreHide}}">
+              <div class="fgrp">
+                <label class="lbl" for="f-name">{{nameLabel}}</label>
+                <input class="field" id="f-name" type="text" value="{{vName}}" onInput="{{inName}}" placeholder="{{namePh}}">
+                <div class="err {{eNameHide}}">{{eName}}</div>
+                <div class="hint">{{nameHint}}</div>
+              </div>
+
+              <div class="fgrp {{clientHide}}">
+                <span class="lbl">모델</span>
+                <div class="seg">
+                  <button type="button" class="{{mmAuto}}" onClick="{{modelAuto}}">{{pName}}가 정하게 두기</button>
+                  <button type="button" class="{{mmCustom}}" onClick="{{modelCustom}}">모델 이름 적기</button>
+                </div>
+                <div class="{{modelTextHide}}" style="margin-top: 8px">
+                  <input class="field" type="text" value="{{vModel}}" onInput="{{inModel}}" placeholder="예: 모델 이름" aria-label="모델 이름">
+                  <div class="err {{eModelHide}}">{{eModel}}</div>
+                </div>
+                <div class="hint">{{pName}}가 부르는 이름 그대로 적어요. 정하지 않으면 {{pName}}가 알아서 골라요.</div>
+              </div>
+              <div class="fgrp {{localOnlyHide}}">
+                <div class="hint" style="margin: 0">모델은 위 목록에서 골라요. 서버가 알려 준 이름을 그대로 써요.</div>
+              </div>
+
+              <div class="fgrp">
+                <span class="lbl">한도 · 비워 두면 한도가 없어요</span>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+                  <div>
+                    <label class="cmd-l" for="f-turns">주고받는 최대 횟수</label>
+                    <input class="field" id="f-turns" type="text" inputmode="numeric" value="{{vTurns}}" onInput="{{inTurns}}" placeholder="1 ~ 500">
+                    <div class="err {{eTurnsHide}}">{{eTurns}}</div>
+                  </div>
+                  <div>
+                    <label class="cmd-l" for="f-mins">걸리는 최대 시간 (분)</label>
+                    <input class="field" id="f-mins" type="text" inputmode="numeric" value="{{vMins}}" onInput="{{inMins}}" placeholder="1 ~ 1,440">
+                    <div class="err {{eMinsHide}}">{{eMins}}</div>
+                  </div>
+                </div>
+                <div class="hint">옮겨 쓰기 한 번에 쓸 수 있는 양이에요. 넘으면 거기서 멈추고 알려 줘요.</div>
+              </div>
+
+              <div class="fgrp {{localOnlyHide}}">
+                <span class="lbl">긴 문서를 이어서 읽기</span>
+                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+                  <div>
+                    <label class="cmd-l" for="f-ctx">모델이 한 번에 읽는 양 (토큰)</label>
+                    <input class="field" id="f-ctx" type="text" inputmode="numeric" value="{{vCtx}}" onInput="{{inCtx}}" placeholder="4,096 ~ 4,000,000">
+                    <div class="err {{eCtxHide}}">{{eCtx}}</div>
+                  </div>
+                  <div>
+                    <label class="cmd-l" for="f-pct">이만큼 차면 다시 시작 (%)</label>
+                    <input class="field" id="f-pct" type="text" inputmode="numeric" value="{{vPct}}" onInput="{{inPct}}" placeholder="10 ~ 95">
+                    <div class="err {{ePctHide}}">{{ePct}}</div>
+                  </div>
+                  <div>
+                    <label class="cmd-l" for="f-hand">다시 시작하는 최대 횟수</label>
+                    <input class="field" id="f-hand" type="text" inputmode="numeric" value="{{vHand}}" onInput="{{inHand}}" placeholder="0 ~ 10">
+                    <div class="err {{eHandHide}}">{{eHand}}</div>
+                  </div>
+                </div>
+                <div class="hint">문서가 모델이 한 번에 읽는 양을 넘으면, 하던 데서 이어서 대화를 새로 시작해요. 읽는 양을 알려 주면 서버가 거절하기 전에 먼저 시작해요. 0이면 처음 넘을 때 멈춰요.</div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 12px; margin-top: 18px">
+                <button class="btn" type="button" onClick="{{save}}">설정 저장</button>
+                <span class="tag n {{savedHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>저장했어요</span>
+                <span class="err {{triedHide}}" style="margin: 0">고쳐야 할 곳이 있어요</span>
+              </div>
+              <div class="hint" style="margin-left: 0">이미 시작한 옮겨 쓰기는 시작할 때의 설정으로 끝나요. 바꾼 설정은 다음 옮겨 쓰기부터 써요.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -114,6 +193,39 @@ body{margin:0}
       </div>
     </div>
   </main>
+
+  <div class="{{pathWrapHide}}">
+    <button class="scrim" type="button" aria-label="닫기" onClick="{{closePath}}"></button>
+    <div class="sheet-wrap" style="align-items: flex-start; padding-top: 150px">
+      <div class="sheet" role="dialog" aria-label="설치 위치 지정">
+        <div class="sheet-head">
+          <span style="font: 700 18px/28px var(--font)">{{pName}} 설치 위치</span>
+          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closePath}}"><span class="ic ic-x"></span></button>
+        </div>
+        <label class="lbl" for="p-path">프로그램의 전체 경로</label>
+        <input class="field" id="p-path" type="text" value="{{pathText}}" onInput="{{typePath}}" placeholder="{{pathPh}}">
+        <div class="hint">/ 나 C:\ 로 시작하는 전체 경로로 적어요. 자동으로 찾지 못했을 때만 쓰세요.</div>
+
+        <div class="demo" style="margin: 14px 0 0; max-width: none">
+          <span>시안용 · 확인 결과</span>
+          <button type="button" class="{{pd1}}" onClick="{{pdFound}}">찾음</button>
+          <button type="button" class="{{pd2}}" onClick="{{pdMute}}">답하지 않음</button>
+          <button type="button" class="{{pd3}}" onClick="{{pdNone}}">없음</button>
+        </div>
+
+        <p class="note {{rBadHide}}" style="margin-top: 14px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{rBadText}}</span></p>
+        <p class="note {{rFoundHide}}" style="margin-top: 14px; background: var(--accent-tint); color: var(--accent-ink)"><span class="ic ic-check" style="margin-top: 2px"></span><span>{{pName}} 버전 2.1.0을 찾았어요.</span></p>
+        <p class="note {{rMuteHide}}" style="margin-top: 14px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>파일은 있지만 버전을 물어도 답하지 않아요. {{pName}}가 아닌 것 같아요.</span></p>
+        <p class="note {{rNoneHide}}" style="margin-top: 14px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>이 위치에 프로그램이 없어요.</span></p>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px">
+          <button class="btn quiet" type="button" onClick="{{closePath}}">취소</button>
+          <button class="btn {{rUseHide}}" type="button" onClick="{{usePath}}">이 위치로 정하기</button>
+          <button class="btn {{rCheckHide}}" type="button" onClick="{{checkPath}}">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"policy":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":900}}'>
@@ -126,11 +238,21 @@ class Component extends DCLogic {
       using: 'claude',
       copied: '',
       model: 1,
+      // the settings of each kind, as typed: text, validated below as the application does
+      more: false, tried: false, saved: false,
+      set: {
+        claude: { name: '', mode: 'auto', model: '', turns: '', mins: '' },
+        codex: { name: '', mode: 'auto', model: '', turns: '', mins: '' },
+        local: { name: '', turns: '', mins: '', ctx: '', pct: '', hand: '' },
+      },
+      // where the person said a client is; empty leaves it to the search
+      where: { claude: '', codex: '' },
+      path: { open: false, text: '', demo: 'found', res: null },
     };
   }
   renderVals() {
     const policy = !!this.props.policy;
-    const { tab, st, using, copied, model } = this.state;
+    const { tab, st, using, copied, model, more, tried, saved, set, where, path } = this.state;
     const kinds = ['claude', 'codex', 'local'];
     const locked = (k) => policy && k !== 'local';
     const isLocked = locked(tab);
@@ -145,7 +267,8 @@ class Component extends DCLogic {
     const good = { sub: 1, usage: 1, this: 1, net: 1, plain: 1 };
     const names = { claude: 'Claude Code', codex: 'Codex', local: '모델 서버' };
     const icons = { claude: 'ic-user', codex: 'ic-user', local: 'ic-cpu' };
-    const metaOf = { claude: '버전 2.1.0 · /usr/local/bin/claude', codex: '버전 0.159.0 · /usr/local/bin/codex' };
+    const found = { claude: ['2.1.0', '/usr/local/bin/claude'], codex: ['0.159.0', '/usr/local/bin/codex'] };
+    const metaOf = (k) => '버전 ' + found[k][0] + ' · ' + (where[k] || found[k][1]) + (where[k] ? ' · 직접 지정함' : '');
     const noMeta = { checking: 1, missing: 1, unknown: 1 };
 
     // what each state says, for the two clients and for a server
@@ -194,14 +317,14 @@ class Component extends DCLogic {
       sdCodex: locked('codex') ? '' : good[st.codex] ? 'ok' : st.codex === 'checking' ? '' : 'attn',
       sdLocal: good[st.local] ? 'ok' : 'attn',
       lockClaude: locked('claude') ? '' : 'hide', lockCodex: locked('codex') ? '' : 'hide',
-      goClaude: () => this.setState({ tab: 'claude', copied: '' }),
-      goCodex: () => this.setState({ tab: 'codex', copied: '' }),
-      goLocal: () => this.setState({ tab: 'local', copied: '' }),
+      goClaude: () => this.setState({ tab: 'claude', copied: '', tried: false, saved: false }),
+      goCodex: () => this.setState({ tab: 'codex', copied: '', tried: false, saved: false }),
+      goLocal: () => this.setState({ tab: 'local', copied: '', tried: false, saved: false }),
 
       lockedHide: isLocked ? '' : 'hide',
       openHide: isLocked ? 'hide' : '',
       pIcon: icons[tab], pName: names[tab],
-      pMeta: tab === 'local' ? '' : metaOf[tab], metaHide: tab === 'local' || noMeta[cur] ? 'hide' : '',
+      pMeta: tab === 'local' ? '' : metaOf(tab), metaHide: tab === 'local' || noMeta[cur] ? 'hide' : '',
       pPill: say.pill, pillClass: say.cls,
       pHead: say.head, pBody: say.body,
       localHide: tab === 'local' ? '' : 'hide',
@@ -234,6 +357,91 @@ class Component extends DCLogic {
       offHide: !usable && !isUsing && !isLocked ? '' : 'hide',
       useThis: () => this.setState({ using: tab }),
     };
+    // the rules of a connection, as the application states them (core/src/connection.rs)
+    const s = set[tab];
+    const control = /[\u0000-\u001f\u007f]/;
+    const oneLine = (t, max) => t.length >= 1 && t.length <= max && t === t.trim() && !control.test(t);
+    const range = (text, min, max, unit) => {
+      const t = (text || '').trim();
+      if (t === '') return '';
+      if (!/^\d+$/.test(t)) return '숫자로 적어 주세요';
+      const n = Number(t);
+      return n < min || n > max
+        ? min.toLocaleString('ko-KR') + unit + '에서 ' + max.toLocaleString('ko-KR') + unit + ' 사이로 적어 주세요'
+        : '';
+    };
+    const isLocal = tab === 'local';
+    const custom = !isLocal && s.mode === 'custom';
+    const err = {
+      name: s.name === '' ? (isLocal && tried ? '이름을 적어 주세요' : '') : oneLine(s.name, 80) ? '' : '앞뒤 공백 없이 한 줄로, 80자 안으로 적어 주세요',
+      model: custom ? (s.model === '' ? (tried ? '모델 이름을 적어 주세요' : '') : oneLine(s.model, 200) ? '' : '앞뒤 공백 없이 한 줄로, 200자 안으로 적어 주세요') : '',
+      turns: range(s.turns, 1, 500, ''),
+      mins: range(s.mins, 1, 1440, '분'),
+      ctx: isLocal ? range(s.ctx, 4096, 4000000, '') : '',
+      pct: isLocal ? range(s.pct, 10, 95, '%') : '',
+      hand: isLocal ? range(s.hand, 0, 10, '') : '',
+    };
+    const blocking = (isLocal && s.name === '') || (custom && s.model === '');
+    const bad = Object.values(err).some(Boolean) || blocking;
+    const field = (k) => (e) => this.setState({ set: { ...set, [tab]: { ...set[tab], [k]: e && e.target ? e.target.value : '' } }, saved: false });
+    const hole = (k, key) => {
+      vals['v' + key] = s[k] || '';
+      vals['in' + key] = field(k);
+      vals['e' + key] = err[k] || '';
+      vals['e' + key + 'Hide'] = err[k] ? '' : 'hide';
+    };
+    hole('name', 'Name'); hole('model', 'Model'); hole('turns', 'Turns'); hole('mins', 'Mins');
+    hole('ctx', 'Ctx'); hole('pct', 'Pct'); hole('hand', 'Hand');
+    Object.assign(vals, {
+      moreHide: more ? '' : 'hide', moreDeg: more ? 90 : 0, ariaMore: String(more),
+      toggleMore: () => this.setState({ more: !more }),
+      clientHide: isLocal ? 'hide' : '', localOnlyHide: isLocal ? '' : 'hide',
+      nameLabel: isLocal ? '이름' : '이름 (선택)',
+      namePh: isLocal ? '예: 사무실 모델 서버' : names[tab],
+      nameHint: isLocal
+        ? '문서가 어디로 가는지 알아볼 수 있는 이름을 적어 주세요. 주소가 127.0.0.1이어도 다른 컴퓨터로 이어진 터널일 수 있어요.'
+        : '목록에 보이는 이름이에요. 비워 두면 "' + names[tab] + '"로 보여요.',
+      mmAuto: custom ? '' : 'on', mmCustom: custom ? 'on' : '',
+      modelAuto: () => this.setState({ set: { ...set, [tab]: { ...set[tab], mode: 'auto' } }, saved: false }),
+      modelCustom: () => this.setState({ set: { ...set, [tab]: { ...set[tab], mode: 'custom' } }, saved: false }),
+      modelTextHide: custom ? '' : 'hide',
+      savedHide: saved && !bad ? '' : 'hide',
+      triedHide: tried && bad ? '' : 'hide',
+      save: () => (bad ? this.setState({ tried: true, saved: false }) : this.setState({ saved: true, tried: false })),
+
+      // where a client is, when the search did not find it
+      pathLinksHide: isLocal || noMeta[cur] ? 'hide' : '',
+      autoHide: where[tab] ? '' : 'hide',
+      autoPath: () => this.setState({ where: { ...where, [tab]: '' } }),
+      openPath: () => this.setState({ path: { open: true, text: where[tab] || '', demo: 'found', res: null } }),
+      closePath: () => this.setState({ path: { ...path, open: false } }),
+      pathWrapHide: path.open && !isLocal && !isLocked ? '' : 'hide',
+      pathText: path.text,
+      pathPh: tab === 'codex' ? '/usr/local/bin/codex' : '/usr/local/bin/claude',
+      typePath: (e) => this.setState({ path: { ...path, text: e && e.target ? e.target.value : '', res: null } }),
+      pd1: path.demo === 'found' ? 'on' : '', pd2: path.demo === 'mute' ? 'on' : '', pd3: path.demo === 'none' ? 'on' : '',
+      pdFound: () => this.setState({ path: { ...path, demo: 'found', res: null } }),
+      pdMute: () => this.setState({ path: { ...path, demo: 'mute', res: null } }),
+      pdNone: () => this.setState({ path: { ...path, demo: 'none', res: null } }),
+      checkPath: () => {
+        const t = path.text;
+        const absolute = t.startsWith('/') || t.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(t);
+        const valid = t.length >= 1 && t.length <= 1024 && !control.test(t) && absolute;
+        this.setState({ path: { ...path, res: valid ? path.demo : 'bad' } });
+      },
+      rBadHide: path.res === 'bad' ? '' : 'hide',
+      rBadText: path.text.length > 1024 ? '1,024자 안으로 적어 주세요' : '전체 경로로 적어 주세요. /, C:\\ 또는 \\\\ 로 시작해야 해요.',
+      rFoundHide: path.res === 'found' ? '' : 'hide',
+      rMuteHide: path.res === 'mute' ? '' : 'hide',
+      rNoneHide: path.res === 'none' ? '' : 'hide',
+      rUseHide: path.res === 'found' ? '' : 'hide',
+      rCheckHide: path.res === 'found' ? 'hide' : '',
+      usePath: () => this.setState({
+        where: { ...where, [tab]: path.text },
+        st: st[tab] === 'missing' ? { ...st, [tab]: 'signedout' } : st,
+        path: { ...path, open: false, res: null },
+      }),
+    });
     const list = demo[tab];
     for (let i = 1; i <= 8; i++) {
       const item = list[i - 1];
