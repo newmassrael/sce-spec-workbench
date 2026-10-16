@@ -36,6 +36,7 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
 | `MdReview` | A Markdown file compared with the current spec; no AI is involved |
+| `Pictures` | The pictures of an original: what is read, seen, sent and decided, one row each, with the one switch that lets an AI read them |
 | `Waiting` | A request waiting for its connection: the reasons the application keeps, said plainly, and what to do |
 | `Request` | The other states of a request: running, interrupted, failed, cancelled, ended by a save, finished; asking while one is open; saving while one is running |
 | `Moved` | The spec changed while it was being checked |
@@ -156,6 +157,20 @@ or failed (`옮겨 쓰지 못했어요`) is amber with a line saying it can be a
 `Request`, which says in plain words what the application keeps: an interrupted request published
 nothing, a failed one carries the AI's own words, which are shown as written.
 
+**Pictures of the original** (ADR 0032). A picture can carry a rule, so none is skipped in a review;
+the review of a conversion has a count of them in its bar and a row where each sits, and `Pictures` is
+where each is decided. Every picture is unread by default and is not sent anywhere: one switch, off,
+lets an AI read them, says how many go and to whom before anything is sent, and is unavailable, with the
+reason, for a model that cannot read pictures and for an organisation that does not allow it. What an AI
+read is marked as needing a decision like any block read from an image; a picture that is a logo is
+decided as no content; a picture reduced to be sent says so, and the original is kept as it was. A
+format that cannot be shown, an address in the document (never opened), and a picture a Markdown file
+names that was not brought are listed, each with what the person can do: put the file in, write what
+it says, or decide it carries nothing. The import sheet and the folder import say how many pictures a
+selection holds and which are missing, and the compare of a Markdown file shows a picture that
+changed, and one that is missing. A picture of the original and a picture SCE draws of a model are
+different things and are called by different names.
+
 **Folders group specs.** A spec is in one folder, two levels deep at most (ADR 0030). Importing a
 folder of sources lets the person pick files and choose whether to keep the structure; the source
 folder itself is not remembered.
@@ -175,6 +190,14 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
 - More connections than fit the list (it holds six), and grouping or searching them.
+- The pictures of a scanned PDF page by page (the page is itself a picture: `ScanReview` still draws
+  its lines as paper), a zoom on a picture, and the pictures of an attachment (a workbook inside a
+  document). The ADR leaves open the renderer, the size above which a picture is reduced, and whether
+  text in a picture is read by OCR first.
+- The modelling stage: the pseudocode read against the text, the AI's questions and the owner's answers,
+  coverage, accepting a design, and what a new model changed. None of it is drawn, and "accept" means two
+  different things in the application (a design) and in these screens (a converted document); the words
+  have to be separated before it is.
 - Reordering connections, and more connections than the screen's six slots (a limit of the
   prototype, which writes its rows out: it is not a limit of the application).
 - Sign-in to a team server and what a member may do: nothing to draw until authentication and

@@ -18,8 +18,8 @@ body{margin:0}
   <div class="bar-top">
     <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
     <span style="font: 700 16px/24px var(--font)">온도 조절기</span>
-    <span class="count done" style="margin-left: 8px">바뀌는 곳 3곳</span>
-    <span class="count">옮기지 못한 곳 1곳</span>
+    <span class="count done" style="margin-left: 8px">바뀌는 곳 4곳</span>
+    <span class="count">옮기지 못한 곳 3곳</span>
     <span class="grow" style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px">
       <a class="btn quiet" href="Library.dc.html">이 제안 버리기</a>
       <a class="btn" href="Accepted.dc.html"><span class="ic ic-check"></span>수락</a>
@@ -51,6 +51,20 @@ body{margin:0}
     <div class="cell chg">고장이 나면 경보를 보낸다.</div>
     <div class="cell empty chg">
       <span style="display: flex; flex-direction: column; align-items: flex-start"><span class="tag n">빠짐</span>가져온 파일에 없어요</span>
+    </div>
+
+    <div class="cell chg"><span class="th diagram" style="width: 110px; height: 76px" role="img" aria-label="images/timing.png 이전"></span><div style="margin-top: 4px; font: 400 13px/20px var(--font); color: var(--ink-3)">images/timing.png</div></div>
+    <div class="cell chg">
+      <span class="tag n">그림이 바뀜</span>
+      <span class="th diagram" style="width: 110px; height: 76px; filter: hue-rotate(200deg)" role="img" aria-label="images/timing.png 이후"></span>
+      <div style="margin-top: 4px; font: 400 13px/20px var(--font); color: var(--ink-3)">같은 이름의 그림이 다른 그림으로 바뀌었어요. 내용에 규칙이 있다면 그림을 직접 확인해 주세요.</div>
+    </div>
+
+    <div class="cell flag"><span class="th diagram" style="width: 110px; height: 76px" role="img" aria-label="images/state.png 이전"></span><div style="margin-top: 4px; font: 400 13px/20px var(--font); color: var(--ink-3)">images/state.png</div></div>
+    <div class="cell empty flag" style="flex-direction: column; align-items: flex-start; justify-content: center">
+      <span class="tag"><span class="ic ic-alert" style="width: 13px; height: 13px"></span>그림을 가져오지 못했어요</span>
+      <span style="font: 400 14px/22px var(--font); color: var(--ink-2)">마크다운은 이 그림을 가리키는데 함께 가져온 파일에 없어요. 수락하면 지금 사양의 그림이 빠져요.</span>
+      <div class="acts"><a class="mini pri" href="Pictures.dc.html">파일 넣기</a></div>
     </div>
 
     <div class="cell flag">온도별 꺼짐 시간 표 (3행)</div>

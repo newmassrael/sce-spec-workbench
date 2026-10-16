@@ -101,6 +101,48 @@ body{margin:0}
       <div class="cap">올린 뒤, AI가 연결되어 있지 않을 때</div>
     </div>
 
+    <div class="cell">
+      <div class="card-s" style="gap: 14px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-ok" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-check" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">원본을 보관했어요</span>
+        </div>
+        <div class="file" style="flex-direction: column; align-items: stretch; gap: 6px">
+          <div style="font: 600 15px/22px var(--font)">그림 6개를 찾았어요</div>
+          <div style="font: 400 13px/20px var(--font); color: var(--ink-2)">보관 3 · 보여 줄 수 없는 형식 1 · 받지 않은 주소 1 · 빠진 그림 1</div>
+        </div>
+        <a class="btn" href="Pictures.dc.html" style="align-self: flex-start">그림 확인하기</a>
+      </div>
+      <div class="cap">올린 뒤, 그림이 있을 때</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 16px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-attn" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-alert" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">그림 2개가 빠져 있어요</span>
+        </div>
+        <p style="margin: 0; font: 400 14px/22px var(--font); color: var(--ink-2)">마크다운이 가리키는 images/a.png, images/b.png가 함께 오지 않았어요. 폴더째 올리면 그림도 함께 가져와요.</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <button class="btn" type="button">폴더째 다시 올리기</button>
+          <button class="btn quiet" type="button">그림 없이 계속</button>
+        </div>
+      </div>
+      <div class="cap">마크다운만 올렸는데 그림이 빠졌을 때</div>
+    </div>
+
+    <div class="cell">
+      <div class="card-s" style="gap: 16px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="badge b-attn" style="width: 32px; height: 32px; border-radius: 999px"><span class="ic ic-alert" style="width: 18px; height: 18px"></span></span>
+          <span style="font: 700 18px/28px var(--font)">인터넷 주소의 그림 2개</span>
+        </div>
+        <p style="margin: 0; font: 400 14px/22px var(--font); color: var(--ink-2)">문서가 가리키는 인터넷 주소는 열지 않아요. 그림 파일을 직접 넣으면 검토에 함께 쓸 수 있어요.</p>
+        <a class="btn" href="Pictures.dc.html" style="align-self: flex-start">그림 확인하기</a>
+      </div>
+      <div class="cap">그림이 인터넷 주소일 때</div>
+    </div>
+
   </div>
 </div>
 </x-dc>

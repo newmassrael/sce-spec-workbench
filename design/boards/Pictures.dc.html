@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>원본의 그림</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <div class="bar-top">
+    <a class="btn quiet icon" href="Review.dc.html" aria-label="변환 확인으로"><span class="ic ic-back"></span></a>
+    <span style="font: 700 16px/24px var(--font)">휴대전화 문 잠금 · 원본의 그림</span>
+    <span class="count {{countClass}}" style="margin-left: 8px">{{countText}}</span>
+    <span class="grow" style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px">
+      <a class="btn {{backHide}}" href="Review.dc.html"><span class="ic ic-check"></span>변환 확인으로</a>
+      <button class="btn off {{offHide}}" type="button" disabled aria-label="확인할 그림이 남아 있어요"><span class="ic ic-check"></span>변환 확인으로</button>
+    </span>
+  </div>
+
+  <main style="width: 100%; max-width: 860px; margin: 0 auto; padding: 20px 24px 96px; display: flex; flex-direction: column; gap: 18px">
+    <div class="demo" style="max-width: none; margin: 0">
+      <span>시안용 · 옮겨 쓰는 AI</span>
+      <button type="button" class="{{pv1}}" onClick="{{setVision}}">그림을 읽는 AI</button>
+      <button type="button" class="{{pv2}}" onClick="{{setText}}">글만 읽는 모델</button>
+      <button type="button" class="{{pv3}}" onClick="{{setPolicy}}">회사 정책으로 막힘</button>
+    </div>
+
+    <div>
+      <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">문서에서 그림 6개를 찾았어요. 그림에 규칙이 들어 있을 수 있어서, 글만 읽고 넘어가지 않고 그림마다 확인해요.</div>
+    </div>
+
+    <button class="switch {{swOn}}" type="button" onClick="{{toggleSend}}" disabled="{{swOff}}" role="switch" aria-checked="{{swAria}}">
+      <span class="tg"></span>
+      <span style="flex: 1; min-width: 0">
+        <span style="display: block; font: 600 15px/24px var(--font)">그림도 AI가 읽게 하기</span>
+        <span style="display: block; font: 400 13px/20px var(--font); color: var(--ink-3)">{{swNote}}</span>
+      </span>
+    </button>
+    <p class="note {{lockHide}}"><span class="ic ic-lock" style="margin-top: 2px"></span><span>{{lockText}}</span></p>
+    <p class="note {{sendInfoHide}}" style="background: var(--ai-tint); color: var(--ai)"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{sendInfo}}</span></p>
+
+    <div style="background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden">
+      <div class="pic">
+        <span class="th diagram" role="img" aria-label="image1.png"><span class="badge-s">120KB</span></span>
+        <div class="pic-main">
+          <div class="pic-t">image1.png<span class="tag {{c1}}" style="margin: 0">{{s1}}</span></div>
+          <div class="pic-m">3쪽 · 신호 도표에 "예"라고 쓴 문장 바로 아래</div>
+          <div class="read {{rd1}}"><b>AI가 읽은 내용 · 확인이 필요해요</b>신호 A가 올라간 뒤 30ms 안에 신호 B가 올라오지 않으면 오류 이벤트를 보내는 것으로 읽었어요.</div>
+          <div class="pic-m {{n1}}" style="margin-top: 8px">{{nt1}}</div>
+          <div class="acts {{ab1}}"><button class="mini pri {{b1a}}" type="button" onClick="{{f1a}}">{{l1a}}</button><button class="mini {{b1b}}" type="button" onClick="{{f1b}}">{{l1b}}</button><button class="mini {{b1c}}" type="button" onClick="{{f1c}}">{{l1c}}</button></div>
+          <div class="{{ty1}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv1}}" onInput="{{ti1}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts1}}">저장</button></div>
+        </div>
+      </div>
+
+      <div class="pic">
+        <span class="th logo" role="img" aria-label="image2.png">로고<span class="badge-s">8KB</span></span>
+        <div class="pic-main">
+          <div class="pic-t">image2.png<span class="tag {{c2}}" style="margin: 0">{{s2}}</span></div>
+          <div class="pic-m">1쪽 · 머리말</div>
+          <div class="read {{rd2}}"><b>AI가 읽은 내용 · 확인이 필요해요</b>회사 로고로 보여요. 규칙이 되는 내용은 없어 보여요.</div>
+          <div class="pic-m {{n2}}" style="margin-top: 8px">{{nt2}}</div>
+          <div class="acts {{ab2}}"><button class="mini pri {{b2a}}" type="button" onClick="{{f2a}}">{{l2a}}</button><button class="mini {{b2b}}" type="button" onClick="{{f2b}}">{{l2b}}</button><button class="mini {{b2c}}" type="button" onClick="{{f2c}}">{{l2c}}</button></div>
+          <div class="{{ty2}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv2}}" onInput="{{ti2}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts2}}">저장</button></div>
+        </div>
+      </div>
+
+      <div class="pic">
+        <span class="th metafile" role="img" aria-label="image3.emf">EMF<span class="badge-s">64KB</span></span>
+        <div class="pic-main">
+          <div class="pic-t">image3.emf<span class="tag {{c3}}" style="margin: 0">{{s3}}</span></div>
+          <div class="pic-m">4쪽 · 상태 표 옆</div>
+          <div class="pic-m {{n3}}" style="margin-top: 8px">{{nt3}}</div>
+          <div class="acts {{ab3}}"><button class="mini pri {{b3a}}" type="button" onClick="{{f3a}}">{{l3a}}</button><button class="mini {{b3b}}" type="button" onClick="{{f3b}}">{{l3b}}</button><button class="mini {{b3c}}" type="button" onClick="{{f3c}}">{{l3c}}</button></div>
+          <div class="{{ty3}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv3}}" onInput="{{ti3}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts3}}">저장</button></div>
+        </div>
+      </div>
+
+      <div class="pic">
+        <span class="th photo" role="img" aria-label="image4.jpg"><span class="badge-s">6.2MB</span></span>
+        <div class="pic-main">
+          <div class="pic-t">image4.jpg<span class="tag {{c4}}" style="margin: 0">{{s4}}</span></div>
+          <div class="pic-m">5쪽 · 배선 상자 사진</div>
+          <div class="read {{rd4}}"><b>AI가 읽은 내용 · 확인이 필요해요</b>배선 상자를 찍은 사진으로 보여요. 라벨 글자는 읽기 어려워요.</div>
+          <div class="pic-m {{n4}}" style="margin-top: 8px">{{nt4}}</div>
+          <div class="acts {{ab4}}"><button class="mini pri {{b4a}}" type="button" onClick="{{f4a}}">{{l4a}}</button><button class="mini {{b4b}}" type="button" onClick="{{f4b}}">{{l4b}}</button><button class="mini {{b4c}}" type="button" onClick="{{f4c}}">{{l4c}}</button></div>
+          <div class="{{ty4}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv4}}" onInput="{{ti4}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts4}}">저장</button></div>
+        </div>
+      </div>
+
+      <div class="pic">
+        <span class="th remote" role="img" aria-label="받지 않은 그림"><span class="ic ic-server" style="width: 20px; height: 20px"></span></span>
+        <div class="pic-main">
+          <div class="pic-t">https://example.com/flow.png<span class="tag {{c5}}" style="margin: 0">{{s5}}</span></div>
+          <div class="pic-m">6쪽 · 흐름도</div>
+          <div class="pic-m {{n5}}" style="margin-top: 8px">{{nt5}}</div>
+          <div class="acts {{ab5}}"><button class="mini pri {{b5a}}" type="button" onClick="{{f5a}}">{{l5a}}</button><button class="mini {{b5b}}" type="button" onClick="{{f5b}}">{{l5b}}</button><button class="mini {{b5c}}" type="button" onClick="{{f5c}}">{{l5c}}</button></div>
+          <div class="{{ty5}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv5}}" onInput="{{ti5}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts5}}">저장</button></div>
+        </div>
+      </div>
+
+      <div class="pic">
+        <span class="th missing" role="img" aria-label="가져오지 못한 그림"><span class="ic ic-doc" style="width: 20px; height: 20px"></span></span>
+        <div class="pic-main">
+          <div class="pic-t">images/state.png<span class="tag {{c6}}" style="margin: 0">{{s6}}</span></div>
+          <div class="pic-m">7쪽 · 상태 전이도</div>
+          <div class="pic-m {{n6}}" style="margin-top: 8px">{{nt6}}</div>
+          <div class="acts {{ab6}}"><button class="mini pri {{b6a}}" type="button" onClick="{{f6a}}">{{l6a}}</button><button class="mini {{b6b}}" type="button" onClick="{{f6b}}">{{l6b}}</button><button class="mini {{b6c}}" type="button" onClick="{{f6c}}">{{l6c}}</button></div>
+          <div class="{{ty6}}" style="display: flex; gap: 8px; margin-top: 10px"><input class="field" type="text" value="{{tv6}}" onInput="{{ti6}}" placeholder="이 그림이 말하는 규칙을 적어 주세요" aria-label="그림 내용" style="height: 40px"><button class="mini pri" type="button" onClick="{{ts6}}">저장</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint" style="margin: 0">그림은 원본 그대로 보관해요. 줄이거나 바꿔서 쓴 그림은 따로 표시하고, 어떤 그림을 AI가 봤는지 기록해요.</div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // the picture rows, by what they are. `file`: whether the original holds the picture and it can be shown;
+    // `big`: it is reduced before it is sent.
+    this.rows = [
+      { id: 1, shown: true },
+      { id: 2, shown: true },
+      { id: 3, shown: false, why: 'metafile' },
+      { id: 4, shown: true, big: true },
+      { id: 5, shown: false, why: 'remote' },
+      { id: 6, shown: false, why: 'missing' },
+    ];
+    // pending, typing, or a decision: none | confirmed | edited | written | added
+    this.state = { provider: 'vision', send: false, rowState: { 1: 'pending', 2: 'pending', 3: 'pending', 4: 'pending', 5: 'pending', 6: 'pending' }, typed: {} };
+  }
+
+  renderVals() {
+    const { provider, send, rowState, typed } = this.state;
+    const canRead = provider === 'vision';
+    const sending = send && canRead;
+    const sent = this.rows.filter((r) => r.shown);
+    const bigSent = this.rows.filter((r) => r.shown && r.big);
+    const decided = {
+      none: '내용 아님으로 정함',
+      confirmed: 'AI가 읽은 내용을 맞다고 확인함',
+      edited: '읽은 내용을 고침',
+      written: '내용을 직접 적음',
+      added: '파일을 넣음 · 다음 가져오기에 반영돼요',
+    };
+    const left = this.rows.filter((r) => rowState[r.id] === 'pending' || rowState[r.id] === 'typing').length;
+    const set = (id, v) => this.setState({ rowState: { ...rowState, [id]: v } });
+    const type = (id) => (e) => this.setState({ typed: { ...typed, [id]: e && e.target ? e.target.value : '' } });
+    const names = { vision: 'Claude Code', text: '사무실 서버', policy: 'Claude Code' };
+
+    const vals = {
+      countText: left > 0 ? '확인할 그림 ' + left + '곳' : '모든 그림을 확인했어요',
+      countClass: left > 0 ? '' : 'done',
+      backHide: left === 0 ? '' : 'hide', offHide: left > 0 ? '' : 'hide',
+      pv1: provider === 'vision' ? 'on' : '', pv2: provider === 'text' ? 'on' : '', pv3: provider === 'policy' ? 'on' : '',
+      setVision: () => this.setState({ provider: 'vision' }), setText: () => this.setState({ provider: 'text' }), setPolicy: () => this.setState({ provider: 'policy' }),
+      swOn: sending ? 'on' : '', swOff: provider !== 'vision', swAria: String(sending),
+      swNote: provider === 'vision'
+        ? (sending ? '켜져 있어요. 보내기 전에 아래 안내를 확인하세요.' : '꺼져 있어요. 그림은 어디로도 보내지지 않고, 직접 확인해요.')
+        : provider === 'text' ? '이 AI는 그림을 읽지 못해요.' : '이 작업 공간에서는 켤 수 없어요.',
+      toggleSend: () => (canRead ? this.setState({ send: !send }) : null),
+      lockHide: provider === 'policy' ? '' : 'hide',
+      lockText: '회사 정책으로 그림은 AI에 보낼 수 없어요. 그림 ' + sent.length + '개는 직접 봐 주세요.',
+      sendInfoHide: sending ? '' : 'hide',
+      sendInfo: '그림 ' + sent.length + '개를 ' + names.vision + '의 AI 서비스로 보내요.' + (bigSent.length ? ' 크기가 큰 그림 ' + bigSent.length + '개는 줄여서 보내요.' : '') + ' 보여 줄 수 없는 형식, 받지 않은 그림, 가져오지 못한 그림은 보내지 않아요.',
+    };
+    // the note under the switch for a text-only model is said once, on the screen
+    if (provider === 'text') vals.swNote = '이 AI는 그림을 읽지 못해요. 그림 ' + sent.length + '개는 직접 봐 주세요.';
+
+    this.rows.forEach((r) => {
+      const i = r.id;
+      const st = rowState[i];
+      const aiRead = r.shown && sending;
+      const v = { tag: '', cls: '', note: '', read: false, a: null, b: null, c: null };
+      if (st !== 'pending' && st !== 'typing') {
+        v.tag = decided[st]; v.cls = 'ok'; v.read = aiRead && (st === 'confirmed' || st === 'edited');
+      } else if (r.why === 'remote') {
+        v.tag = '받지 않았어요'; v.note = '문서에 적힌 주소는 열지 않아요. 그림 파일을 직접 넣거나, 이 그림이 말하는 내용을 적어 주세요.';
+        v.a = ['파일 넣기', () => set(i, 'added')]; v.b = ['내용 직접 적기', () => set(i, 'typing')]; v.c = ['내용 아님', () => set(i, 'none')];
+      } else if (r.why === 'missing') {
+        v.tag = '가져오지 못했어요'; v.note = '마크다운에는 있는데 함께 가져온 파일에 없어요. 파일을 넣으면 원본이 새 판으로 이어지고, 이미 내린 결정은 그대로 이어져요.';
+        v.a = ['파일 넣기', () => set(i, 'added')]; v.b = ['내용 직접 적기', () => set(i, 'typing')]; v.c = ['내용 아님', () => set(i, 'none')];
+      } else if (r.why === 'metafile') {
+        v.tag = '보여 드릴 수 없어요'; v.note = 'EMF 형식은 아직 그려 드리지 못해요. 원본 문서에서 열어 보고 내용을 적어 주세요.' + (sending ? ' 이 그림은 AI에게 보내지 않아요.' : '');
+        v.a = ['내용 직접 적기', () => set(i, 'typing')]; v.b = ['내용 아님', () => set(i, 'none')];
+      } else if (aiRead) {
+        v.tag = 'AI가 읽었어요'; v.cls = 'ai'; v.read = true;
+        v.note = r.big ? 'AI는 줄인 그림(1.8MB)으로 봤어요. 원본은 6.2MB이고 그대로 보관해요.' : '';
+        v.a = ['맞아요', () => set(i, 'confirmed')]; v.b = ['고치기', () => set(i, 'typing')]; v.c = ['내용 아님', () => set(i, 'none')];
+      } else {
+        v.tag = '읽지 않았어요';
+        v.note = provider === 'text' ? '이 AI는 그림을 읽지 못해요. 직접 보고 정해 주세요.' : provider === 'policy' ? '회사 정책으로 AI에 보내지 않아요. 직접 보고 정해 주세요.' : '직접 보고 정해 주세요. AI에게 읽게 하려면 위 스위치를 켜세요.';
+        v.a = ['내용 직접 적기', () => set(i, 'typing')]; v.b = ['내용 아님', () => set(i, 'none')];
+      }
+      const btn = (k, slot) => {
+        vals['b' + i + k] = slot ? '' : 'hide';
+        vals['l' + i + k] = slot ? slot[0] : '';
+        vals['f' + i + k] = slot ? slot[1] : () => null;
+      };
+      btn('a', v.a); btn('b', v.b); btn('c', v.c);
+      const typing = st === 'typing';
+      vals['ab' + i] = st === 'pending' ? '' : 'hide';
+      vals['s' + i] = typing ? '내용을 적는 중' : v.tag; vals['c' + i] = typing ? '' : v.cls;
+      vals['rd' + i] = v.read ? '' : 'hide';
+      vals['nt' + i] = v.note; vals['n' + i] = v.note && st === 'pending' ? '' : 'hide';
+      vals['ty' + i] = typing ? '' : 'hide';
+      vals['tv' + i] = typed[i] || '';
+      vals['ti' + i] = type(i);
+      vals['ts' + i] = () => (typed[i] && typed[i].trim() ? set(i, aiRead && r.shown && st === 'typing' && sending ? 'edited' : 'written') : null);
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

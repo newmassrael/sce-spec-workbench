@@ -313,10 +313,10 @@ body{margin:0}
             <span class="ic ic-folder" style="width: 18px; height: 18px"></span><span class="fn">출입</span>
           </button>
           <button class="fr l1 {{hideOut}}" type="button" role="checkbox" aria-checked="{{ariaF1}}" onClick="{{tog1}}">
-            <span class="cb {{cb1}}"><span class="ic ic-check"></span></span><span class="fn">휴대전화-문잠금.docx</span><span class="ft ai">AI가 옮겨 써요</span>
+            <span class="cb {{cb1}}"><span class="ic ic-check"></span></span><span class="fn">휴대전화-문잠금.docx<span class="pm">그림 4개가 들어 있어요</span></span><span class="ft ai">AI가 옮겨 써요</span>
           </button>
           <button class="fr l1 {{hideOut}}" type="button" role="checkbox" aria-checked="{{ariaF2}}" onClick="{{tog2}}">
-            <span class="cb {{cb2}}"><span class="ic ic-check"></span></span><span class="fn">도어락-규칙.md</span><span class="ft md">바로 가져와요</span>
+            <span class="cb {{cb2}}"><span class="ic ic-check"></span></span><span class="fn">도어락-규칙.md<span class="pm">그림 2개를 함께 가져와요</span></span><span class="ft md">바로 가져와요</span>
           </button>
           <div class="fr l1 off {{hideOut}}" aria-disabled="true">
             <span class="cb dis"><span class="ic ic-check"></span></span><span class="fn">회의-메모.txt</span><span class="ft no">가져올 수 없어요</span>
@@ -327,10 +327,10 @@ body{margin:0}
             <span class="ic ic-folder" style="width: 18px; height: 18px"></span><span class="fn">설비</span>
           </button>
           <button class="fr l1 {{hideFac}}" type="button" role="checkbox" aria-checked="{{ariaF3}}" onClick="{{tog3}}">
-            <span class="cb {{cb3}}"><span class="ic ic-check"></span></span><span class="fn">엘리베이터-호출.pdf</span><span class="ft ai">AI가 옮겨 써요</span>
+            <span class="cb {{cb3}}"><span class="ic ic-check"></span></span><span class="fn">엘리베이터-호출.pdf<span class="pm">스캔한 쪽 3장이 그림이에요</span></span><span class="ft ai">AI가 옮겨 써요</span>
           </button>
           <button class="fr l1 {{hideFac}}" type="button" role="checkbox" aria-checked="{{ariaF4}}" onClick="{{tog4}}">
-            <span class="cb {{cb4}}"><span class="ic ic-check"></span></span><span class="fn">온도-조절기.md</span><span class="ft md">바로 가져와요</span>
+            <span class="cb {{cb4}}"><span class="ic ic-check"></span></span><span class="fn">온도-조절기.md<span class="pm bad">그림 1개가 빠져 있어요 (images/state.png)</span></span><span class="ft md">바로 가져와요</span>
           </button>
         </div>
 
@@ -338,6 +338,7 @@ body{margin:0}
           <span class="cb {{cbKeep}}"><span class="ic ic-check"></span></span>폴더 구조도 그대로 가져오기
         </button>
         <div style="margin: 2px 0 0 34px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{keepHint}}</div>
+        <div class="{{picsHide}}" style="margin: 12px 4px 0; padding: 12px 14px; border-radius: 12px; background: var(--page); font: 400 13px/20px var(--font); color: var(--ink-2)"><b style="font-weight: 600">{{picsLine}}</b><br>그림은 원본 그대로 보관하고, AI에게는 보내지 않아요. 변환을 확인할 때 그림을 AI가 읽게 할지 정할 수 있어요. 문서가 가리키는 인터넷 주소는 열지 않아요.</div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px">
           <span style="font: 400 14px/22px var(--font); color: var(--ink-2)">{{sumText}}</span>
@@ -539,6 +540,10 @@ class Component extends DCLogic {
       if (aiCount > 0) parts.push((mdCount > 0 ? '' : 'Word·PDF ') + aiCount + '개는 AI가 옮겨 써요');
       sumText = n + '개 선택 · ' + parts.join(', ') + (needsAi ? ' · 옮겨 쓸 AI를 골라 주세요' : '');
     }
+    // pictures of what is selected: held in a file, beside it, or named and not there
+    const picsHeld = (f1 ? 4 : 0) + (f2 ? 2 : 0) + (f3 ? 3 : 0);
+    const picsMissing = f4 ? 1 : 0;
+    const picsLine = n === 0 ? '' : '그림 ' + picsHeld + '개' + (picsMissing ? ' · 빠진 그림 ' + picsMissing + '개' : '');
     const root = src === 'pc' ? '내 컴퓨터' : '팀 서버';
     const srcPath = root + ' › ' + (src === 'pc' ? '문서' : '공유') + ' › 사양';
 
@@ -659,6 +664,7 @@ class Component extends DCLogic {
       toggleKeep: () => this.setState({ keep: !keep }),
       keepHint: keep ? '출입, 설비 폴더가 사양 폴더로 만들어져요.' : '모든 사양이 폴더 없이 들어가요.',
       sumText,
+      picsLine, picsHide: n > 0 ? '' : 'hide', picsBad: picsMissing ? 'bad' : '',
       noneSel: !canImport,
 
       mvName: specNames[moving],
