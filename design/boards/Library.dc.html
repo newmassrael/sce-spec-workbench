@@ -174,6 +174,19 @@ body{margin:0}
           </a>
           <button class="mv" type="button" aria-label="도어락 규칙을 다른 폴더로 옮기기" onClick="{{mv7}}"><span class="ic ic-folder"></span></button>
         </div>
+        <div class="rw {{h8}}">
+          <a class="row" href="Waiting.dc.html">
+            <span class="badge b-attn" role="img" aria-label="연결을 기다리는 중"><span class="ic ic-clock" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="t">소방 점검</span>
+              <span class="s"><span class="st st-attn">연결을 기다리는 중</span><span class="where">{{w8}}</span><span class="who">민이 올림</span></span>
+              <span class="s" style="color: var(--ink-3)">Claude Code 로그인이 필요해요</span>
+            </span>
+            <span class="avs" role="img" aria-label="민"><span class="av pa">민</span></span>
+            <span class="ic ic-chev go"></span>
+          </a>
+          <button class="mv" type="button" aria-label="소방 점검을 다른 폴더로 옮기기" onClick="{{mv8}}"><span class="ic ic-folder"></span></button>
+        </div>
         <div class="{{emptyHide}}" style="padding: 40px 24px; text-align: center; font: 400 15px/24px var(--font); color: var(--ink-3)">이 폴더는 비어 있어요. 사양을 옮겨 오거나 문서를 가져오세요.</div>
       </div>
     </main>
@@ -383,7 +396,7 @@ class Component extends DCLogic {
       sel: 'all', openBld: true,
       src: 'pc', openOut: true, openFac: false,
       f1: true, f2: true, f3: false, f4: false, keep: true,
-      loc: { 1: 'acc', 2: 'fac', 3: 'fac', 4: 'acc', 5: 'pay', 6: 'fac', 7: 'acc' },
+      loc: { 1: 'acc', 2: 'fac', 3: 'fac', 4: 'acc', 5: 'pay', 6: 'fac', 7: 'acc', 8: 'fac' },
       moving: 1, pick: 'none', newParent: 'top',
       // one folder made in this prototype; a real workspace holds any number
       custom: null, typed: '',
@@ -403,9 +416,9 @@ class Component extends DCLogic {
     ];
     const chosen = ai >= 0 ? AIS[ai] : null;
 
-    // specs 1, 2, 3 and 7 need a look; the others do not
-    const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true };
-    const ids = [1, 2, 3, 4, 5, 6, 7];
+    // specs 1, 2, 3, 7 and 8 need the owner (a look, or a connection to fix); the others do not
+    const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true, 8: true };
+    const ids = [1, 2, 3, 4, 5, 6, 7, 8];
     const cp = custom ? custom.parent : null;
     const cName = custom ? custom.name : '';
     const within = {
@@ -420,7 +433,7 @@ class Component extends DCLogic {
     const attn = (key) => ids.some((i) => within[key](loc[i]) && needs[i]);
     const customPath = cp === 'bld' ? '건물 / ' + cName : cp === 'pay' ? '정산 / ' + cName : cName;
     const place = { none: '', bld: '건물', acc: '건물 / 출입', fac: '건물 / 설비', pay: '정산', custom: customPath };
-    const specNames = { 1: '휴대전화 문 잠금', 2: '온도 조절기', 3: '엘리베이터 호출', 4: '데스크톱 문 잠금', 5: '주차 요금 정산', 6: '비상 호출 장치', 7: '도어락 규칙' };
+    const specNames = { 1: '휴대전화 문 잠금', 2: '온도 조절기', 3: '엘리베이터 호출', 4: '데스크톱 문 잠금', 5: '주차 요금 정산', 6: '비상 호출 장치', 7: '도어락 규칙', 8: '소방 점검' };
     const visible = ids.filter((i) => within[sel](loc[i])).length;
 
     const titles = { all: '사양', bld: '건물', acc: '출입', fac: '설비', pay: '정산', custom: cName };

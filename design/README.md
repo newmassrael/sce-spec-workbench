@@ -36,6 +36,7 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
 | `MdReview` | A Markdown file compared with the current spec; no AI is involved |
+| `Waiting` | A request waiting for its connection: the reasons the application keeps, said plainly, and what to do |
 | `Moved` | The spec changed while it was being checked |
 | `Accepted` | Saved as a spec, with the decisions that were made |
 
@@ -113,9 +114,13 @@ The screen follows what the application does (`core/src/auth_policy.rs`, `claude
 
 ## What the design says
 
-**Four states, in words.** A row in the list is one of: needs a look (`확인할 부분`), changed while
-you looked (`보던 사이에 바뀜`), the AI is writing it (`AI가 옮겨 쓰는 중`), accepted (`수락함`).
-Every state has a word and a shape; colour is never the only cue.
+**Five states, in words.** A row in the list is one of: needs a look (`확인할 부분`), changed while
+you looked (`보던 사이에 바뀜`), the AI is writing it (`AI가 옮겨 쓰는 중`), waiting for its connection
+(`연결을 기다리는 중`), accepted (`수락함`). Every state has a word and a shape; colour is never the
+only cue. The fifth was added because the application can hold a request that no AI is working on
+and that only the person can free (nobody is signed in, the client is not found): showing it as "the AI
+is writing it" would be false, and it needs amber, the colour of what waits for the owner. Its row says
+the reason in a line, and the screen it opens says what to do.
 
 **Every piece of text says who wrote it.** The original is set in a serif, in a white page. What the
 AI wrote is labelled with the AI's name and carries the teal. What the product checked is said in a
@@ -159,10 +164,12 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
 - More connections than fit the list (it holds six), and grouping or searching them.
-- A request that is waiting for its connection, and why. The application keeps the reason (nobody is
-  signed in, the client is not found, the settings it was made with are not on this computer), but the
-  list row says only "AI가 옮겨 쓰는 중".
-- Reordering connections, and converting a spec again with another connection.
+- What becomes of the old request when a person asks again with another connection; the screen says
+  only "다시 요청했어요".
+- Reasons for waiting that only a person who installs the application meets (the authoring server
+  not found on the computer); the screen has nine, and any other would show the application's own
+  sentence.
+- Reordering connections.
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts

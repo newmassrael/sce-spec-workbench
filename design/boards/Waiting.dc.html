@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>연결을 기다리는 사양</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+@media (max-width:720px){.wrow{flex-wrap:wrap}}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+  <main style="width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 24px 96px; display: flex; flex-direction: column; gap: 22px">
+    <div class="demo" style="max-width: none; margin: 0">
+      <span>시안용 · 기다리는 이유</span>
+      <button type="button" class="{{dc1}}" onClick="{{dp1}}">{{dl1}}</button>
+      <button type="button" class="{{dc2}}" onClick="{{dp2}}">{{dl2}}</button>
+      <button type="button" class="{{dc3}}" onClick="{{dp3}}">{{dl3}}</button>
+      <button type="button" class="{{dc4}}" onClick="{{dp4}}">{{dl4}}</button>
+      <button type="button" class="{{dc5}}" onClick="{{dp5}}">{{dl5}}</button>
+      <button type="button" class="{{dc6}}" onClick="{{dp6}}">{{dl6}}</button>
+      <button type="button" class="{{dc7}}" onClick="{{dp7}}">{{dl7}}</button>
+      <button type="button" class="{{dc8}}" onClick="{{dp8}}">{{dl8}}</button>
+      <button type="button" class="{{dc9}}" onClick="{{dp9}}">{{dl9}}</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px">
+      <a class="btn quiet icon" href="Library.dc.html" aria-label="목록으로"><span class="ic ic-back"></span></a>
+      <h1 style="margin: 0; font: 700 28px/38px var(--font); letter-spacing: -0.02em">소방 점검</h1>
+    </div>
+
+    <div class="{{endedHide}}">
+      <p class="note"><span class="ic ic-check" style="margin-top: 2px"></span><span>요청을 취소했어요.</span></p>
+      <div style="margin-top: 16px"><a class="btn" href="Library.dc.html">사양 목록</a></div>
+    </div>
+
+    <div class="{{liveHide}}" style="display: flex; flex-direction: column; gap: 22px">
+      <div role="status" style="display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-radius: 16px; background: var(--attn-tint); color: var(--attn)">
+        <span class="ic ic-clock" style="width: 22px; height: 22px; margin-top: 1px"></span>
+        <span>
+          <span style="display: block; font: 600 16px/24px var(--font)">AI를 기다리고 있어요</span>
+          <span style="display: block; margin-top: 2px; font: 500 15px/24px var(--font)">{{head}}</span>
+        </span>
+      </div>
+
+      <div style="padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow)">
+        <div style="font: 400 15px/24px var(--font); color: var(--ink)">{{body}}</div>
+        <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">민이 어제 올림 · 옮겨 쓸 연결: Claude Code</div>
+      </div>
+
+      <div class="wrow" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <a class="btn {{linkHide}}" href="Connect.dc.html"><span class="ic ic-server"></span>연결 확인</a>
+        <button class="btn {{againPriHide}}" type="button" onClick="{{openAgain}}">{{againLabel}}</button>
+        <button class="btn quiet {{againSecHide}}" type="button" onClick="{{openAgain}}">다른 연결로 다시 요청</button>
+        <button class="btn quiet" type="button" onClick="{{askCancel}}">요청 취소</button>
+      </div>
+
+      <div class="{{cancelAskHide}}" style="display: flex; align-items: center; gap: 10px; font: 400 14px/22px var(--font); color: var(--ink-2)">이 요청을 취소할까요?
+        <button class="mini pri" type="button" onClick="{{doCancel}}">취소하기</button>
+        <button class="mini" type="button" onClick="{{noCancel}}">그만두기</button>
+      </div>
+
+      <div class="{{againHide}}" style="padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 16px">
+        <div style="font: 600 15px/24px var(--font)">어떤 연결로 다시 요청할까요?</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px">
+          <button class="opt sm {{o1c}}" type="button" onClick="{{o1}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">Claude Code · 기본</span><span class="opt-s">{{o1s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          <button class="opt sm {{o2c}}" type="button" onClick="{{o2}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">Codex</span><span class="opt-s">찾지 못함</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          <button class="opt sm {{o3c}}" type="button" onClick="{{o3}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">사무실 서버</span><span class="opt-s">연결됨</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+        </div>
+        <p class="note {{warnHide}}" style="margin-top: 10px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{warn}}</span></p>
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 14px">
+          <button class="btn" type="button" onClick="{{ask}}">다시 요청</button>
+          <button class="btn quiet" type="button" onClick="{{closeAgain}}">그만두기</button>
+        </div>
+      </div>
+
+      <p class="note {{askedHide}}" style="background: var(--accent-tint); color: var(--accent-ink)"><span class="ic ic-check" style="margin-top: 2px"></span><span>다시 요청했어요.</span></p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { r: 'login', again: false, pick: 0, asked: false, confirm: false, ended: false };
+  }
+
+  // The reasons a request waits, as the application keeps them (core/src/directory.rs), said to the
+  // person. `go` is what the person does first: look at the connection, or ask again.
+  reasons() {
+    return {
+      login: { label: '로그인 안 됨', head: 'Claude Code에 로그인되어 있지 않아요', body: '로그인하면 기다리던 옮겨 쓰기가 곧 시작돼요. 연결 화면에서 로그인 방법을 볼 수 있어요.', go: 'link' },
+      missing: { label: '프로그램 없음', head: '이 컴퓨터에서 Claude Code를 찾지 못했어요', body: '설치하면 곧 시작돼요. 다른 곳에 설치했다면 연결 화면에서 위치를 알려 주세요.', go: 'link' },
+      mute: { label: '물어보지 못함', head: 'Claude Code에 로그인 여부를 물어보지 못했어요', body: '연결 화면에서 다시 확인해 보세요. 확인되면 곧 시작돼요.', go: 'link' },
+      unusable: { label: '쓸 수 없는 로그인', head: '이 로그인은 이 앱에서 쓸 수 없어요', body: '다른 방식으로 다시 로그인하면 곧 시작돼요. 다른 연결로 다시 요청할 수도 있어요.', go: 'link' },
+      unverified: { label: '확인 안 된 버전', head: '이 Codex 버전은 아직 확인되지 않았어요', body: '이 앱이 확인한 버전에서만 Codex를 써요. 확인된 버전으로 바꾸면 곧 시작돼요.', go: 'link' },
+      key: { label: '서버가 키를 요구', head: '이 모델 서버는 키가 있어야 들어갈 수 있어요', body: '이 앱은 서버 키를 보관할 곳이 아직 없어서 이 서버로는 실행할 수 없어요. 키가 필요 없는 서버나 다른 연결로 다시 요청해 주세요.', go: 'again', againLabel: '다른 연결로 다시 요청' },
+      model: { label: '모델 안 정함', head: '모델 서버에 쓸 모델이 정해지지 않았어요', body: '연결 화면에서 모델을 고르면 곧 시작돼요.', go: 'link' },
+      other: { label: '다른 컴퓨터에서 만든 요청', head: '다른 컴퓨터에서 만든 요청이에요', body: '이 요청을 만든 연결의 설정이 이 컴퓨터에 없어서 여기서는 실행할 수 없어요. 이 컴퓨터에서 다시 요청해 주세요.', go: 'again', againLabel: '이 컴퓨터에서 다시 요청' },
+      newer: { label: '더 새로운 앱이 만듦', head: '더 새로운 버전의 앱이 만든 요청이에요', body: '이 앱이 모르는 방식으로 만든 요청이에요. 그 앱으로 실행하거나, 이 앱에서 다시 요청해 주세요.', go: 'again', againLabel: '이 앱에서 다시 요청' },
+    };
+  }
+
+  renderVals() {
+    const { r, again, pick, asked, confirm, ended } = this.state;
+    const R = this.reasons();
+    const order = ['login', 'missing', 'mute', 'unusable', 'unverified', 'key', 'model', 'other', 'newer'];
+    const cur = R[r];
+    const warns = [null, 'Codex를 찾지 못했어요. 연결되면 바로 시작하고, 그때까지 기다려요.', null];
+    const vals = {
+      head: cur.head, body: cur.body,
+      linkHide: cur.go === 'link' ? '' : 'hide',
+      againPriHide: cur.go === 'again' ? '' : 'hide',
+      againSecHide: cur.go === 'link' ? '' : 'hide',
+      againLabel: cur.againLabel || '',
+      liveHide: ended ? 'hide' : '', endedHide: ended ? '' : 'hide',
+      openAgain: () => this.setState({ again: true, asked: false, confirm: false }),
+      closeAgain: () => this.setState({ again: false }),
+      againHide: again ? '' : 'hide',
+      o1c: pick === 0 ? 'sel' : '', o2c: pick === 1 ? 'sel' : '', o3c: pick === 2 ? 'sel' : '',
+      o1: () => this.setState({ pick: 0 }), o2: () => this.setState({ pick: 1 }), o3: () => this.setState({ pick: 2 }),
+      o1s: r === 'login' || r === 'missing' || r === 'mute' || r === 'unusable' ? '로그인 필요' : '연결됨',
+      warnHide: pick === 1 || (pick === 0 && (r === 'login' || r === 'missing' || r === 'mute' || r === 'unusable')) ? '' : 'hide',
+      warn: pick === 1 ? warns[1] : 'Claude Code가 아직 준비되지 않았어요. 준비되면 바로 시작하고, 그때까지 기다려요.',
+      ask: () => this.setState({ again: false, asked: true }),
+      askedHide: asked ? '' : 'hide',
+      askCancel: () => this.setState({ confirm: true }),
+      cancelAskHide: confirm ? '' : 'hide',
+      noCancel: () => this.setState({ confirm: false }),
+      doCancel: () => this.setState({ ended: true, confirm: false, again: false }),
+    };
+    order.forEach((k, i) => {
+      vals['dl' + (i + 1)] = R[k].label;
+      vals['dc' + (i + 1)] = k === r ? 'on' : '';
+      vals['dp' + (i + 1)] = () => this.setState({ r: k, again: false, asked: false, confirm: false });
+    });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
