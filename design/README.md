@@ -30,7 +30,8 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | Board | Screen |
 |---|---|
 | `Main` | First run: one drop target, a way to connect to a team server |
-| `Library` | The specs in a workspace: folder tree, move a spec, new folder, import from files or from a folder, the AI connection |
+| `Library` | The specs in a workspace: folder tree, move a spec, new folder, import from files or from a folder |
+| `Connect` | Connecting an AI: Claude Code, Codex, a model server; what each says about itself and what the person does |
 | `ImportStates` | The states of an import: first, dragging, uploading, stored, refused file, no AI connected |
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
@@ -38,8 +39,32 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `Moved` | The spec changed while it was being checked |
 | `Accepted` | Saved as a spec, with the decisions that were made |
 
-`Library` has three switches in the canvas: `team` shows who is working on what, `multi` shows
-the workspace switcher, `policy` shows an organisation that restricts the AI to one kind.
+`Library` has two switches in the canvas: `team` shows who is working on what, `multi` shows
+the workspace switcher. `Connect` has `policy`, an organisation that restricts the AI to one kind. The
+dashed bar on `Connect` is for the prototype only: it picks which state of the selected AI to show,
+because a real one comes from the computer.
+
+## Connecting an AI
+
+The screen follows what the application does (`core/src/auth_policy.rs`, `claude_status.rs`,
+`codex_status.rs`, `server_status.rs`) and not a wish about it.
+
+- **The application never signs anyone in.** It asks the client what it sees and says it in words:
+  not found, not signed in, signed in by subscription or by usage billing, signed in in a way this
+  build does not use, could not be asked. A client that could not be asked is never shown as signed
+  out. The person signs in in their own terminal with a command the screen shows and offers to copy;
+  a sign-in screen of the application's own, or a command it runs for the person, is a route the
+  policy table forbids or has not confirmed.
+- **There is no field for an API key.** A connection names no secret and holds none. A usage-billed
+  login is made in the client, and Codex's key is typed into Codex in the terminal.
+- **A server is checked, not trusted.** The address is asked for its models and nothing else. The
+  screen says where the server is (this computer or the network, and whether the way is encrypted),
+  because that is where a spec is about to go, and says plainly that a server that wants a key
+  cannot be used yet.
+- **Subscription or usage is said once, in words** ("월 정액", "사용량 요금"), where the person
+  chooses how to sign in and where the sign-in is shown.
+- The exact words of a sign-in command come from the application. `codex login -c …` is shortened
+  on the screen; the application shows the whole of it.
 
 ## What the design says
 
@@ -86,7 +111,10 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
   server takes over (ADR 0027 and 0028 leave authentication open).
 - Search and sort, for a workspace with more specs than fit on a screen.
 - Renaming and removing a folder; the prototype makes one folder to show the flow.
-- Adding or replacing an API key in the AI connection sheet.
+- Choosing the model of Claude Code or Codex, the limits of a connection (turns, seconds), the name
+  a person gives a connection, and the application's own Codex login folder.
+- Pointing at a Claude Code or Codex that is installed somewhere the search does not look (the
+  button is drawn and does nothing).
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts

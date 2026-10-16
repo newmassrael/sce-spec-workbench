@@ -19,7 +19,7 @@ body{margin:0}
 <div class="app" style="width: 100%; min-height: 800px; display: flex; flex-direction: column">
   <header class="top">
     <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
-    <span class="conn {{connClass}}"><i></i>{{connText}}</span>
+    <a class="conn {{connClass}}" href="Connect.dc.html"><i></i>{{connText}}</a>
   </header>
 
   <main class="stage" style="flex: 1">
@@ -38,7 +38,7 @@ body{margin:0}
     </div>
 
     <sc-if value="{{offline}}" hint-placeholder-val="{{ false }}">
-      <p class="note" style="max-width: 560px; margin-top: 16px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>AI가 연결되지 않았어요. 마크다운은 바로 가져올 수 있고, Word와 PDF는 연결되는 대로 옮겨 써요. <a href="#">AI 연결</a></span></p>
+      <p class="note" style="max-width: 560px; margin-top: 16px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>AI가 연결되지 않았어요. 마크다운은 바로 가져올 수 있고, Word와 PDF는 연결되는 대로 옮겨 써요. <a href="Connect.dc.html">AI 연결</a></span></p>
     </sc-if>
 
     <button class="fine" type="button" onClick="{{openServer}}" style="margin-top: 28px; display: inline-flex; align-items: center; gap: 8px; font: 400 14px/22px var(--font); color: var(--ink-3); background: transparent; border: 0; cursor: pointer"><span class="ic ic-server" style="width: 16px; height: 16px"></span>팀 서버에 연결</button>

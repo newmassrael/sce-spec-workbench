@@ -33,7 +33,7 @@ body{margin:0}
         <button class="ws" type="button" aria-label="작업 공간 바꾸기">우리 팀<span class="ic ic-down" style="width: 14px; height: 14px"></span></button>
       </sc-if>
     </span>
-    <button class="conn" type="button" onClick="{{openProvider}}" aria-label="AI 연결 바꾸기"><i></i>{{provName}}<span class="ic ic-down" style="width: 14px; height: 14px"></span></button>
+    <a class="conn" href="Connect.dc.html" aria-label="AI 연결 바꾸기"><i></i>Claude Code 연결됨<span class="ic ic-down" style="width: 14px; height: 14px"></span></a>
   </header>
 
   <div class="shell">
@@ -354,45 +354,15 @@ body{margin:0}
     </div>
   </sc-if>
 
-  <sc-if value="{{providerOpen}}" hint-placeholder-val="{{ false }}">
-    <div class="sheet-wrap">
-      <div class="sheet" role="dialog" aria-label="AI 연결">
-        <div class="sheet-head">
-          <span style="font: 700 18px/28px var(--font)">AI 연결</span>
-          <button class="btn quiet icon" type="button" aria-label="닫기" onClick="{{closeSheet}}"><span class="ic ic-x"></span></button>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 10px">
-          <button class="opt {{selAccount}}" type="button" disabled="{{accountOff}}" onClick="{{pickAccount}}">
-            <span class="opt-ic"><span class="ic ic-user" style="width: 20px; height: 20px"></span></span>
-            <span><span class="opt-t">내 AI 계정</span><span class="opt-s">Claude Code처럼 이미 쓰는 AI로</span></span>
-            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
-          </button>
-          <button class="opt {{selKey}}" type="button" disabled="{{keyOff}}" onClick="{{pickKey}}">
-            <span class="opt-ic"><span class="ic ic-key" style="width: 20px; height: 20px"></span></span>
-            <span><span class="opt-t">API 키</span><span class="opt-s">키를 넣으면 앱이 직접 불러요</span></span>
-            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
-          </button>
-          <button class="opt {{selLocal}}" type="button" onClick="{{pickLocal}}">
-            <span class="opt-ic"><span class="ic ic-cpu" style="width: 20px; height: 20px"></span></span>
-            <span><span class="opt-t">이 컴퓨터의 모델</span><span class="opt-s">문서가 컴퓨터 밖으로 나가지 않아요</span></span>
-            <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
-          </button>
-        </div>
-        <sc-if value="{{policy}}" hint-placeholder-val="{{ false }}">
-          <p class="note" style="margin-top: 16px"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 모델만 쓸 수 있어요.</span></p>
-        </sc-if>
-        <div style="margin-top: 16px; font: 400 14px/22px var(--font); color: var(--ink-3)">{{provHint}}</div>
-      </div>
-    </div>
-  </sc-if>
+  <!-- the AI connection is its own board (Connect.dc.html): the chip in the top bar opens it -->
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"team":{"editor":"boolean","default":false},"multi":{"editor":"boolean","default":false},"policy":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"team":{"editor":"boolean","default":false},"multi":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = {
-      sheet: null, prov: 'account',
+      sheet: null,
       sel: 'all', openBld: true,
       src: 'pc', openOut: true, openFac: false,
       f1: true, f2: true, f3: false, f4: false, keep: true,
@@ -403,15 +373,7 @@ class Component extends DCLogic {
     };
   }
   renderVals() {
-    const policy = !!this.props.policy;
     const hasServer = !!this.props.team || !!this.props.multi;
-    const prov = policy ? 'local' : this.state.prov;
-    const names = { account: 'Claude Code 연결됨', key: 'API 키 연결됨', local: '이 컴퓨터의 모델' };
-    const hints = {
-      account: '문서는 연결한 AI 서비스로 전송돼요.',
-      key: '문서는 키를 발급한 AI 서비스로 전송돼요.',
-      local: '문서는 이 컴퓨터를 떠나지 않아요.',
-    };
     const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed } = this.state;
 
     // specs 1, 2, 3 and 7 need a look; the others do not
@@ -457,14 +419,6 @@ class Component extends DCLogic {
       teamClass: this.props.team ? 'team' : '',
       allClass: sel === 'all' ? 'all' : '',
       multi: !!this.props.multi,
-      policy,
-      provName: names[prov],
-      provHint: hints[prov],
-      selAccount: prov === 'account' ? 'sel' : '',
-      selKey: prov === 'key' ? 'sel' : '',
-      selLocal: prov === 'local' ? 'sel' : '',
-      accountOff: policy,
-      keyOff: policy,
 
       wsIcon: this.props.team ? 'ic-server' : 'ic-monitor',
       wsName: this.props.team ? '우리 팀 서버' : '내 컴퓨터',
@@ -502,13 +456,8 @@ class Component extends DCLogic {
       folderOpen: sheet === 'folder',
       moveOpen: sheet === 'move',
       newOpen: sheet === 'new',
-      providerOpen: sheet === 'provider',
       openImport: () => this.setState({ sheet: 'import' }),
-      openProvider: () => this.setState({ sheet: 'provider' }),
       closeSheet: () => this.setState({ sheet: null }),
-      pickAccount: () => this.setState({ prov: 'account' }),
-      pickKey: () => this.setState({ prov: 'key' }),
-      pickLocal: () => this.setState({ prov: 'local' }),
 
       serverHide: hasServer ? '' : 'hide',
       openFolderPc: () => this.setState({ sheet: 'folder', src: 'pc' }),

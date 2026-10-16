@@ -1,13 +1,15 @@
 """Render a .dc.html board to a PNG with headless Chrome (local preview only).
 
-usage: python3 -I render.py <board.dc.html> <out.png> [width] [height] [key=value ...]
-Holes {{key}} are replaced with the key=value pairs; unknown holes become empty.
-THEME=dark in the environment renders the dark theme.
+usage: python3 -I render.py <board.dc.html> <out.png> [width] [height] [key=value | @values.json ...]
+Holes {{key}} are replaced with the key=value pairs, or with the values of a JSON object in
+a file named after an @; unknown holes become empty. A function-valued hole is not a value:
+leave it out of the file. THEME=dark in the environment renders the dark theme.
 
 This is a static preview: it does not run the board's script, and its handling of
 <sc-if> is a regular expression, so a nested <sc-if> shows both branches. A hole
 that the script would compute has to be passed on the command line.
 """
+import json
 import os
 import re
 import subprocess
@@ -18,7 +20,13 @@ src = Path(sys.argv[1]).resolve()
 out = Path(sys.argv[2]).resolve()
 width = int(sys.argv[3]) if len(sys.argv) > 3 else 1280
 height = int(sys.argv[4]) if len(sys.argv) > 4 else 800
-vals = dict(a.split("=", 1) for a in sys.argv[5:])
+vals = {}
+for arg in sys.argv[5:]:
+    if arg.startswith("@"):
+        vals.update({k: str(v) for k, v in json.loads(Path(arg[1:]).read_text(encoding="utf-8")).items()})
+    else:
+        key, value = arg.split("=", 1)
+        vals[key] = value
 
 html = src.read_text(encoding="utf-8")
 helmet = "".join(re.findall(r"<helmet>(.*?)</helmet>", html, re.S))

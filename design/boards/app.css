@@ -104,6 +104,8 @@ body{background:var(--page)}
 .app a{color:inherit;text-decoration:none}
 .app a.btn{color:var(--on-ink)}
 .app a.btn.quiet{color:var(--ink-2)}
+.app a.conn{color:var(--ink-2)}
+.app a.conn.off{color:var(--attn)}
 .app a.fine{color:var(--ink-3)}
 .app a.fine:hover{color:var(--ink)}
 .app :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
@@ -187,8 +189,8 @@ body{background:var(--page)}
 .ic-lock{--g:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 11h12v9H6z M8.5 11V8a3.5 3.5 0 0 1 7 0v3' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E")}
 
 /* top-bar controls that open something */
-button.conn{font-family:inherit;cursor:pointer;transition:background .15s,border-color .15s}
-button.conn:hover{background:var(--hover);border-color:var(--line-strong)}
+button.conn,a.conn{font-family:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+button.conn:hover,a.conn:hover{background:var(--hover);border-color:var(--line-strong)}
 .ws{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;margin-left:12px;border:0;border-radius:8px;background:transparent;color:var(--ink-2);font:500 14px/1 var(--font);cursor:pointer}
 .ws:hover{background:var(--chip-hover)}
 
@@ -298,6 +300,23 @@ ins{background:var(--ins-bg);color:var(--ins-ink);text-decoration:none;border-ra
 .item + .item{border-top:1px solid var(--line)}
 .dot{display:inline-flex;flex:none;width:28px;height:28px;border-radius:999px;align-items:center;justify-content:center;background:var(--accent-tint);color:var(--accent)}
 .dot.w{background:var(--attn-tint);color:var(--attn-icon)}
+
+/* connecting an AI: a tab per kind, a command to copy, a status in words */
+.sd{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--faint);flex:none}
+.sd.ok{background:var(--accent)}
+.sd.attn{background:var(--attn-icon)}
+.seg button .ic-lock{width:13px;height:13px;color:var(--ink-3)}
+.cmd{display:flex;align-items:center;gap:12px;padding:10px 10px 10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--page)}
+.cmd code{flex:1;min-width:0;overflow-wrap:anywhere;font:500 13px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink)}
+.cmd-l{display:block;margin:0 2px 6px;font:500 13px/20px var(--font);color:var(--ink-2)}
+.copy{flex:none;display:inline-flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--card);color:var(--ink);font:500 13px/1 var(--font);cursor:pointer}
+.copy:hover{background:var(--hover)}
+.panel{margin-top:16px;padding:18px;border:1px solid var(--line);border-radius:14px}
+.panel-h{display:flex;align-items:center;gap:12px}
+.panel-h .meta{display:block;font:400 13px/20px var(--font);color:var(--ink-3);overflow-wrap:anywhere}
+.demo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:600px;margin:0 auto 20px;padding:12px 14px;border:1.5px dashed var(--line-strong);border-radius:14px;font:400 13px/20px var(--font);color:var(--ink-3)}
+.demo button{height:28px;padding:0 10px;border:1px solid var(--line-strong);border-radius:999px;background:var(--card);color:var(--ink-2);font:500 12px/1 var(--font);cursor:pointer}
+.demo button.on{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 
 /* narrow screens: the two columns become one, each original above what answers it */
 @media (max-width:720px){

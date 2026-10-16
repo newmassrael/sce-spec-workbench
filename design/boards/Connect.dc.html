@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>AI 연결</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <header class="top">
+    <a class="brand" href="Library.dc.html"><span class="brand-mark"><span class="ic ic-pair" style="width: 18px; height: 18px"></span></span><span class="brand-name">Spec Workbench</span></a>
+  </header>
+
+  <main style="padding: 8px 16px 72px">
+    <div class="demo">
+      <span>시안용 · {{demoLabel}}</span>
+      <button type="button" class="{{dc1}} {{dh1}}" onClick="{{dp1}}">{{dl1}}</button>
+      <button type="button" class="{{dc2}} {{dh2}}" onClick="{{dp2}}">{{dl2}}</button>
+      <button type="button" class="{{dc3}} {{dh3}}" onClick="{{dp3}}">{{dl3}}</button>
+      <button type="button" class="{{dc4}} {{dh4}}" onClick="{{dp4}}">{{dl4}}</button>
+      <button type="button" class="{{dc5}} {{dh5}}" onClick="{{dp5}}">{{dl5}}</button>
+      <button type="button" class="{{dc6}} {{dh6}}" onClick="{{dp6}}">{{dl6}}</button>
+      <button type="button" class="{{dc7}} {{dh7}}" onClick="{{dp7}}">{{dl7}}</button>
+      <button type="button" class="{{dc8}} {{dh8}}" onClick="{{dp8}}">{{dl8}}</button>
+    </div>
+
+    <div class="sheet wide" role="dialog" aria-label="AI 연결" style="margin: 0 auto">
+      <div class="sheet-head">
+        <span style="font: 700 18px/28px var(--font)">AI 연결</span>
+        <a class="btn quiet icon" href="Library.dc.html" aria-label="닫기"><span class="ic ic-x"></span></a>
+      </div>
+
+      <div class="seg" role="tablist">
+        <button type="button" class="{{tabClaude}}" onClick="{{goClaude}}"><span class="sd {{sdClaude}}"></span>Claude Code<span class="ic ic-lock {{lockClaude}}"></span></button>
+        <button type="button" class="{{tabCodex}}" onClick="{{goCodex}}"><span class="sd {{sdCodex}}"></span>Codex<span class="ic ic-lock {{lockCodex}}"></span></button>
+        <button type="button" class="{{tabLocal}}" onClick="{{goLocal}}"><span class="sd {{sdLocal}}"></span>모델 서버</button>
+      </div>
+
+      <div class="panel">
+        <div class="{{lockedHide}}">
+          <p class="note"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 AI만 쓸 수 있어요. 이 종류는 쓸 수 없어요.</span></p>
+        </div>
+
+        <div class="{{openHide}}">
+          <div class="panel-h">
+            <span class="opt-ic"><span class="ic {{pIcon}}" style="width: 20px; height: 20px"></span></span>
+            <span style="flex: 1; min-width: 0"><span class="opt-t">{{pName}}</span><span class="meta {{metaHide}}">{{pMeta}}</span></span>
+            <span class="tag {{pillClass}}" style="margin: 0">{{pPill}}</span>
+          </div>
+
+          <div class="{{localHide}}" style="margin-top: 16px">
+            <label class="lbl" for="addr">서버 주소</label>
+            <div style="display: flex; gap: 8px">
+              <input class="field" id="addr" type="text" value="http://127.0.0.1:8080/v1" style="flex: 1">
+              <button class="btn" type="button" onClick="{{recheck}}" style="height: 46px">서버 확인</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px">
+            <div style="font: 600 16px/24px var(--font)">{{pHead}}</div>
+            <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{pBody}}</div>
+          </div>
+
+          <div class="{{reachHide}}" style="margin-top: 12px">
+            <p class="note {{reachNote}}" style="{{reachStyle}}"><span class="ic {{reachIcon}}" style="margin-top: 2px"></span><span>{{reachText}}</span></p>
+          </div>
+
+          <div class="{{cmdHide}}" style="margin-top: 16px">
+            <span class="cmd-l">{{c1Label}}</span>
+            <div class="cmd"><code>{{c1Cmd}}</code><button class="copy" type="button" onClick="{{copy1}}">{{c1Copy}}</button></div>
+            <span class="cmd-l" style="margin-top: 12px">{{c2Label}}</span>
+            <div class="cmd"><code>{{c2Cmd}}</code><button class="copy" type="button" onClick="{{copy2}}">{{c2Copy}}</button></div>
+            <div style="margin-top: 10px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{cmdNote}}</div>
+          </div>
+
+          <div class="{{modelsHide}}" style="margin-top: 16px">
+            <span class="cmd-l">서버가 알려 준 모델</span>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <button class="opt sm {{mk1}}" type="button" onClick="{{pickM1}}">
+                <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
+                <span><span class="opt-t">local-model-14b</span></span>
+                <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+              </button>
+              <button class="opt sm {{mk2}}" type="button" onClick="{{pickM2}}">
+                <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
+                <span><span class="opt-t">local-model-32b</span></span>
+                <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="acts {{btnsHide}}" style="margin-top: 16px">
+            <button class="mini pri" type="button" onClick="{{recheck}}">{{b1Label}}</button>
+            <button class="mini {{b2Hide}}" type="button">위치 직접 지정</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{footNote}}</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px">
+        <span style="font: 400 14px/22px var(--font); {{usingStyle}}">{{usingText}}</span>
+        <span>
+          <button class="btn {{useHide}}" type="button" onClick="{{useThis}}">이 AI로 옮겨 쓰기</button>
+          <button class="btn off {{offHide}}" type="button" disabled>이 AI로 옮겨 쓰기</button>
+        </span>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"policy":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: props.policy ? 'local' : 'claude',
+      st: { claude: 'signedout', codex: 'missing', local: 'this' },
+      using: 'claude',
+      copied: '',
+      model: 1,
+    };
+  }
+  renderVals() {
+    const policy = !!this.props.policy;
+    const { tab, st, using, copied, model } = this.state;
+    const kinds = ['claude', 'codex', 'local'];
+    const locked = (k) => policy && k !== 'local';
+    const isLocked = locked(tab);
+    const cur = st[tab];
+    const nowUsing = policy ? 'local' : using;
+
+    const demo = {
+      claude: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unusable', '쓸 수 없는 로그인'], ['unknown', '확인 못 함']],
+      codex: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unverified', '확인 안 된 버전'], ['unknown', '확인 못 함']],
+      local: [['this', '이 컴퓨터'], ['net', '네트워크'], ['plain', '암호화 없음'], ['down', '닿지 않음'], ['cert', '인증서 문제'], ['key', '키 필요'], ['nolist', '모델 목록 아님'], ['empty', '모델 없음']],
+    };
+    const good = { sub: 1, usage: 1, this: 1, net: 1, plain: 1 };
+    const names = { claude: 'Claude Code', codex: 'Codex', local: '모델 서버' };
+    const icons = { claude: 'ic-user', codex: 'ic-user', local: 'ic-cpu' };
+    const metaOf = { claude: '버전 2.1.0 · /usr/local/bin/claude', codex: '버전 0.159.0 · /usr/local/bin/codex' };
+    const noMeta = { checking: 1, missing: 1, unknown: 1 };
+
+    // what each state says, for the two clients and for a server
+    const client = (k) => {
+      const who = k === 'claude' ? 'Claude Code' : 'Codex';
+      const plan = k === 'claude' ? 'Claude 구독' : 'ChatGPT 구독';
+      return {
+        checking: { pill: '확인 중', cls: '', head: who + '에 확인하는 중이에요', body: '' },
+        missing: { pill: '찾지 못함', cls: '', head: '이 컴퓨터에서 ' + who + '를 찾지 못했어요', body: who + '를 설치한 뒤 다시 확인해 주세요. 다른 곳에 설치했다면 위치를 직접 알려 줄 수 있어요.', btn: '다시 확인', loc: true },
+        signedout: { pill: '로그인 필요', cls: '', head: who + '에 로그인해 주세요', body: '터미널에서 아래 명령 중 하나를 실행하세요. 로그인은 ' + who + '가 직접 처리하고, 이 앱은 계정 정보나 키를 받지 않아요.', cmds: true, btn: '로그인했어요 · 다시 확인' },
+        sub: { pill: '연결됨', cls: 'n', head: plan + '으로 로그인되어 있어요', body: plan + '의 사용 한도 안에서 옮겨 써요.' },
+        usage: { pill: '연결됨', cls: 'n', head: 'API 사용량 요금으로 로그인되어 있어요', body: '옮겨 쓴 만큼 요금이 나가요.' },
+        unusable: { pill: '쓸 수 없음', cls: '', head: '이 로그인은 이 앱에서 쓸 수 없어요', body: who + '가 알려 준 로그인 방식을 이 앱은 쓰지 않아요. 아래 방식으로 다시 로그인해 주세요.', cmds: true, btn: '다시 로그인했어요 · 다시 확인' },
+        unverified: { pill: '확인 안 된 버전', cls: '', head: '이 ' + who + ' 버전은 아직 확인되지 않았어요', body: '이 앱이 확인한 버전에서만 ' + who + '를 써요. 확인된 버전으로 바꾼 뒤 다시 확인해 주세요.', btn: '다시 확인' },
+        unknown: { pill: '확인 못 함', cls: '', head: who + '에 물어보지 못했어요', body: '로그인이 안 되어 있다는 뜻은 아니에요. 시간 안에 답이 없었어요.', btn: '다시 확인' },
+      };
+    };
+    const server = {
+      this: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-check', '이 컴퓨터에 있는 서버예요. 문서가 이 컴퓨터를 떠나지 않아요.', ''], models: true },
+      net: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 네트워크로 나가요. 암호화되어 있어요.', 'warn'], models: true },
+      plain: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 암호화되지 않은 채 네트워크로 나가요.', 'warn'], models: true },
+      down: { pill: '닿지 않음', cls: '', head: '서버에 닿지 않아요', body: '주소를 다시 확인해 주세요. 연결이 거절됐어요.' },
+      cert: { pill: '인증서 문제', cls: '', head: '서버의 인증서를 믿을 수 없어요', body: '아무것도 보내지 않았어요. 주소나 서버의 인증서를 확인해 주세요.' },
+      key: { pill: '키 필요', cls: '', head: '이 서버는 키가 있어야 들어갈 수 있어요', body: '이 앱은 서버 키를 보관할 곳이 아직 없어서 이 서버를 쓸 수 없어요.' },
+      nolist: { pill: '확인 못 함', cls: '', head: '모델 목록이 아닌 답이 왔어요', body: '주소가 서버의 맨 위(보통 …/v1)가 아닌 것 같아요.' },
+      empty: { pill: '모델 없음', cls: '', head: '서버에 불러온 모델이 없어요', body: '서버에 모델을 올린 뒤 다시 확인해 주세요.' },
+    };
+    const say = tab === 'local' ? server[cur] : client(tab)[cur];
+
+    // the commands: fixed words, and what each one signs in for
+    const cmds = tab === 'claude'
+      ? [['Claude 구독으로 로그인 (월 정액)', 'claude auth login'], ['API 사용량 요금으로 로그인', 'claude auth login --console']]
+      : [['ChatGPT 구독으로 로그인 (월 정액)', 'codex login -c …'], ['API 사용량 요금으로 로그인', 'codex login --with-api-key -c …']];
+    const cmdNote = tab === 'claude'
+      ? '로그인은 이 앱이 대신 열지 않아요. 터미널에서 직접 실행하면 Claude Code가 알아서 처리해요.'
+      : 'API 키는 터미널에서 Codex에 직접 입력해요. 이 앱에는 입력하지 않아요. 명령의 나머지 부분은 이 앱이 정확하게 보여 줘요.';
+
+    const usable = !isLocked && !!good[cur] && (tab !== 'local' || (cur === 'this' || cur === 'net' || cur === 'plain'));
+    const isUsing = nowUsing === tab;
+    const reach = say.reach || ['', '', ''];
+
+    const vals = {
+      demoLabel: isLocked ? '회사 정책으로 막힌 종류예요' : names[tab] + ' 상태 고르기',
+      tabClaude: tab === 'claude' ? 'on' : '', tabCodex: tab === 'codex' ? 'on' : '', tabLocal: tab === 'local' ? 'on' : '',
+      sdClaude: locked('claude') ? '' : good[st.claude] ? 'ok' : st.claude === 'checking' ? '' : 'attn',
+      sdCodex: locked('codex') ? '' : good[st.codex] ? 'ok' : st.codex === 'checking' ? '' : 'attn',
+      sdLocal: good[st.local] ? 'ok' : 'attn',
+      lockClaude: locked('claude') ? '' : 'hide', lockCodex: locked('codex') ? '' : 'hide',
+      goClaude: () => this.setState({ tab: 'claude', copied: '' }),
+      goCodex: () => this.setState({ tab: 'codex', copied: '' }),
+      goLocal: () => this.setState({ tab: 'local', copied: '' }),
+
+      lockedHide: isLocked ? '' : 'hide',
+      openHide: isLocked ? 'hide' : '',
+      pIcon: icons[tab], pName: names[tab],
+      pMeta: tab === 'local' ? '' : metaOf[tab], metaHide: tab === 'local' || noMeta[cur] ? 'hide' : '',
+      pPill: say.pill, pillClass: say.cls,
+      pHead: say.head, pBody: say.body,
+      localHide: tab === 'local' ? '' : 'hide',
+      reachHide: say.reach ? '' : 'hide',
+      reachIcon: reach[0], reachText: reach[1],
+      reachNote: '', reachStyle: reach[2] === 'warn' ? '' : 'background: var(--accent-tint); color: var(--accent-ink)',
+      cmdHide: say.cmds ? '' : 'hide',
+      c1Label: cmds[0][0], c1Cmd: cmds[0][1], c2Label: cmds[1][0], c2Cmd: cmds[1][1],
+      c1Copy: copied === 'c1' ? '복사했어요' : '복사', c2Copy: copied === 'c2' ? '복사했어요' : '복사',
+      copy1: () => this.setState({ copied: 'c1' }), copy2: () => this.setState({ copied: 'c2' }),
+      cmdNote,
+      modelsHide: say.models ? '' : 'hide',
+      mk1: model === 1 ? 'sel' : '', mk2: model === 2 ? 'sel' : '',
+      pickM1: () => this.setState({ model: 1 }), pickM2: () => this.setState({ model: 2 }),
+      btnsHide: tab === 'local' || !say.btn ? 'hide' : '',
+      b1Label: say.btn || '', b2Hide: say.loc ? '' : 'hide',
+      recheck: () => {
+        const next = tab === 'local'
+          ? { down: 'this', cert: 'net', nolist: 'this', empty: 'this' }
+          : { checking: 'sub', missing: 'signedout', signedout: 'sub', unusable: 'sub', unknown: 'sub' };
+        this.setState({ st: { ...st, [tab]: next[cur] || cur }, copied: '' });
+      },
+
+      footNote: tab === 'local'
+        ? '키나 비밀번호가 들어간 주소는 받지 않아요.'
+        : '선택한 AI에 문서가 전송돼요. 로그인 정보는 사양에 들어가지 않아요.',
+      usingText: '지금 사용 중: ' + names[nowUsing] + (nowUsing === tab && !usable && !isLocked ? ' · 연결을 확인해 주세요' : ''),
+      usingStyle: nowUsing === tab && !usable && !isLocked ? 'color: var(--attn)' : 'color: var(--ink-2)',
+      useHide: usable && !isUsing ? '' : 'hide',
+      offHide: !usable && !isUsing && !isLocked ? '' : 'hide',
+      useThis: () => this.setState({ using: tab }),
+    };
+    const list = demo[tab];
+    for (let i = 1; i <= 8; i++) {
+      const item = list[i - 1];
+      vals['dl' + i] = item ? item[1] : '';
+      vals['dc' + i] = item && item[0] === cur ? 'on' : '';
+      vals['dh' + i] = item && !isLocked ? '' : 'hide';
+      vals['dp' + i] = () => item && this.setState({ st: { ...st, [tab]: item[0] }, copied: '' });
+    }
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
