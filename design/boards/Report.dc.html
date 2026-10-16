@@ -67,14 +67,15 @@ body{margin:0}
         </div>
 
         <div style="padding: 14px 18px; background: var(--ai-tint); border-radius: 14px; color: var(--ai); font: 400 13px/20px var(--font)">
-          <b style="font-weight: 600">이 보고서는 AI가 쓴 글이에요.</b> SCE의 판단이 아니에요. 글에 붙은 근거(R2, 줄 10 같은 표시)를 SCE가 하나씩 확인해서, 맞으면 "SCE가 확인함", 찾지 못하면 "확인하지 못함", 근거가 없으면 "AI의 의견"이라고 붙여요.
+          <b style="font-weight: 600">이 보고서는 AI가 쓴 글이에요.</b> SCE의 판단이 아니에요. 글에 붙은 근거(R2, 전이 Unlocked→Locked 같은 표시)가 실제로 있는지 SCE가 하나씩 찾아봐요. 있으면 "근거가 있어요", 찾지 못하면 "근거를 찾지 못함", 근거를 달지 않았으면 "AI의 의견"이에요.
+          <div style="margin-top: 6px"><b style="font-weight: 600">"근거가 있어요"는 말이 맞다는 뜻이 아니에요.</b> 가리킨 곳이 있다는 뜻이에요. 맞는지는 직접 읽고 판단하세요. 문서의 글은 AI에게 "읽을 자료"로만 넘기고 문서 안의 지시는 따르지 않게 하지만, 완전히 막을 수는 없어요.</div>
           <div style="margin-top: 6px; color: var(--ink-2)">{{pinned}}</div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font: 500 14px/22px var(--font)">
           <span>문장 {{nAll}}개</span>
-          <span class="tag n" style="margin: 0">SCE가 확인함 {{nOk}}</span>
-          <span class="tag {{badTone}}" style="margin: 0">확인하지 못함 {{nBad}}</span>
+          <span class="tag n" style="margin: 0">근거가 있어요 {{nOk}}</span>
+          <span class="tag {{badTone}}" style="margin: 0">근거를 찾지 못함 {{nBad}}</span>
           <span class="tag op" style="margin: 0">AI의 의견 {{nOp}}</span>
           <span style="margin-left: auto; font: 400 13px/20px var(--font); color: var(--ink-3)">이전 보고서 2개 · 새로 쓰면 이전 것은 남아 있어요</span>
         </div>
@@ -107,7 +108,7 @@ body{margin:0}
             </div>
           </sc-for>
           <div class="figc">
-            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">동작 흐름</b><span>Mermaid로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleMmSrc}}">{{mmSrcLabel}}</button><button class="link" type="button">그림 저장</button></span></div>
+            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">동작 흐름</b><span>Mermaid로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleMmSrc}}">{{mmSrcLabel}}</button><button class="link {{mmSaveHide}}" type="button">정리한 그림 저장</button></span></div>
             <div class="figc-b {{mmDrawnHide}}">
               <div class="fig" role="img" aria-label="Locked에서 unlock_request로 Unlocked로, 30초 뒤 또는 lock_request로 다시 Locked로">
                 <span class="st-box">Locked</span>
@@ -140,7 +141,7 @@ body{margin:0}
             </div>
           </sc-for>
           <div class="figc">
-            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">시나리오 1의 시간</b><span>SVG로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleSvgSrc}}">{{svgSrcLabel}}</button><button class="link" type="button">그림 저장</button></span></div>
+            <div class="figc-h"><span class="tag ai" style="margin: 0">AI가 그림</span><b style="font-weight: 600">시나리오 1의 시간</b><span>SVG로 그렸어요</span><span style="margin-left: auto; display: inline-flex; gap: 12px"><button class="link" type="button" onClick="{{toggleSvgSrc}}">{{svgSrcLabel}}</button><button class="link {{svgSaveHide}}" type="button">정리한 그림 저장</button></span></div>
             <div class="figc-b {{svgDrawnHide}}">
               <svg viewBox="0 0 560 130" width="100%" role="img" aria-label="0초에 풀림, 30초에 다시 잠김" style="display: block; max-width: 560px; margin: 0 auto">
                 <line x1="30" y1="70" x2="530" y2="70" stroke="#667085" stroke-width="2"/>
@@ -161,7 +162,7 @@ body{margin:0}
   &lt;line .../&gt;  &lt;rect .../&gt;  &lt;circle .../&gt;  &lt;text&gt;0초 · 풀림&lt;/text&gt; ...
 &lt;/svg&gt;   (정리한 뒤의 1.2KB · 스크립트, 바깥 주소, 포함된 그림, 이벤트는 없음)</pre>
           </div>
-          <div class="hint" style="margin: 6px 0 0">AI가 쓴 SVG는 제품이 허용한 것만 남기고 정리해요. 스크립트, 바깥 주소, 그림 안의 그림은 지워요. 정리할 수 없으면 거절하고 이유를 알려요.</div>
+          <div class="hint" style="margin: 6px 0 0">AI가 쓴 SVG는 제품이 허용한 것만 남기고 정리해요. 스크립트, 바깥 주소, 그림 안의 그림은 지워요. 정리할 수 없으면 거절하고 이유를 알려요. 저장되는 것은 정리한 그림뿐이에요: AI가 쓴 원본 파일을 그대로 열면 브라우저가 그 안의 스크립트를 실행할 수 있어서예요.</div>
         </section>
 
         <section class="rsec">
@@ -280,7 +281,7 @@ class Component extends DCLogic {
     const S = (t, c, k, r) => this.stmt(t, c, k, r);
     return {
       sec1: [
-        S('문은 잠겨 있다가 "잠금 풀기 요청"이 오면 풀리고, 30초가 지나면 스스로 다시 잠겨요.', ['R1', 'R2', '줄 6', '줄 10'], 'ok'),
+        S('문은 잠겨 있다가 "잠금 풀기 요청"이 오면 풀리고, 30초가 지나면 스스로 다시 잠겨요.', ['R1', 'R2', '전이 Locked→Unlocked', '전이 Unlocked→Locked'], 'ok'),
         S('요구사항 5개 중 3개는 설계에 담겨 있어요(R1, R2, R3).', ['점검표'], 'ok'),
         S('배터리 알림(R4)은 설계 어디에도 없어요.', ['R4', '점검표'], 'ok'),
         S('현관문이라서 R4가 빠진 것은 가볍게 넘기기 어려워 보여요.', [], 'op'),
@@ -289,8 +290,9 @@ class Component extends DCLogic {
       sec3: [S('시나리오 1에서 문은 0초에 풀리고 30초에 다시 잠겨요.', ['시나리오 1'], 'ok')],
       sec4: [
         S('R4는 설계에 담긴 곳이 없어요. SCE 점검표는 "빠짐"이라고 해요.', ['R4', '점검표'], 'ok'),
-        S('R5는 열려 있다고 표시된 자리만 담고 있어요.', ['R5', '줄 14'], 'ok'),
-        S('30초는 문이 닫힌 뒤부터 세는 것 같아요.', ['줄 20'], 'bad', '줄 20은 수도코드에 없는 줄이에요(수도코드는 14줄이에요). AI가 가리킨 곳을 찾지 못했어요.'),
+        S('R5는 열려 있다고 표시된 자리만 담고 있어요.', ['R5', '열린 자리 q2'], 'ok'),
+        S('30초는 문이 닫힌 뒤부터 세는 것 같아요.', ['상태 Closed'], 'bad', '상태 Closed는 모델에 없어요. 모델의 상태는 Locked와 Unlocked 두 개예요. AI가 가리킨 곳을 찾지 못했어요.'),
+        S('R3도 충분히 담겨 있는 것 같아요.', ['R3'], 'op', '설계가 요구사항을 담는다는 말에는 SCE의 점검표 결과가 붙어야 해요. 붙어 있지 않아서, 근거는 찾았지만 의견으로 표시했어요.'),
         S('배터리 알림이 빠진 것이 일부러일 수도 있어요. 사양 글에는 그 이유가 없어요.', [], 'op'),
       ],
       sec5: [
@@ -308,7 +310,7 @@ class Component extends DCLogic {
       return { stmts: [S('R4는 설계 어디에도 없어서, 지금 설계대로 만들면 배터리가 20% 이하여도 알림이 가지 않아요.', ['R4', '점검표'], 'ok'), S('배터리가 방전되면 문을 못 열 수 있어서, 현관문에서는 위험이 큰 편이에요.', [], 'op')] };
     }
     if (/30초/.test(q)) {
-      return { stmts: [S('설계에서 30초는 "잠금 해제됨" 상태에 들어간 순간부터 세요.', ['줄 10'], 'ok'), S('문이 열려 있는 동안 다시 시작하는지는 설계가 정하지 않았어요.', ['질문 1'], 'ok')] };
+      return { stmts: [S('설계에서 30초는 "잠금 해제됨" 상태에 들어간 순간부터 세요.', ['전이 Unlocked→Locked'], 'ok'), S('문이 열려 있는 동안 다시 시작하는지는 설계가 정하지 않았어요.', ['질문 1'], 'ok')] };
     }
     if (/질문 1|답/.test(q)) {
       return {
@@ -323,7 +325,7 @@ class Component extends DCLogic {
     const { rep, prov, mmFail, svgFail, mmSrc, svgSrc, think, privacy, msgs, ctx, draftMsg, stale } = this.state;
     const has = rep === 'fresh' || rep === 'behind';
     const R = this.report();
-    const marks = { ok: ['n', 'SCE가 확인함'], bad: ['', 'SCE가 확인하지 못함'], op: ['op', 'AI의 의견'] };
+    const marks = { ok: ['n', '근거가 있어요'], bad: ['', '근거를 찾지 못함'], op: ['op', 'AI의 의견'] };
     const show = (s) => ({
       text: s.text, cites: s.cites, tone: marks[s.kind][0], markText: marks[s.kind][1], reason: s.reason, reasonHide: s.reason ? '' : 'hide',
       ask: () => this.setState({ ctx: { text: s.text.length > 40 ? s.text.slice(0, 40) + '…' : s.text }, draftMsg: '' }),
@@ -366,6 +368,7 @@ class Component extends DCLogic {
       sec1: R.sec1.map(show), sec2: R.sec2.map(show), sec3: R.sec3.map(show), sec4: R.sec4.map(show), sec5: R.sec5.map(show),
       mmDrawnHide: mmFail ? 'hide' : '', mmFailHide: mmFail ? '' : 'hide', mmSrcHide: mmSrc || mmFail ? '' : 'hide',
       mmSrcLabel: mmSrc ? '원문 닫기' : '원문 보기', toggleMmSrc: () => this.setState({ mmSrc: !mmSrc }),
+      mmSaveHide: mmFail ? 'hide' : '', svgSaveHide: svgFail ? 'hide' : '',
       svgDrawnHide: svgFail ? 'hide' : '', svgFailHide: svgFail ? '' : 'hide', svgSrcHide: svgSrc && !svgFail ? '' : 'hide',
       svgSrcLabel: svgSrc ? '원문 닫기' : '원문 보기', toggleSvgSrc: () => this.setState({ svgSrc: !svgSrc }),
 

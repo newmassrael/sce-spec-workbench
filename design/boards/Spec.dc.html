@@ -34,7 +34,12 @@ body{margin:0}
       <button type="button" class="{{dirtyOn}}" onClick="{{toggleDirty}}">저장 안 한 글 변경</button>
       <button type="button" onClick="{{arrive}}">새 설계가 도착함</button>
       <button type="button" class="{{orphanOn}}" onClick="{{toggleOrphan}}">묻지 않는 질문의 답</button>
-      <button type="button" class="{{refusedOn}}" onClick="{{toggleRefused}}">SCE가 눌러 보기를 거절</button>
+      <button type="button" class="{{renamedOn}}" onClick="{{toggleRenamed}}">새 설계가 이름을 바꿈</button>
+      <span style="margin-left: 8px">눌러 보기</span>
+      <button type="button" class="{{sm1}}" onClick="{{sma}}">준비됨</button>
+      <button type="button" class="{{sm2}}" onClick="{{smb}}">만드는 중</button>
+      <button type="button" class="{{sm3}}" onClick="{{smc}}">멈춤</button>
+      <button type="button" class="{{sm4}}" onClick="{{smd}}">SCE가 거절</button>
     </div>
 
     <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
@@ -100,16 +105,26 @@ body{margin:0}
           </div>
           <button class="link" type="button" onClick="{{toggleNames}}" style="margin-left: auto">{{namesLabel}}</button>
         </div>
+        <div class="{{orphanAlertHide}}"><p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span style="flex: 1">새 설계가 이름을 바꿨어요. 이름표 1개가 맞는 이름을 잃었어요.</span><button class="link" type="button" onClick="{{toggleNames}}" style="color: inherit; white-space: nowrap">이름 붙이기 열기</button></p></div>
         <div class="hint" style="margin: 0">{{viewHint}}</div>
 
         <div class="{{namesHide}}" style="padding: 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px">
           <div style="font: 600 15px/24px var(--font)">이름 붙이기</div>
           <div style="margin: 4px 0 12px; font: 400 13px/20px var(--font); color: var(--ink-3)">설계 속 이름에 내 말을 붙여요. 이 말은 위 보기들에 나오고, 원래 이름은 글자 위에 마우스를 올리면 보여요. 비워 두면 원래 이름이 나와요.</div>
+
+          <div class="{{orphanBoxHide}}" style="margin-bottom: 14px; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--attn-icon); background: var(--attn-tint)">
+            <div style="font: 600 15px/24px var(--font); color: var(--attn)">이전 설계의 이름표 1개가 맞는 이름을 잃었어요</div>
+            <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink)">이전 설계의 <b>Unlocked</b>에 붙여 둔 「잠금 해제됨」은 새 설계에 같은 이름이 없어서 어느 화면에도 쓰이지 않고 있어요. 새 설계에는 이름표가 없는 이름이 있어요: <b>Opened</b>.</div>
+            <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 400 14px/22px var(--font)">같은 상태로 보여요: Unlocked → Opened (30초 뒤 잠기는 상태)</span></div>
+            <div class="{{orphanActsHide}}" style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap"><button class="mini pri" type="button" onClick="{{orphanCarry}}">Opened에 붙이기</button><button class="mini" type="button" onClick="{{orphanRelease}}">놓아 주기</button></div>
+            <div class="{{orphanDoneHide}}" style="margin-top: 8px; font: 500 14px/22px var(--font); color: var(--ink-2)">{{orphanDone}}</div>
+            <div class="hint" style="margin: 8px 0 0">글자가 비슷하다고 알아서 옮기지 않아요. 옮길지는 내가 정해요.</div>
+          </div>
           <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
-            <div><label class="cmd-l">상태 · Locked</label><input class="field" type="text" value="{{lv1}}" onInput="{{li1}}" placeholder="Locked" style="height: 42px"><div class="{{lp1h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp1}}</span><button class="link" type="button" onClick="{{lu1}}">사용</button></div></div>
-            <div><label class="cmd-l">상태 · Unlocked</label><input class="field" type="text" value="{{lv2}}" onInput="{{li2}}" placeholder="Unlocked" style="height: 42px"><div class="{{lp2h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp2}}</span><button class="link" type="button" onClick="{{lu2}}">사용</button></div></div>
-            <div><label class="cmd-l">신호 · unlock_request</label><input class="field" type="text" value="{{lv3}}" onInput="{{li3}}" placeholder="unlock_request" style="height: 42px"><div class="{{lp3h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp3}}</span><button class="link" type="button" onClick="{{lu3}}">사용</button></div></div>
-            <div><label class="cmd-l">신호 · lock_request</label><input class="field" type="text" value="{{lv4}}" onInput="{{li4}}" placeholder="lock_request" style="height: 42px"><div class="{{lp4h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp4}}</span><button class="link" type="button" onClick="{{lu4}}">사용</button></div></div>
+            <div><label class="cmd-l">상태 · Locked</label><input class="field" type="text" value="{{lv1}}" onInput="{{li1}}" placeholder="Locked" style="height: 42px"><div class="err {{le1h}}">{{le1}}</div><div class="{{lp1h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp1}}</span><button class="link" type="button" onClick="{{lu1}}">사용</button></div></div>
+            <div><label class="cmd-l">상태 · Unlocked</label><input class="field" type="text" value="{{lv2}}" onInput="{{li2}}" placeholder="Unlocked" style="height: 42px"><div class="err {{le2h}}">{{le2}}</div><div class="{{lp2h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp2}}</span><button class="link" type="button" onClick="{{lu2}}">사용</button></div></div>
+            <div><label class="cmd-l">신호 · unlock_request</label><input class="field" type="text" value="{{lv3}}" onInput="{{li3}}" placeholder="unlock_request" style="height: 42px"><div class="err {{le3h}}">{{le3}}</div><div class="{{lp3h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp3}}</span><button class="link" type="button" onClick="{{lu3}}">사용</button></div></div>
+            <div><label class="cmd-l">신호 · lock_request</label><input class="field" type="text" value="{{lv4}}" onInput="{{li4}}" placeholder="lock_request" style="height: 42px"><div class="err {{le4h}}">{{le4}}</div><div class="{{lp4h}}" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="tag ai" style="margin: 0">AI 제안</span><span style="font: 500 14px/22px var(--font)">{{lp4}}</span><button class="link" type="button" onClick="{{lu4}}">사용</button></div></div>
           </div>
           <div style="display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap">
             <button class="btn" type="button" onClick="{{saveNames}}" disabled="{{namesSaveOff}}">이름 저장</button>
@@ -194,6 +209,18 @@ body{margin:0}
         <!-- simulator -->
         <div class="{{vsim}}" style="display: flex; flex-direction: column; gap: 14px">
           <p class="note {{simRefHide}}"><span class="ic ic-alert" style="margin-top: 2px"></span><span>SCE가 눌러 보기를 만들지 못했어요: 미리 계산한 표가 실제 엔진과 한 걸음에서 달랐어요(disagreed). 틀린 화면을 보여 드리지 않으려고 만들지 않았어요. 설계가 기록을 기억하는 상태(history)를 쓰면 이럴 수 있어요.</span></p>
+          <div class="{{simBuildHide}}" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 16px">
+            <div style="display: flex; align-items: center; gap: 12px"><span class="spin"></span><span style="font: 600 16px/24px var(--font)">눌러 볼 수 있게 만드는 중이에요</span></div>
+            <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">설계가 만들 수 있는 상황을 하나씩 찾고 있어요. 상황 312개를 찾았고 41초가 지났어요. 큰 설계는 몇 분 걸릴 수 있어요. 기다리는 동안 다른 보기를 봐도 돼요.</div>
+            <div class="bar" role="progressbar" aria-label="찾은 상황" aria-valuemin="0" aria-valuemax="500" aria-valuenow="312"><i style="width: 62%"></i></div>
+            <div style="display: flex; gap: 10px"><button class="btn quiet" type="button" onClick="{{smc}}">만들기 멈추기</button></div>
+            <div class="hint" style="margin: 0">SCE가 상황을 다 찾고, 표가 실제 엔진과 한 걸음도 다르지 않은지 확인한 뒤에야 이 화면을 보여 줘요. 한도(상황 수, 깊이, 시간)를 넘으면 거절하고 이유를 알려요.</div>
+          </div>
+          <div class="{{simStopHide}}" style="display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--card); border: 1px dashed var(--line-strong); border-radius: 16px">
+            <div style="font: 600 16px/24px var(--font)">만들기를 멈췄어요</div>
+            <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">눌러 보기는 아직 없어요. 다시 만들면 처음부터 찾아요.</div>
+            <div><button class="btn" type="button" onClick="{{smb}}">다시 만들기</button></div>
+          </div>
           <div class="{{simOkHide}}" style="display: flex; flex-direction: column; gap: 14px">
             <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">설계를 직접 눌러 보세요. 버튼은 사람이 보낼 수 있는 신호예요. 기계가 스스로 만드는 신호는 버튼이 아니라 결과로만 나와요.</div>
             <div style="padding: 20px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; text-align: center">
@@ -361,7 +388,8 @@ class Component extends DCLogic {
       ans: { q1: '', q2: '' }, saved: { q1: '', q2: '' }, stage: { q1: 'idle', q2: 'idle' },
       freshIds: false, flash: false, lapse: '',
       view: 'table', namesOpen: false, labels, draft: { ...labels }, prop: {}, namesFlash: false,
-      sim: { cur: 'Locked', t: 0, log: [] }, simRefused: false,
+      sim: { cur: 'Locked', t: 0, log: [] }, simMode: 'ready',
+      renamed: false, orphan2: 'open',
     };
   }
 
@@ -378,7 +406,7 @@ class Component extends DCLogic {
   }
 
   renderVals() {
-    const { tab, model, acc, dirty, marked, orphan, ans, saved, stage, freshIds, flash, lapse, view, namesOpen, labels, draft, prop, namesFlash, sim, simRefused } = this.state;
+    const { tab, model, acc, dirty, marked, orphan, ans, saved, stage, freshIds, flash, lapse, view, namesOpen, labels, draft, prop, namesFlash, sim, simMode, renamed, orphan2 } = this.state;
     const hasCode = model === 'fresh' || model === 'behind';
     const anyTyped = ['q1', 'q2'].some((q) => ans[q] !== saved[q]);
     const savedCount = ['q1', 'q2'].filter((q) => saved[q] !== '').length;
@@ -414,6 +442,10 @@ class Component extends DCLogic {
     const disp = (n) => labels[n] || n;
     const tip = (n) => (labels[n] ? n : '');
     const draftDirty = NAMES.some((n) => (draft[n] || '') !== (labels[n] || ''));
+    // SCE puts a label into a page's script without escaping '<' (an open defect, ADR 0033), so a label
+    // that holds one is not accepted, and the screen says why.
+    const bad = (n) => (draft[n] || '').includes('<');
+    const anyBad = NAMES.some(bad);
 
     const sCur = sim.cur;
     const moves = { Locked: { unlock: 'Unlocked' }, Unlocked: { lock: 'Locked', time: 'Locked' } };
@@ -425,10 +457,11 @@ class Component extends DCLogic {
     };
 
     const views = ['table', 'timeline', 'sim', 'pic', 'words', 'code'];
+    const framed = ' SCE가 만든 이 페이지는 인터넷도 이 앱도 건드릴 수 없는 틀 안에서 열려요.';
     const viewHints = {
-      table: '상태마다 어떤 신호가 오면 어디로 가는지를 표로 봐요. 설계 자체에서 읽은 것이에요.',
-      timeline: '내가 정한 시나리오를 실제 엔진에서 한 걸음씩 돌려 본 결과예요.',
-      sim: '버튼을 눌러 설계를 직접 움직여 봐요. 실제 엔진의 동작을 기반으로 해요.',
+      table: '상태마다 어떤 신호가 오면 어디로 가는지를 표로 봐요. 설계 자체에서 읽은 것이에요.' + framed,
+      timeline: '내가 정한 시나리오를 실제 엔진에서 한 걸음씩 돌려 본 결과예요.' + framed,
+      sim: '버튼을 눌러 설계를 직접 움직여 봐요. 실제 엔진의 동작을 기반으로 해요.' + framed,
       pic: '상태와 화살표로 그린 그림, 그리고 요구사항 점검표예요. SCE가 그려요.',
       words: '표를 문장으로 옮겼어요. 설계에 있는 것만 말해요.',
       code: 'SCE가 쓴 수도코드예요. 프로그래머가 읽는 보기라서 다른 보기를 먼저 권해요.',
@@ -440,7 +473,6 @@ class Component extends DCLogic {
       m4: () => this.setState({ model: 'behind' }), m5: () => this.setState({ model: 'refused', marked: '' }),
       dirtyOn: dirty ? 'on' : '', toggleDirty: () => this.setState({ dirty: !dirty }),
       orphanOn: orphan ? 'on' : '', toggleOrphan: () => this.setState({ orphan: !orphan }),
-      refusedOn: simRefused ? 'on' : '', toggleRefused: () => this.setState({ simRefused: !simRefused }),
       arrive: () => {
         if (model !== 'writing') return;
         this.setState({
@@ -512,13 +544,22 @@ class Component extends DCLogic {
       // naming
       namesHide: namesOpen ? '' : 'hide', namesLabel: namesOpen ? '이름 붙이기 닫기' : '이름 붙이기',
       toggleNames: () => this.setState({ namesOpen: !namesOpen, namesFlash: false }),
-      namesSaveOff: !draftDirty,
+      namesSaveOff: !draftDirty || anyBad,
+      orphanAlertHide: renamed && orphan2 === 'open' && !namesOpen ? '' : 'hide',
+      orphanBoxHide: renamed ? '' : 'hide',
+      orphanActsHide: orphan2 === 'open' ? '' : 'hide', orphanDoneHide: orphan2 === 'open' ? 'hide' : '',
+      orphanDone: orphan2 === 'carried' ? 'Opened에 붙였어요. 이름 저장을 눌러야 적용돼요. (시안: 다른 보기의 이름은 그대로예요)' : '놓아 줬어요. 「잠금 해제됨」은 쓰이지 않고 이전 설계 쪽에 남아 있어요.',
+      orphanCarry: () => this.setState({ orphan2: 'carried' }), orphanRelease: () => this.setState({ orphan2: 'released' }),
+      renamedOn: renamed ? 'on' : '', toggleRenamed: () => this.setState({ renamed: !renamed, orphan2: 'open' }),
+      sm1: simMode === 'ready' ? 'on' : '', sm2: simMode === 'building' ? 'on' : '', sm3: simMode === 'stopped' ? 'on' : '', sm4: simMode === 'refused' ? 'on' : '',
+      sma: () => this.setState({ simMode: 'ready' }), smb: () => this.setState({ simMode: 'building' }), smc: () => this.setState({ simMode: 'stopped' }), smd: () => this.setState({ simMode: 'refused' }),
       saveNames: () => this.setState({ labels: { ...draft }, namesFlash: true }),
       namesSavedHide: namesFlash && !draftDirty ? '' : 'hide',
       askNames: () => this.setState({ prop: { Locked: '잠김', Unlocked: '잠금 해제됨', unlock_request: '잠금 풀기 요청', lock_request: '잠그기 요청' }, namesFlash: false }),
 
       // the simulator
-      simOkHide: simRefused ? 'hide' : '', simRefHide: simRefused ? '' : 'hide',
+      simOkHide: simMode === 'ready' ? '' : 'hide', simRefHide: simMode === 'refused' ? '' : 'hide',
+      simBuildHide: simMode === 'building' ? '' : 'hide', simStopHide: simMode === 'stopped' ? '' : 'hide',
       simNow: disp(sCur), simTitle: tip(sCur), simTime: '지난 시간 ' + sim.t + '초',
       simA: () => press('unlock'), simB: () => press('lock'), simT: () => press('time'),
       simR: () => this.setState({ sim: { cur: 'Locked', t: 0, log: [] } }),
@@ -577,6 +618,7 @@ class Component extends DCLogic {
     NAMES.forEach((n, i) => {
       const k = i + 1;
       vals['lv' + k] = draft[n] || '';
+      vals['le' + k] = bad(n) ? '「<」는 이름표에 쓸 수 없어요.' : ''; vals['le' + k + 'h'] = bad(n) ? '' : 'hide';
       vals['li' + k] = (e) => this.setState({ draft: { ...draft, [n]: e && e.target ? e.target.value : '' }, namesFlash: false });
       const p = prop[n];
       const show = p && !(draft[n] || '').trim();

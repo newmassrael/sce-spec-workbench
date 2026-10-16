@@ -195,12 +195,17 @@ parts as panels on one page, `ui/src/app.ts`):
    it is read against the present text. Things that cannot be drawn are said, in SCE's own words: a
    scenario that waits on a decision is not drawn (and names the question that would settle it), a
    simulator SCE refused (the table and the engine disagreed) is a sentence and no screen, a figure that
-   does not fit is refused.
+   does not fit is refused. The simulator takes minutes on a large design, so it has a **making** state
+   (situations found, time passed, a way to stop) and a **stopped** state before it is ever a screen.
+   SCE's pages open in a frame with no network and no access to the application, and the screen says so.
    **Naming.** The words in these views are the document's own names, plus **the owner's labels**: a
    panel ("이름 붙이기") where each state and signal can be given a word of the owner's. A label never
    replaces a name, which stays as the tooltip, and a cleared label goes back to the name. The AI may
    propose names; a proposal is marked as the AI's and appears in no view until the owner presses "use" and
-   saves, because SCE does not put a reading of its own into the owner's picture.
+   saves, because SCE does not put a reading of its own into the owner's picture. A label whose name the
+   new design no longer has is not dropped and not moved by a match of letters: it is shown apart, beside
+   the names that have no label, and the owner carries it to one or lets it go. A label that holds `<` is
+   refused, because SCE writes labels into its pages' script without escaping it (an open defect, ADR 0033).
 3. **Questions and answers.** What the text does not say. An answer does not change the model: the screen
    says so at the top, and each answer says where it is: typed, saved, being written into a new model,
    in the model shown (the question is no longer asked), or still asked after the new model. Answers to
@@ -217,14 +222,16 @@ parts as panels on one page, `ui/src/app.ts`):
 AI writes from the text, the design, SCE's pages and the answers, and it is in the AI's voice, in the
 AI's colour, with the provider and the recipe version beside it. It is pinned to the revisions it was
 written for and says when it is older. **Every statement about the design cites what it is about** (a
-requirement, a line, a scenario, a question), and SCE checks the citation: a statement is marked
-*SCE가 확인함* when what it cites exists, *확인하지 못함* with what SCE looked for when it does not (the
-example cites a line that is not in the pseudocode), and *AI의 의견* when it cites nothing. The counts at
+requirement, a state or transition by its id, a scenario, a sentence), never a line number, because lines
+move with SCE's version. SCE checks that what is cited exists: a statement is marked *근거가 있어요* when it
+does, *근거를 찾지 못함* with what SCE looked for when it does not, and *AI의 의견* when it cites nothing
+or claims coverage without quoting SCE's own finding. **Found is not true**: the screen says the check
+shows that the thing exists, not that the statement is right, and never says "checked". The counts at
 the top are SCE's, and a report cannot call itself verified. Its pictures are drawn in the page for the
 prototype; in the application a **provider's picture is untrusted**: SVG is cleaned against an allowlist
 and shown as an image (never as markup), Mermaid is a source the product renders itself, offline and
 without scripts, and a picture that cannot be made safe or drawn is a sentence plus its source, never
-a blank. **The chat** reads the same material through read tools and cannot change the text, an answer,
+a blank. Only the cleaned picture is saved. **The chat** reads the same material through read tools and cannot change the text, an answer,
 a name or an acceptance: what it may offer is a *draft*, shown as a draft, which becomes real only when
 the owner moves it to the answer box and saves it there. Pressing "이 부분 물어보기" on a statement
 attaches it to the question and shows it as context. The panel says what is sent and to whom, answers
