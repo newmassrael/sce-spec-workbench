@@ -6,7 +6,7 @@
   "pages": [],
   "boards": {
     "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 800, "title": "1  First run (Tweaks: AI connected, unreachable)", "expand": "fill", "is_interactive": true },
-    "Library.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "2  Spec list: folders, move a spec, new folder, import from files or folders (Tweaks: team, multi)", "expand": "fill", "is_interactive": true },
+    "Library.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 800, "title": "2  Spec list: folders, move a spec, new folder, import from files or folders (Tweaks: team, multi, noDefault)", "expand": "fill", "is_interactive": true },
     "ImportStates.dc.html": { "x": 2720, "y": 0, "w": 1280, "h": 900, "title": "3  Import states", "expand": "fill" },
     "Review.dc.html": { "x": 0, "y": 1020, "w": 1280, "h": 900, "title": "4  Check beside the original", "expand": "fill", "is_interactive": true },
     "Accepted.dc.html": { "x": 1360, "y": 1020, "w": 1280, "h": 800, "title": "5  Saved as a spec", "expand": "fill", "is_interactive": true },

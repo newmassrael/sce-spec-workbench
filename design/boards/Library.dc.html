@@ -198,6 +198,13 @@ body{margin:0}
           </div>
           <button class="btn" type="button"><span class="ic ic-doc"></span>파일 선택</button>
         </div>
+        <div style="margin-top: 14px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{aiLine}} <button class="link" type="button" onClick="{{toggleAi}}">{{aiLink}}</button></div>
+        <div class="{{aiOpenHide}}" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
+          <button class="opt sm {{o1c}}" type="button" onClick="{{o1}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o1n}}</span><span class="opt-s">{{o1s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          <button class="opt sm {{o2c}}" type="button" onClick="{{o2}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o2n}}</span><span class="opt-s">{{o2s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          <button class="opt sm {{o3c}}" type="button" onClick="{{o3}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o3n}}</span><span class="opt-s">{{o3s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+        </div>
+        <p class="note {{aiWarnHide}}" style="margin-top: 10px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{aiWarn}}</span></p>
         <div style="margin-top: 18px; text-align: center; font: 400 13px/20px var(--font); color: var(--ink-3)">폴더째 가져올 수도 있어요</div>
         <div style="display: flex; gap: 10px; margin-top: 10px">
           <button class="btn out" type="button" style="flex: 1" onClick="{{openFolderPc}}"><span class="ic ic-monitor"></span>내 컴퓨터의 폴더</button>
@@ -223,6 +230,16 @@ body{margin:0}
           <button type="button" class="{{segServer}}" onClick="{{srcServer}}"><span class="ic ic-server" style="width: 16px; height: 16px"></span>팀 서버</button>
         </div>
         <div class="src-path">{{srcPath}}</div>
+
+        <div class="{{aiRowHide}}">
+          <div style="margin: 0 4px 12px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{aiLine}} <button class="link" type="button" onClick="{{toggleAi}}">{{aiLink}}</button></div>
+          <div class="{{aiOpenHide}}" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px">
+            <button class="opt sm {{o1c}}" type="button" onClick="{{o1}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o1n}}</span><span class="opt-s">{{o1s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+            <button class="opt sm {{o2c}}" type="button" onClick="{{o2}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o2n}}</span><span class="opt-s">{{o2s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+            <button class="opt sm {{o3c}}" type="button" onClick="{{o3}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">{{o3n}}</span><span class="opt-s">{{o3s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          </div>
+          <p class="note {{aiWarnHide}}" style="margin: 0 0 12px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{aiWarn}}</span></p>
+        </div>
 
         <div class="srcbox">
           <button class="fr dir" type="button" onClick="{{toggleOut}}">
@@ -357,7 +374,7 @@ body{margin:0}
   <!-- the AI connection is its own board (Connect.dc.html): the chip in the top bar opens it -->
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"team":{"editor":"boolean","default":false},"multi":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"team":{"editor":"boolean","default":false},"multi":{"editor":"boolean","default":false},"noDefault":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":800}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -370,11 +387,21 @@ class Component extends DCLogic {
       moving: 1, pick: 'none', newParent: 'top',
       // one folder made in this prototype; a real workspace holds any number
       custom: null, typed: '',
+      // which connection converts what is imported: the default unless the person chooses
+      ai: props.noDefault ? -1 : 0, aiOpen: !!props.noDefault,
     };
   }
   renderVals() {
     const hasServer = !!this.props.team || !!this.props.multi;
-    const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed } = this.state;
+    const { sheet, sel, openBld, src, openOut, openFac, f1, f2, f3, f4, keep, loc, moving, pick, newParent, custom, typed, ai, aiOpen } = this.state;
+
+    // the connections, as the connection screen keeps them; this is what a person chooses among
+    const AIS = [
+      { name: 'Claude Code', note: '연결됨', ok: true },
+      { name: 'Codex', note: '찾지 못함', ok: false, why: 'Codex를 찾지 못했어요. 연결되면 바로 옮겨 쓰기를 시작하고, 그때까지 기다려요.' },
+      { name: '사무실 서버', note: '연결됨', ok: true },
+    ];
+    const chosen = ai >= 0 ? AIS[ai] : null;
 
     // specs 1, 2, 3 and 7 need a look; the others do not
     const needs = { 1: true, 2: true, 3: true, 4: false, 5: false, 6: false, 7: true };
@@ -405,12 +432,15 @@ class Component extends DCLogic {
     const mdCount = [f2, f4].filter(Boolean).length;
     const aiCount = [f1, f3].filter(Boolean).length;
     const n = mdCount + aiCount;
+    // a request nobody chose a connection for waits: with no default, the person has to choose
+    const needsAi = aiCount > 0 && ai < 0;
+    const canImport = n > 0 && !needsAi;
     let sumText = '가져올 파일을 골라 주세요';
     if (n > 0) {
       const parts = [];
       if (mdCount > 0) parts.push('마크다운 ' + mdCount + '개는 바로');
       if (aiCount > 0) parts.push((mdCount > 0 ? '' : 'Word·PDF ') + aiCount + '개는 AI가 옮겨 써요');
-      sumText = n + '개 선택 · ' + parts.join(', ');
+      sumText = n + '개 선택 · ' + parts.join(', ') + (needsAi ? ' · 옮겨 쓸 AI를 골라 주세요' : '');
     }
     const root = src === 'pc' ? '내 컴퓨터' : '팀 서버';
     const srcPath = root + ' › ' + (src === 'pc' ? '문서' : '공유') + ' › 사양';
@@ -436,7 +466,18 @@ class Component extends DCLogic {
       emptyHide: visible === 0 ? '' : 'hide',
       typeName: (e) => this.setState({ typed: e && e.target ? e.target.value : '' }),
       makeFolder: () => this.setState({ custom: { name: typed.trim() || '새 폴더', parent: newParent }, sel: 'custom', openBld: newParent === 'bld' ? true : openBld, sheet: null, typed: '' }),
-      hasSel: n > 0,
+      hasSel: canImport,
+      aiLine: chosen ? 'Word와 PDF는 ' + chosen.name + (ai === 0 ? '(기본)' : '') + '가 옮겨 써요.' : '기본 연결이 없어요. 옮겨 쓸 AI를 골라 주세요.',
+      aiLink: aiOpen ? '접기' : chosen ? '바꾸기' : '고르기',
+      aiOpenHide: aiOpen ? '' : 'hide',
+      toggleAi: () => this.setState({ aiOpen: !aiOpen }),
+      aiRowHide: aiCount > 0 ? '' : 'hide',
+      aiWarnHide: chosen && !chosen.ok ? '' : 'hide',
+      aiWarn: chosen && !chosen.ok ? chosen.why : '',
+      o1n: AIS[0].name + ' · 기본', o2n: AIS[1].name, o3n: AIS[2].name,
+      o1s: AIS[0].note, o2s: AIS[1].note, o3s: AIS[2].note,
+      o1c: ai === 0 ? 'sel' : '', o2c: ai === 1 ? 'sel' : '', o3c: ai === 2 ? 'sel' : '',
+      o1: () => this.setState({ ai: 0 }), o2: () => this.setState({ ai: 1 }), o3: () => this.setState({ ai: 2 }),
       twBld: openBld ? 'open' : '',
       kids: openBld ? '' : 'hide',
       toggleBld: () => this.setState({ openBld: !openBld }),
@@ -484,7 +525,7 @@ class Component extends DCLogic {
       toggleKeep: () => this.setState({ keep: !keep }),
       keepHint: keep ? '출입, 설비 폴더가 사양 폴더로 만들어져요.' : '모든 사양이 폴더 없이 들어가요.',
       sumText,
-      noneSel: n === 0,
+      noneSel: !canImport,
 
       mvName: specNames[moving],
       pkNone: pk('none'), pkBld: pk('bld'), pkAcc: pk('acc'), pkFac: pk('fac'), pkPay: pk('pay'),

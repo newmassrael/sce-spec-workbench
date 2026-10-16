@@ -32,15 +32,22 @@ body{margin:0}
       <button type="button" class="{{dc8}} {{dh8}}" onClick="{{dp8}}">{{dl8}}</button>
     </div>
 
+    <div class="demo {{raceHide}}">
+      <span>시안용 · 다른 창이 먼저 바꿨다면</span>
+      <button type="button" class="{{rc1}}" onClick="{{race1}}">저장할 때</button>
+      <button type="button" class="{{rc2}}" onClick="{{race2}}">지울 때</button>
+      <button type="button" class="{{rc3}}" onClick="{{race3}}">기본으로 정할 때</button>
+    </div>
+
     <div class="cgrid" role="dialog" aria-label="AI 연결">
       <aside class="clist" aria-label="연결 목록">
         <div class="clist-h">AI 연결</div>
-        <button type="button" class="crow {{ron1}} {{rh1}}" onClick="{{rg1}}"><span class="sd {{rd1}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn1}}</span><span class="ck">{{rk1}}</span></span><span class="cu {{ru1}}">사용 중</span></button>
-        <button type="button" class="crow {{ron2}} {{rh2}}" onClick="{{rg2}}"><span class="sd {{rd2}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn2}}</span><span class="ck">{{rk2}}</span></span><span class="cu {{ru2}}">사용 중</span></button>
-        <button type="button" class="crow {{ron3}} {{rh3}}" onClick="{{rg3}}"><span class="sd {{rd3}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn3}}</span><span class="ck">{{rk3}}</span></span><span class="cu {{ru3}}">사용 중</span></button>
-        <button type="button" class="crow {{ron4}} {{rh4}}" onClick="{{rg4}}"><span class="sd {{rd4}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn4}}</span><span class="ck">{{rk4}}</span></span><span class="cu {{ru4}}">사용 중</span></button>
-        <button type="button" class="crow {{ron5}} {{rh5}}" onClick="{{rg5}}"><span class="sd {{rd5}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn5}}</span><span class="ck">{{rk5}}</span></span><span class="cu {{ru5}}">사용 중</span></button>
-        <button type="button" class="crow {{ron6}} {{rh6}}" onClick="{{rg6}}"><span class="sd {{rd6}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn6}}</span><span class="ck">{{rk6}}</span></span><span class="cu {{ru6}}">사용 중</span></button>
+        <button type="button" class="crow {{ron1}} {{rh1}}" onClick="{{rg1}}"><span class="sd {{rd1}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn1}}</span><span class="ck">{{rk1}}</span></span><span class="cu {{ru1}}">기본</span></button>
+        <button type="button" class="crow {{ron2}} {{rh2}}" onClick="{{rg2}}"><span class="sd {{rd2}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn2}}</span><span class="ck">{{rk2}}</span></span><span class="cu {{ru2}}">기본</span></button>
+        <button type="button" class="crow {{ron3}} {{rh3}}" onClick="{{rg3}}"><span class="sd {{rd3}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn3}}</span><span class="ck">{{rk3}}</span></span><span class="cu {{ru3}}">기본</span></button>
+        <button type="button" class="crow {{ron4}} {{rh4}}" onClick="{{rg4}}"><span class="sd {{rd4}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn4}}</span><span class="ck">{{rk4}}</span></span><span class="cu {{ru4}}">기본</span></button>
+        <button type="button" class="crow {{ron5}} {{rh5}}" onClick="{{rg5}}"><span class="sd {{rd5}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn5}}</span><span class="ck">{{rk5}}</span></span><span class="cu {{ru5}}">기본</span></button>
+        <button type="button" class="crow {{ron6}} {{rh6}}" onClick="{{rg6}}"><span class="sd {{rd6}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn6}}</span><span class="ck">{{rk6}}</span></span><span class="cu {{ru6}}">기본</span></button>
         <button type="button" class="crow cadd {{addOn}}" onClick="{{goAdd}}"><span class="ic ic-plus" style="width: 16px; height: 16px"></span><span class="cn">연결 추가</span></button>
       </aside>
 
@@ -62,6 +69,9 @@ body{margin:0}
         </div>
 
         <div class="{{connHide}}">
+          <div class="{{conflictHide}}" style="margin-bottom: 14px">
+            <p class="note"><span class="ic ic-alert" style="margin-top: 2px"></span><span style="flex: 1">{{conflictText}}</span><button class="link" type="button" onClick="{{reload}}" style="color: inherit">다시 불러오기</button></p>
+          </div>
           <div class="{{lockedHide}}">
             <p class="note"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 AI만 쓸 수 있어요. 이 종류는 쓸 수 없어요.</span></p>
           </div>
@@ -206,15 +216,17 @@ body{margin:0}
               <button class="mini" type="button" onClick="{{noDel}}">그만두기</button>
             </span>
           </div>
+          <div class="hint {{delAskHide}}" style="margin-left: 0">{{delNote}}</div>
 
           <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{footNote}}</div>
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px">
             <span style="font: 400 14px/22px var(--font); {{usingStyle}}">{{usingText}}</span>
             <span>
-              <button class="btn {{useHide}}" type="button" onClick="{{useThis}}">이 AI로 옮겨 쓰기</button>
-              <button class="btn off {{offHide}}" type="button" disabled>이 AI로 옮겨 쓰기</button>
+              <span class="tag n {{isDefaultHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>기본 연결</span>
+              <button class="btn {{useHide}}" type="button" onClick="{{useThis}}">기본으로 정하기</button>
             </span>
           </div>
+          <div class="hint" style="margin-left: 0">새 사양을 가져올 때 따로 고르지 않으면 기본 연결을 써요.</div>
         </div>
       </section>
     </div>
@@ -273,6 +285,8 @@ class Component extends DCLogic {
       where: { c1: '', c2: '' },
       picked: { c3: 1 },
       copied: '', more: false, tried: false, saved: false, confirm: false,
+      // another window changed it first: which action is to be refused, and what was refused
+      race: '', conflict: '',
       path: { open: false, text: '', demo: 'found', res: null },
     };
   }
@@ -316,7 +330,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const policy = !!this.props.policy;
-    const { conns, next, sel, view, using, st, set, where, picked, copied, more, tried, saved, confirm, path } = this.state;
+    const { conns, next, sel, view, using, st, set, where, picked, copied, more, tried, saved, confirm, race, conflict, path } = this.state;
     const KINDS = this.kinds();
     const ORDER = ['claude', 'codex', 'local', 'hosted'];
     const good = { sub: 1, usage: 1, this: 1, net: 1, plain: 1 };
@@ -334,7 +348,13 @@ class Component extends DCLogic {
     const cur = conn ? st[id] : '';
     const s = conn ? set[id] : {};
     const firstServer = conns.find((c) => KINDS[c.kind].flow === 'server');
+    // the default connection: the one a new request uses when the person does not choose one
     const nowUsing = policy ? (firstServer ? firstServer.id : null) : (conns.some((c) => c.id === using) ? using : null);
+    const conflictTexts = {
+      save: '다른 창에서 이 연결을 먼저 바꿨어요. 아무것도 저장하지 않았어요. 바뀐 내용을 불러온 뒤 다시 고쳐 주세요.',
+      delete: '다른 창에서 이 연결을 먼저 바꿔서 지우지 않았어요. 바뀐 내용을 확인한 뒤 다시 지워 주세요.',
+      default: '다른 창에서 기본 연결을 먼저 바꿨어요. 아무것도 바꾸지 않았어요. 바뀐 내용을 불러온 뒤 다시 정해 주세요.',
+    };
 
     // what each state says
     const say = (() => {
@@ -397,7 +417,7 @@ class Component extends DCLogic {
     const vals = {
       // the list of connections
       addOn: showAdd ? 'on' : '',
-      goAdd: () => this.setState({ view: 'add', copied: '', confirm: false }),
+      goAdd: () => this.setState({ view: 'add', copied: '', confirm: false, conflict: '' }),
       paneTitle: showAdd ? '연결 추가' : labelOf(conn),
       addHide: showAdd ? '' : 'hide',
       connHide: showAdd ? 'hide' : '',
@@ -436,20 +456,38 @@ class Component extends DCLogic {
       footNote: isServer
         ? '키나 비밀번호가 들어간 주소는 받지 않아요.'
         : '선택한 AI에 문서가 전송돼요. 로그인 정보는 사양에 들어가지 않아요.',
-      usingText: nowUsing ? '지금 사용 중: ' + labelOf(conns.find((c) => c.id === nowUsing)) + (isUsing && !usable && !isLocked ? ' · 연결을 확인해 주세요' : '') : '지금 사용 중인 AI가 없어요',
-      usingStyle: isUsing && !usable && !isLocked ? 'color: var(--attn)' : 'color: var(--ink-2)',
-      useHide: usable && !isUsing ? '' : 'hide',
-      offHide: conn && !usable && !isUsing && !isLocked ? '' : 'hide',
-      useThis: () => this.setState({ using: id }),
+      // the default connection, said where the person is looking at one
+      usingText: nowUsing
+        ? '기본 연결: ' + labelOf(conns.find((c) => c.id === nowUsing)) + (nowUsing === id && !usable && !isLocked ? ' · 연결을 확인해 주세요' : '')
+        : '기본 연결이 없어요. 사양을 가져올 때마다 고르거나, 하나를 기본으로 정해 주세요.',
+      usingStyle: (nowUsing === id && !usable && !isLocked) || !nowUsing ? 'color: var(--attn)' : 'color: var(--ink-2)',
+      isDefaultHide: isUsing && !isLocked ? '' : 'hide',
+      useHide: conn && !isUsing && !isLocked ? '' : 'hide',
+      useThis: () => {
+        if (race === 'default') return this.setState({ conflict: 'default', race: '' });
+        this.setState({ using: id, conflict: '' });
+      },
+
+      // another window changed it first
+      raceHide: showAdd || isLocked ? 'hide' : '',
+      rc1: race === 'save' ? 'on' : '', rc2: race === 'delete' ? 'on' : '', rc3: race === 'default' ? 'on' : '',
+      race1: () => this.setState({ race: race === 'save' ? '' : 'save', conflict: '' }),
+      race2: () => this.setState({ race: race === 'delete' ? '' : 'delete', conflict: '' }),
+      race3: () => this.setState({ race: race === 'default' ? '' : 'default', conflict: '' }),
+      conflictHide: conflict ? '' : 'hide',
+      conflictText: conflictTexts[conflict] || '',
+      reload: () => this.setState({ conflict: '', confirm: false }),
 
       // removing a connection
       delHide: confirm ? 'hide' : '',
       delAskHide: confirm ? '' : 'hide',
-      askDel: () => this.setState({ confirm: true }),
+      askDel: () => this.setState({ confirm: true, conflict: '' }),
       noDel: () => this.setState({ confirm: false }),
+      delNote: '지워도 이미 만든 옮겨 쓰기 요청은 그때의 설정으로 계속돼요. 이 연결로 새 요청은 만들 수 없어요.' + (isUsing ? ' 기본 연결이 없어져요.' : ''),
       doDel: () => {
+        if (race === 'delete') return this.setState({ conflict: 'delete', race: '', confirm: false });
         const rest = conns.filter((c) => c.id !== id);
-        this.setState({ conns: rest, sel: rest.length ? rest[0].id : null, view: rest.length ? 'conn' : 'add', using: using === id ? null : using, confirm: false, more: false });
+        this.setState({ conns: rest, sel: rest.length ? rest[0].id : null, view: rest.length ? 'conn' : 'add', using: using === id ? null : using, confirm: false, more: false, conflict: '' });
       },
 
       // settings
@@ -467,7 +505,11 @@ class Component extends DCLogic {
       modelTextHide: customModel ? '' : 'hide',
       savedHide: saved && !bad ? '' : 'hide',
       triedHide: tried && bad ? '' : 'hide',
-      save: () => (bad ? this.setState({ tried: true, saved: false }) : this.setState({ saved: true, tried: false })),
+      save: () => {
+        if (bad) return this.setState({ tried: true, saved: false });
+        if (race === 'save') return this.setState({ conflict: 'save', race: '', saved: false, tried: false });
+        this.setState({ saved: true, tried: false, conflict: '' });
+      },
 
       // where a client is, when the search did not find it
       pathLinksHide: isServer || noMeta[cur] || !conn ? 'hide' : '',
@@ -522,7 +564,7 @@ class Component extends DCLogic {
       vals['rd' + i] = !c || cl ? '' : good[st[c.id]] ? 'ok' : st[c.id] === 'checking' ? '' : 'attn';
       vals['ron' + i] = c && !showAdd && c.id === sel ? 'on' : '';
       vals['ru' + i] = c && c.id === nowUsing ? '' : 'hide';
-      vals['rg' + i] = () => c && this.setState({ sel: c.id, view: 'conn', copied: '', tried: false, saved: false, confirm: false });
+      vals['rg' + i] = () => c && this.setState({ sel: c.id, view: 'conn', copied: '', tried: false, saved: false, confirm: false, conflict: '' });
     }
 
     // the kinds that can be added, as the add step lists them

@@ -50,9 +50,26 @@ The screen follows what the application does (`core/src/auth_policy.rs`, `claude
 `codex_status.rs`, `server_status.rs`) and not a wish about it.
 
 - **The screen shows connections, not kinds.** A list on the left holds what the person has
-  connected, each with its name, its kind, a status dot and a mark on the one in use. "연결 추가" opens
+  connected, each with its name, its kind, a status dot and a mark on the default one. "연결 추가" opens
   a step that lists the kinds. A second connection of one kind is allowed (two servers, two Claude
   Code settings). A connection can be removed after a question.
+- **Default, and the choice at import.** One connection is the default: what a new request uses when
+  the person does not choose one. Importing a Word or PDF file says which connection will convert it
+  (the default, with a way to change it), and a connection that is not ready says what the request
+  will do: wait, and start when it is. With no default, the person has to choose before a file that
+  needs an AI is imported, because the application does not guess for a request nobody chose a
+  connection for. Markdown never needs one.
+- **Changing and removing, as the application does them** (`connection_store.rs`, `commands.rs`,
+  `runner.rs`). Removing takes a connection out of the list and keeps its earlier revisions, so a
+  request made while it existed can still say what it was made with; removing the default leaves no
+  default; a new request for a removed connection is refused. A request carries a copy of the model and
+  limits it was made with, so a change or a removal does not reach it. No path was found that cancels a
+  running conversion when its connection is removed; the screen says that earlier requests go on with
+  their settings, and says no more than that.
+- **Another window got there first.** Saving a connection, removing it and setting the default each
+  name the revision the person saw, so a change made elsewhere in the meantime refuses the action and
+  changes nothing. The screen says that in words and offers to load what changed. The prototype bar
+  makes the next action of each kind be refused, to show it.
 - **The list of kinds is open.** In `Connect.dc.html` the `kinds()` method is a table; each entry states
   how its sign-in is done (a command to run, an address), the states it can report (the chips in the
   prototype bar), how its model is named (typed, or picked from the server's list), whether its name
@@ -142,9 +159,10 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
 - More connections than fit the list (it holds six), and grouping or searching them.
-- What happens to a spec being converted when its connection is changed or removed; the removal
-  question does not say.
-- Reordering connections and choosing which one a given spec uses; one connection is in use at a time.
+- A request that is waiting for its connection, and why. The application keeps the reason (nobody is
+  signed in, the client is not found, the settings it was made with are not on this computer), but the
+  list row says only "AI가 옮겨 쓰는 중".
+- Reordering connections, and converting a spec again with another connection.
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts
