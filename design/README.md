@@ -164,12 +164,34 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
 - More connections than fit the list (it holds six), and grouping or searching them.
-- What becomes of the old request when a person asks again with another connection; the screen says
-  only "다시 요청했어요".
-- Reasons for waiting that only a person who installs the application meets (the authoring server
-  not found on the computer); the screen has nine, and any other would show the application's own
-  sentence.
 - Reordering connections.
+- A request that was running when its lease ran out (`interrupted`) and one that `failed`: the
+  application has both states and this design draws neither.
+
+## What was checked in the application about waiting
+
+Read in `core/src/directory.rs`, `runner.rs` and `sce/sce-specs/src` (`store/request_store.rs`,
+`requests.rs`), and in the UI's `generation_model.ts`:
+
+- **Asking again replaces.** A spec has at most one open request. Registering another is refused
+  (`active-request`) unless the caller says to replace; replacing ends the old request as
+  `superseded` ("a newer request replaced it"). The screen says so, and that nothing is lost because
+  a waiting request has not started. A request that is running is a different question (the run is
+  thrown away) and is not drawn here.
+- **Cancelling** a queued, running or interrupted request ends it as `cancelled`; a running
+  generation looks for that and stops.
+- **Deleting a connection does not stop a run in progress**: the runner already holds its generator,
+  and no path was found that cancels it.
+- **A reason is an English sentence, not a code.** The executor keeps it as text ("in that executor's
+  words"), the UI puts it into a sentence, and `Waiting` maps the ones this application writes to plain
+  Korean: thirteen cases, including a chosen program that is gone, a missing authoring tool, and
+  nobody to take the request. A sentence it does not know is shown in its own words and said to be
+  so (the last case). A real build needs either codes in the application or a table of its sentences
+  in the UI; matching text is fragile, and this is a decision for that work and not the design.
+- **A reason is known only while a runner is alive.** The UI counts a runner that stopped reporting
+  as absent, so a request can wait with no reason at all (the `받을 AI 없음` case).
+- A request made in the application for no connection is not run at all (`unchosen`), which is why
+  the import choice exists.
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts
