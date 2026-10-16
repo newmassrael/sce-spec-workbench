@@ -31,7 +31,7 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 |---|---|
 | `Main` | First run: one drop target, a way to connect to a team server |
 | `Library` | The specs in a workspace: folder tree, move a spec, new folder, import from files or from a folder |
-| `Connect` | Connecting an AI: Claude Code, Codex, a model server; what each says about itself and what the person does |
+| `Connect` | The AI connections a person has, adding one, and what each kind says about itself and asks of the person |
 | `ImportStates` | The states of an import: first, dragging, uploading, stored, refused file, no AI connected |
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
@@ -48,6 +48,22 @@ because a real one comes from the computer.
 
 The screen follows what the application does (`core/src/auth_policy.rs`, `claude_status.rs`,
 `codex_status.rs`, `server_status.rs`) and not a wish about it.
+
+- **The screen shows connections, not kinds.** A list on the left holds what the person has
+  connected, each with its name, its kind, a status dot and a mark on the one in use. "연결 추가" opens
+  a step that lists the kinds. A second connection of one kind is allowed (two servers, two Claude
+  Code settings). A connection can be removed after a question.
+- **The list of kinds is open.** In `Connect.dc.html` the `kinds()` method is a table; each entry states
+  how its sign-in is done (a command to run, an address), the states it can report (the chips in the
+  prototype bar), how its model is named (typed, or picked from the server's list), whether its name
+  is required, and which limits apply. The panel is built from the entry. To add a kind, add an entry;
+  the panel and the add step need no change. The application behind it needs an adapter, a row in the
+  policy table that rests on the provider's terms, a reader of its status and a check against the real
+  client (ADR 0031).
+- **A service that needs a key is listed and not offered** ("지원하지 않아요", with the reason), and a kind
+  an organisation restricts is listed with "회사 정책으로 막힘". Neither is left out: a person who looks
+  for one finds out why it is not there. The entry for a key-holding service is `hosted`, marked
+  `supported: false`; making it work is a decision about where a key is kept, not a screen.
 
 - **The application never signs anyone in.** It asks the client what it sees and says it in words:
   not found, not signed in, signed in by subscription or by usage billing, signed in in a way this
@@ -125,8 +141,10 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
 - Renaming and removing a folder; the prototype makes one folder to show the flow.
 - The application's own Codex login folder, which a Codex sign-in can be kept in apart from the
   person's, and the choice between that and the client's own login.
-- Several connections of one kind, and removing a connection; the screen holds one per kind.
-- What happens to a spec being converted when its connection is changed or removed.
+- More connections than fit the list (it holds six), and grouping or searching them.
+- What happens to a spec being converted when its connection is changed or removed; the removal
+  question does not say.
+- Reordering connections and choosing which one a given spec uses; one connection is in use at a time.
 - A review of a conversion that is long enough to need its own navigation.
 
 ## Fonts

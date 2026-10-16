@@ -20,7 +20,7 @@ body{margin:0}
   </header>
 
   <main style="padding: 8px 16px 72px">
-    <div class="demo">
+    <div class="demo {{demoHide}}">
       <span>시안용 · {{demoLabel}}</span>
       <button type="button" class="{{dc1}} {{dh1}}" onClick="{{dp1}}">{{dl1}}</button>
       <button type="button" class="{{dc2}} {{dh2}}" onClick="{{dp2}}">{{dl2}}</button>
@@ -32,165 +32,191 @@ body{margin:0}
       <button type="button" class="{{dc8}} {{dh8}}" onClick="{{dp8}}">{{dl8}}</button>
     </div>
 
-    <div class="sheet wide" role="dialog" aria-label="AI 연결" style="margin: 0 auto">
-      <div class="sheet-head">
-        <span style="font: 700 18px/28px var(--font)">AI 연결</span>
-        <a class="btn quiet icon" href="Library.dc.html" aria-label="닫기"><span class="ic ic-x"></span></a>
-      </div>
+    <div class="cgrid" role="dialog" aria-label="AI 연결">
+      <aside class="clist" aria-label="연결 목록">
+        <div class="clist-h">AI 연결</div>
+        <button type="button" class="crow {{ron1}} {{rh1}}" onClick="{{rg1}}"><span class="sd {{rd1}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn1}}</span><span class="ck">{{rk1}}</span></span><span class="cu {{ru1}}">사용 중</span></button>
+        <button type="button" class="crow {{ron2}} {{rh2}}" onClick="{{rg2}}"><span class="sd {{rd2}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn2}}</span><span class="ck">{{rk2}}</span></span><span class="cu {{ru2}}">사용 중</span></button>
+        <button type="button" class="crow {{ron3}} {{rh3}}" onClick="{{rg3}}"><span class="sd {{rd3}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn3}}</span><span class="ck">{{rk3}}</span></span><span class="cu {{ru3}}">사용 중</span></button>
+        <button type="button" class="crow {{ron4}} {{rh4}}" onClick="{{rg4}}"><span class="sd {{rd4}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn4}}</span><span class="ck">{{rk4}}</span></span><span class="cu {{ru4}}">사용 중</span></button>
+        <button type="button" class="crow {{ron5}} {{rh5}}" onClick="{{rg5}}"><span class="sd {{rd5}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn5}}</span><span class="ck">{{rk5}}</span></span><span class="cu {{ru5}}">사용 중</span></button>
+        <button type="button" class="crow {{ron6}} {{rh6}}" onClick="{{rg6}}"><span class="sd {{rd6}}"></span><span style="flex: 1; min-width: 0"><span class="cn">{{rn6}}</span><span class="ck">{{rk6}}</span></span><span class="cu {{ru6}}">사용 중</span></button>
+        <button type="button" class="crow cadd {{addOn}}" onClick="{{goAdd}}"><span class="ic ic-plus" style="width: 16px; height: 16px"></span><span class="cn">연결 추가</span></button>
+      </aside>
 
-      <div class="seg" role="tablist">
-        <button type="button" class="{{tabClaude}}" onClick="{{goClaude}}"><span class="sd {{sdClaude}}"></span>Claude Code<span class="ic ic-lock {{lockClaude}}"></span></button>
-        <button type="button" class="{{tabCodex}}" onClick="{{goCodex}}"><span class="sd {{sdCodex}}"></span>Codex<span class="ic ic-lock {{lockCodex}}"></span></button>
-        <button type="button" class="{{tabLocal}}" onClick="{{goLocal}}"><span class="sd {{sdLocal}}"></span>모델 서버</button>
-      </div>
-
-      <div class="panel">
-        <div class="{{lockedHide}}">
-          <p class="note"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 AI만 쓸 수 있어요. 이 종류는 쓸 수 없어요.</span></p>
+      <section class="cpane">
+        <div class="sheet-head" style="padding-bottom: 8px">
+          <span style="font: 700 18px/28px var(--font)">{{paneTitle}}</span>
+          <a class="btn quiet icon" href="Library.dc.html" aria-label="닫기"><span class="ic ic-x"></span></a>
         </div>
 
-        <div class="{{openHide}}">
-          <div class="panel-h">
-            <span class="opt-ic"><span class="ic {{pIcon}}" style="width: 20px; height: 20px"></span></span>
-            <span style="flex: 1; min-width: 0"><span class="opt-t">{{pName}}</span><span class="meta {{metaHide}}">{{pMeta}}</span></span>
-            <span class="tag {{pillClass}}" style="margin: 0">{{pPill}}</span>
+        <div class="{{addHide}}">
+          <div style="font: 400 14px/22px var(--font); color: var(--ink-2)">어떤 AI를 연결할까요?</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px">
+            <button type="button" class="kcard {{kc1}}" onClick="{{kg1}}"><span class="opt-ic"><span class="ic {{ki1}}" style="width: 20px; height: 20px"></span></span><span style="flex: 1; min-width: 0"><span class="opt-t">{{kn1}}</span><span class="opt-s">{{kd1}}</span></span><span class="tag {{kt1}}" style="margin: 0">{{kw1}}</span></button>
+            <button type="button" class="kcard {{kc2}}" onClick="{{kg2}}"><span class="opt-ic"><span class="ic {{ki2}}" style="width: 20px; height: 20px"></span></span><span style="flex: 1; min-width: 0"><span class="opt-t">{{kn2}}</span><span class="opt-s">{{kd2}}</span></span><span class="tag {{kt2}}" style="margin: 0">{{kw2}}</span></button>
+            <button type="button" class="kcard {{kc3}}" onClick="{{kg3}}"><span class="opt-ic"><span class="ic {{ki3}}" style="width: 20px; height: 20px"></span></span><span style="flex: 1; min-width: 0"><span class="opt-t">{{kn3}}</span><span class="opt-s">{{kd3}}</span></span><span class="tag {{kt3}}" style="margin: 0">{{kw3}}</span></button>
+            <button type="button" class="kcard {{kc4}}" onClick="{{kg4}}"><span class="opt-ic"><span class="ic {{ki4}}" style="width: 20px; height: 20px"></span></span><span style="flex: 1; min-width: 0"><span class="opt-t">{{kn4}}</span><span class="opt-s">{{kd4}}</span></span><span class="tag {{kt4}}" style="margin: 0">{{kw4}}</span></button>
           </div>
-          <div class="{{pathLinksHide}}" style="display: flex; gap: 14px; margin: 8px 0 0 52px">
-            <button class="link" type="button" onClick="{{openPath}}">위치 바꾸기</button>
-            <button class="link {{autoHide}}" type="button" onClick="{{autoPath}}">자동으로 찾기</button>
+          <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">이 앱은 키를 받지 않아요. 키가 필요 없는 서버나, 로그인해서 쓰는 AI 도구를 연결할 수 있어요.</div>
+        </div>
+
+        <div class="{{connHide}}">
+          <div class="{{lockedHide}}">
+            <p class="note"><span class="ic ic-lock" style="margin-top: 2px"></span><span>이 작업 공간은 회사가 정한 AI만 쓸 수 있어요. 이 종류는 쓸 수 없어요.</span></p>
           </div>
 
-          <div class="{{localHide}}" style="margin-top: 16px">
-            <label class="lbl" for="addr">서버 주소</label>
-            <div style="display: flex; gap: 8px">
-              <input class="field" id="addr" type="text" value="http://127.0.0.1:8080/v1" style="flex: 1">
-              <button class="btn" type="button" onClick="{{recheck}}" style="height: 46px">서버 확인</button>
+          <div class="{{openHide}}">
+            <div class="panel-h">
+              <span class="opt-ic"><span class="ic {{pIcon}}" style="width: 20px; height: 20px"></span></span>
+              <span style="flex: 1; min-width: 0"><span class="opt-t">{{pName}}</span><span class="meta {{metaHide}}">{{pMeta}}</span></span>
+              <span class="tag {{pillClass}}" style="margin: 0">{{pPill}}</span>
+            </div>
+            <div class="{{pathLinksHide}}" style="display: flex; gap: 14px; margin: 8px 0 0 52px">
+              <button class="link" type="button" onClick="{{openPath}}">위치 바꾸기</button>
+              <button class="link {{autoHide}}" type="button" onClick="{{autoPath}}">자동으로 찾기</button>
+            </div>
+
+            <div class="{{addrHide}}" style="margin-top: 16px">
+              <label class="lbl" for="addr">서버 주소</label>
+              <div style="display: flex; gap: 8px">
+                <input class="field" id="addr" type="text" value="http://127.0.0.1:8080/v1" style="flex: 1">
+                <button class="btn" type="button" onClick="{{recheck}}" style="height: 46px">서버 확인</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px">
+              <div style="font: 600 16px/24px var(--font)">{{pHead}}</div>
+              <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{pBody}}</div>
+            </div>
+
+            <div class="{{reachHide}}" style="margin-top: 12px">
+              <p class="note" style="{{reachStyle}}"><span class="ic {{reachIcon}}" style="margin-top: 2px"></span><span>{{reachText}}</span></p>
+            </div>
+
+            <div class="{{cmdHide}}" style="margin-top: 16px">
+              <span class="cmd-l">{{c1Label}}</span>
+              <div class="cmd"><code>{{c1Cmd}}</code><button class="copy" type="button" onClick="{{copy1}}">{{c1Copy}}</button></div>
+              <span class="cmd-l" style="margin-top: 12px">{{c2Label}}</span>
+              <div class="cmd"><code>{{c2Cmd}}</code><button class="copy" type="button" onClick="{{copy2}}">{{c2Copy}}</button></div>
+              <div style="margin-top: 10px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{cmdNote}}</div>
+            </div>
+
+            <div class="{{modelsHide}}" style="margin-top: 16px">
+              <span class="cmd-l">서버가 알려 준 모델</span>
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <button class="opt sm {{mk1}}" type="button" onClick="{{pickM1}}">
+                  <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
+                  <span><span class="opt-t">local-model-14b</span></span>
+                  <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+                </button>
+                <button class="opt sm {{mk2}}" type="button" onClick="{{pickM2}}">
+                  <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
+                  <span><span class="opt-t">local-model-32b</span></span>
+                  <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="acts {{btnsHide}}" style="margin-top: 16px">
+              <button class="mini pri" type="button" onClick="{{recheck}}">{{b1Label}}</button>
+              <button class="mini {{b2Hide}}" type="button" onClick="{{openPath}}">위치 직접 지정</button>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line)">
+              <button class="more" type="button" onClick="{{toggleMore}}" aria-expanded="{{ariaMore}}"><span class="ic ic-chev" style="width: 14px; height: 14px; transform: rotate({{moreDeg}}deg)"></span>자세한 설정</button>
+
+              <div class="{{moreHide}}">
+                <div class="fgrp">
+                  <label class="lbl" for="f-name">{{nameLabel}}</label>
+                  <input class="field" id="f-name" type="text" value="{{vName}}" onInput="{{inName}}" placeholder="{{namePh}}">
+                  <div class="err {{eNameHide}}">{{eName}}</div>
+                  <div class="hint">{{nameHint}}</div>
+                </div>
+
+                <div class="fgrp {{textModelHide}}">
+                  <span class="lbl">모델</span>
+                  <div class="seg">
+                    <button type="button" class="{{mmAuto}}" onClick="{{modelAuto}}">{{pName}}가 정하게 두기</button>
+                    <button type="button" class="{{mmCustom}}" onClick="{{modelCustom}}">모델 이름 적기</button>
+                  </div>
+                  <div class="{{modelTextHide}}" style="margin-top: 8px">
+                    <input class="field" type="text" value="{{vModel}}" onInput="{{inModel}}" placeholder="예: 모델 이름" aria-label="모델 이름">
+                    <div class="err {{eModelHide}}">{{eModel}}</div>
+                  </div>
+                  <div class="hint">{{pName}}가 부르는 이름 그대로 적어요. 정하지 않으면 {{pName}}가 알아서 골라요.</div>
+                </div>
+                <div class="fgrp {{listModelHide}}">
+                  <div class="hint" style="margin: 0">모델은 위 목록에서 골라요. 서버가 알려 준 이름을 그대로 써요.</div>
+                </div>
+
+                <div class="fgrp">
+                  <span class="lbl">한도 · 비워 두면 한도가 없어요</span>
+                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+                    <div>
+                      <label class="cmd-l" for="f-turns">주고받는 최대 횟수</label>
+                      <input class="field" id="f-turns" type="text" inputmode="numeric" value="{{vTurns}}" onInput="{{inTurns}}" placeholder="1 ~ 500">
+                      <div class="err {{eTurnsHide}}">{{eTurns}}</div>
+                    </div>
+                    <div>
+                      <label class="cmd-l" for="f-mins">걸리는 최대 시간 (분)</label>
+                      <input class="field" id="f-mins" type="text" inputmode="numeric" value="{{vMins}}" onInput="{{inMins}}" placeholder="1 ~ 1,440">
+                      <div class="err {{eMinsHide}}">{{eMins}}</div>
+                    </div>
+                  </div>
+                  <div class="hint">옮겨 쓰기 한 번에 쓸 수 있는 양이에요. 넘으면 거기서 멈추고 알려 줘요.</div>
+                </div>
+
+                <div class="fgrp {{serverLimitsHide}}">
+                  <span class="lbl">긴 문서를 이어서 읽기</span>
+                  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+                    <div>
+                      <label class="cmd-l" for="f-ctx">모델이 한 번에 읽는 양 (토큰)</label>
+                      <input class="field" id="f-ctx" type="text" inputmode="numeric" value="{{vCtx}}" onInput="{{inCtx}}" placeholder="4,096 ~ 4,000,000">
+                      <div class="err {{eCtxHide}}">{{eCtx}}</div>
+                    </div>
+                    <div>
+                      <label class="cmd-l" for="f-pct">이만큼 차면 다시 시작 (%)</label>
+                      <input class="field" id="f-pct" type="text" inputmode="numeric" value="{{vPct}}" onInput="{{inPct}}" placeholder="10 ~ 95">
+                      <div class="err {{ePctHide}}">{{ePct}}</div>
+                    </div>
+                    <div>
+                      <label class="cmd-l" for="f-hand">다시 시작하는 최대 횟수</label>
+                      <input class="field" id="f-hand" type="text" inputmode="numeric" value="{{vHand}}" onInput="{{inHand}}" placeholder="0 ~ 10">
+                      <div class="err {{eHandHide}}">{{eHand}}</div>
+                    </div>
+                  </div>
+                  <div class="hint">문서가 모델이 한 번에 읽는 양을 넘으면, 하던 데서 이어서 대화를 새로 시작해요. 읽는 양을 알려 주면 서버가 거절하기 전에 먼저 시작해요. 0이면 처음 넘을 때 멈춰요.</div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 18px">
+                  <button class="btn" type="button" onClick="{{save}}">설정 저장</button>
+                  <span class="tag n {{savedHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>저장했어요</span>
+                  <span class="err {{triedHide}}" style="margin: 0">고쳐야 할 곳이 있어요</span>
+                </div>
+                <div class="hint" style="margin-left: 0">이미 시작한 옮겨 쓰기는 시작할 때의 설정으로 끝나요. 바꾼 설정은 다음 옮겨 쓰기부터 써요.</div>
+              </div>
             </div>
           </div>
 
-          <div style="margin-top: 16px">
-            <div style="font: 600 16px/24px var(--font)">{{pHead}}</div>
-            <div style="margin-top: 4px; font: 400 14px/22px var(--font); color: var(--ink-2)">{{pBody}}</div>
+          <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; font: 400 13px/20px var(--font)">
+            <button class="link {{delHide}}" type="button" onClick="{{askDel}}" style="color: var(--ink-3)">이 연결 지우기</button>
+            <span class="{{delAskHide}}" style="display: inline-flex; align-items: center; gap: 10px; color: var(--ink-2)">이 연결을 지울까요?
+              <button class="mini pri" type="button" onClick="{{doDel}}">지우기</button>
+              <button class="mini" type="button" onClick="{{noDel}}">그만두기</button>
+            </span>
           </div>
 
-          <div class="{{reachHide}}" style="margin-top: 12px">
-            <p class="note {{reachNote}}" style="{{reachStyle}}"><span class="ic {{reachIcon}}" style="margin-top: 2px"></span><span>{{reachText}}</span></p>
-          </div>
-
-          <div class="{{cmdHide}}" style="margin-top: 16px">
-            <span class="cmd-l">{{c1Label}}</span>
-            <div class="cmd"><code>{{c1Cmd}}</code><button class="copy" type="button" onClick="{{copy1}}">{{c1Copy}}</button></div>
-            <span class="cmd-l" style="margin-top: 12px">{{c2Label}}</span>
-            <div class="cmd"><code>{{c2Cmd}}</code><button class="copy" type="button" onClick="{{copy2}}">{{c2Copy}}</button></div>
-            <div style="margin-top: 10px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{cmdNote}}</div>
-          </div>
-
-          <div class="{{modelsHide}}" style="margin-top: 16px">
-            <span class="cmd-l">서버가 알려 준 모델</span>
-            <div style="display: flex; flex-direction: column; gap: 8px">
-              <button class="opt sm {{mk1}}" type="button" onClick="{{pickM1}}">
-                <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
-                <span><span class="opt-t">local-model-14b</span></span>
-                <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
-              </button>
-              <button class="opt sm {{mk2}}" type="button" onClick="{{pickM2}}">
-                <span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span>
-                <span><span class="opt-t">local-model-32b</span></span>
-                <span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span>
-              </button>
-            </div>
-          </div>
-
-          <div class="acts {{btnsHide}}" style="margin-top: 16px">
-            <button class="mini pri" type="button" onClick="{{recheck}}">{{b1Label}}</button>
-            <button class="mini {{b2Hide}}" type="button" onClick="{{openPath}}">위치 직접 지정</button>
-          </div>
-
-          <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line)">
-            <button class="more" type="button" onClick="{{toggleMore}}" aria-expanded="{{ariaMore}}"><span class="ic ic-chev" style="width: 14px; height: 14px; transform: rotate({{moreDeg}}deg)"></span>자세한 설정</button>
-
-            <div class="{{moreHide}}">
-              <div class="fgrp">
-                <label class="lbl" for="f-name">{{nameLabel}}</label>
-                <input class="field" id="f-name" type="text" value="{{vName}}" onInput="{{inName}}" placeholder="{{namePh}}">
-                <div class="err {{eNameHide}}">{{eName}}</div>
-                <div class="hint">{{nameHint}}</div>
-              </div>
-
-              <div class="fgrp {{clientHide}}">
-                <span class="lbl">모델</span>
-                <div class="seg">
-                  <button type="button" class="{{mmAuto}}" onClick="{{modelAuto}}">{{pName}}가 정하게 두기</button>
-                  <button type="button" class="{{mmCustom}}" onClick="{{modelCustom}}">모델 이름 적기</button>
-                </div>
-                <div class="{{modelTextHide}}" style="margin-top: 8px">
-                  <input class="field" type="text" value="{{vModel}}" onInput="{{inModel}}" placeholder="예: 모델 이름" aria-label="모델 이름">
-                  <div class="err {{eModelHide}}">{{eModel}}</div>
-                </div>
-                <div class="hint">{{pName}}가 부르는 이름 그대로 적어요. 정하지 않으면 {{pName}}가 알아서 골라요.</div>
-              </div>
-              <div class="fgrp {{localOnlyHide}}">
-                <div class="hint" style="margin: 0">모델은 위 목록에서 골라요. 서버가 알려 준 이름을 그대로 써요.</div>
-              </div>
-
-              <div class="fgrp">
-                <span class="lbl">한도 · 비워 두면 한도가 없어요</span>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
-                  <div>
-                    <label class="cmd-l" for="f-turns">주고받는 최대 횟수</label>
-                    <input class="field" id="f-turns" type="text" inputmode="numeric" value="{{vTurns}}" onInput="{{inTurns}}" placeholder="1 ~ 500">
-                    <div class="err {{eTurnsHide}}">{{eTurns}}</div>
-                  </div>
-                  <div>
-                    <label class="cmd-l" for="f-mins">걸리는 최대 시간 (분)</label>
-                    <input class="field" id="f-mins" type="text" inputmode="numeric" value="{{vMins}}" onInput="{{inMins}}" placeholder="1 ~ 1,440">
-                    <div class="err {{eMinsHide}}">{{eMins}}</div>
-                  </div>
-                </div>
-                <div class="hint">옮겨 쓰기 한 번에 쓸 수 있는 양이에요. 넘으면 거기서 멈추고 알려 줘요.</div>
-              </div>
-
-              <div class="fgrp {{localOnlyHide}}">
-                <span class="lbl">긴 문서를 이어서 읽기</span>
-                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
-                  <div>
-                    <label class="cmd-l" for="f-ctx">모델이 한 번에 읽는 양 (토큰)</label>
-                    <input class="field" id="f-ctx" type="text" inputmode="numeric" value="{{vCtx}}" onInput="{{inCtx}}" placeholder="4,096 ~ 4,000,000">
-                    <div class="err {{eCtxHide}}">{{eCtx}}</div>
-                  </div>
-                  <div>
-                    <label class="cmd-l" for="f-pct">이만큼 차면 다시 시작 (%)</label>
-                    <input class="field" id="f-pct" type="text" inputmode="numeric" value="{{vPct}}" onInput="{{inPct}}" placeholder="10 ~ 95">
-                    <div class="err {{ePctHide}}">{{ePct}}</div>
-                  </div>
-                  <div>
-                    <label class="cmd-l" for="f-hand">다시 시작하는 최대 횟수</label>
-                    <input class="field" id="f-hand" type="text" inputmode="numeric" value="{{vHand}}" onInput="{{inHand}}" placeholder="0 ~ 10">
-                    <div class="err {{eHandHide}}">{{eHand}}</div>
-                  </div>
-                </div>
-                <div class="hint">문서가 모델이 한 번에 읽는 양을 넘으면, 하던 데서 이어서 대화를 새로 시작해요. 읽는 양을 알려 주면 서버가 거절하기 전에 먼저 시작해요. 0이면 처음 넘을 때 멈춰요.</div>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 12px; margin-top: 18px">
-                <button class="btn" type="button" onClick="{{save}}">설정 저장</button>
-                <span class="tag n {{savedHide}}" style="margin: 0"><span class="ic ic-check" style="width: 13px; height: 13px"></span>저장했어요</span>
-                <span class="err {{triedHide}}" style="margin: 0">고쳐야 할 곳이 있어요</span>
-              </div>
-              <div class="hint" style="margin-left: 0">이미 시작한 옮겨 쓰기는 시작할 때의 설정으로 끝나요. 바꾼 설정은 다음 옮겨 쓰기부터 써요.</div>
-            </div>
+          <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{footNote}}</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px">
+            <span style="font: 400 14px/22px var(--font); {{usingStyle}}">{{usingText}}</span>
+            <span>
+              <button class="btn {{useHide}}" type="button" onClick="{{useThis}}">이 AI로 옮겨 쓰기</button>
+              <button class="btn off {{offHide}}" type="button" disabled>이 AI로 옮겨 쓰기</button>
+            </span>
           </div>
         </div>
-      </div>
-
-      <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">{{footNote}}</div>
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px">
-        <span style="font: 400 14px/22px var(--font); {{usingStyle}}">{{usingText}}</span>
-        <span>
-          <button class="btn {{useHide}}" type="button" onClick="{{useThis}}">이 AI로 옮겨 쓰기</button>
-          <button class="btn off {{offHide}}" type="button" disabled>이 AI로 옮겨 쓰기</button>
-        </span>
-      </div>
+      </section>
     </div>
   </main>
 
@@ -232,133 +258,118 @@ body{margin:0}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
+    const client = () => ({ name: '', mode: 'auto', model: '', turns: '', mins: '' });
+    const server = (name) => ({ name, turns: '', mins: '', ctx: '', pct: '', hand: '' });
+    this.blank = { client, server };
     this.state = {
-      tab: props.policy ? 'local' : 'claude',
-      st: { claude: 'signedout', codex: 'missing', local: 'this' },
-      using: 'claude',
-      copied: '',
-      model: 1,
-      // the settings of each kind, as typed: text, validated below as the application does
-      more: false, tried: false, saved: false,
-      set: {
-        claude: { name: '', mode: 'auto', model: '', turns: '', mins: '' },
-        codex: { name: '', mode: 'auto', model: '', turns: '', mins: '' },
-        local: { name: '', turns: '', mins: '', ctx: '', pct: '', hand: '' },
-      },
-      // where the person said a client is; empty leaves it to the search
-      where: { claude: '', codex: '' },
+      // what the person has connected; a kind is only a way of making one
+      conns: [{ id: 'c1', kind: 'claude' }, { id: 'c2', kind: 'codex' }, { id: 'c3', kind: 'local' }],
+      next: 4,
+      sel: props.policy ? 'c3' : 'c1',
+      view: 'conn',
+      using: 'c1',
+      st: { c1: 'signedout', c2: 'missing', c3: 'this' },
+      set: { c1: client(), c2: client(), c3: server('사무실 서버') },
+      where: { c1: '', c2: '' },
+      picked: { c3: 1 },
+      copied: '', more: false, tried: false, saved: false, confirm: false,
       path: { open: false, text: '', demo: 'found', res: null },
     };
   }
+
+  // The kinds. A kind says how its sign-in is done, which states it can report, how its model is
+  // named and which limits apply; the screen is built from this and nothing else. Adding a kind
+  // is adding an entry. A kind with `supported: false` is listed with the reason and cannot be added.
+  kinds() {
+    return {
+      claude: {
+        name: 'Claude Code', icon: 'ic-user', flow: 'client', model: 'text',
+        desc: 'Claude 구독이나 API 사용량 요금으로 쓰는 AI 도구',
+        plan: 'Claude 구독', found: ['2.1.0', '/usr/local/bin/claude'],
+        cmds: [['Claude 구독으로 로그인 (월 정액)', 'claude auth login'], ['API 사용량 요금으로 로그인', 'claude auth login --console']],
+        cmdNote: '로그인은 이 앱이 대신 열지 않아요. 터미널에서 직접 실행하면 Claude Code가 알아서 처리해요.',
+        limits: ['turns', 'mins'],
+        chips: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unusable', '쓸 수 없는 로그인'], ['unknown', '확인 못 함']],
+      },
+      codex: {
+        name: 'Codex', icon: 'ic-user', flow: 'client', model: 'text',
+        desc: 'ChatGPT 구독이나 API 사용량 요금으로 쓰는 AI 도구',
+        plan: 'ChatGPT 구독', found: ['0.159.0', '/usr/local/bin/codex'],
+        cmds: [['ChatGPT 구독으로 로그인 (월 정액)', 'codex login -c …'], ['API 사용량 요금으로 로그인', 'codex login --with-api-key -c …']],
+        cmdNote: 'API 키는 터미널에서 Codex에 직접 입력해요. 이 앱에는 입력하지 않아요. 명령의 나머지 부분은 이 앱이 정확하게 보여 줘요.',
+        limits: ['turns', 'mins'],
+        chips: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unverified', '확인 안 된 버전'], ['unknown', '확인 못 함']],
+      },
+      local: {
+        name: '모델 서버', icon: 'ic-cpu', flow: 'server', model: 'list', nameRequired: true,
+        desc: '이 컴퓨터나 회사 서버에서 돌아가는 모델. 키가 필요 없는 서버만 쓸 수 있어요',
+        limits: ['turns', 'mins', 'ctx', 'pct', 'hand'],
+        chips: [['this', '이 컴퓨터'], ['net', '네트워크'], ['plain', '암호화 없음'], ['down', '닿지 않음'], ['cert', '인증서 문제'], ['key', '키 필요'], ['nolist', '모델 목록 아님'], ['empty', '모델 없음']],
+      },
+      hosted: {
+        name: 'API 키로 쓰는 AI 서비스', icon: 'ic-key', supported: false,
+        desc: '주소와 키로 쓰는 호스팅 AI',
+        why: '키를 보관할 곳이 아직 없어서 지원하지 않아요',
+      },
+    };
+  }
+
   renderVals() {
     const policy = !!this.props.policy;
-    const { tab, st, using, copied, model, more, tried, saved, set, where, path } = this.state;
-    const kinds = ['claude', 'codex', 'local'];
-    const locked = (k) => policy && k !== 'local';
-    const isLocked = locked(tab);
-    const cur = st[tab];
-    const nowUsing = policy ? 'local' : using;
-
-    const demo = {
-      claude: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unusable', '쓸 수 없는 로그인'], ['unknown', '확인 못 함']],
-      codex: [['checking', '확인 중'], ['missing', '없음'], ['signedout', '로그아웃'], ['sub', '구독'], ['usage', '사용량 요금'], ['unverified', '확인 안 된 버전'], ['unknown', '확인 못 함']],
-      local: [['this', '이 컴퓨터'], ['net', '네트워크'], ['plain', '암호화 없음'], ['down', '닿지 않음'], ['cert', '인증서 문제'], ['key', '키 필요'], ['nolist', '모델 목록 아님'], ['empty', '모델 없음']],
-    };
+    const { conns, next, sel, view, using, st, set, where, picked, copied, more, tried, saved, confirm, path } = this.state;
+    const KINDS = this.kinds();
+    const ORDER = ['claude', 'codex', 'local', 'hosted'];
     const good = { sub: 1, usage: 1, this: 1, net: 1, plain: 1 };
-    const names = { claude: 'Claude Code', codex: 'Codex', local: '모델 서버' };
-    const icons = { claude: 'ic-user', codex: 'ic-user', local: 'ic-cpu' };
-    const found = { claude: ['2.1.0', '/usr/local/bin/claude'], codex: ['0.159.0', '/usr/local/bin/codex'] };
-    const metaOf = (k) => '버전 ' + found[k][0] + ' · ' + (where[k] || found[k][1]) + (where[k] ? ' · 직접 지정함' : '');
     const noMeta = { checking: 1, missing: 1, unknown: 1 };
+    const lockedKind = (k) => policy && KINDS[k].flow !== 'server';
+    const labelOf = (c) => set[c.id].name || (KINDS[c.kind].flow === 'server' ? '이름 없는 서버' : KINDS[c.kind].name);
 
-    // what each state says, for the two clients and for a server
-    const client = (k) => {
-      const who = k === 'claude' ? 'Claude Code' : 'Codex';
-      const plan = k === 'claude' ? 'Claude 구독' : 'ChatGPT 구독';
+    const conn = view === 'conn' ? conns.find((c) => c.id === sel) : null;
+    const showAdd = view === 'add' || !conn;
+    const id = conn ? conn.id : '';
+    const kind = conn ? conn.kind : 'claude';
+    const K = KINDS[kind];
+    const isServer = K.flow === 'server';
+    const isLocked = !!conn && lockedKind(kind);
+    const cur = conn ? st[id] : '';
+    const s = conn ? set[id] : {};
+    const firstServer = conns.find((c) => KINDS[c.kind].flow === 'server');
+    const nowUsing = policy ? (firstServer ? firstServer.id : null) : (conns.some((c) => c.id === using) ? using : null);
+
+    // what each state says
+    const say = (() => {
+      if (!conn) return { pill: '', cls: '', head: '', body: '' };
+      if (isServer) {
+        const stateOf = {
+          idle: { pill: '확인 전', cls: '', head: '서버 주소를 넣고 확인해 주세요', body: '확인하면 서버가 알려 주는 모델 목록을 볼 수 있어요.' },
+          this: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-check', '이 컴퓨터에 있는 서버예요. 문서가 이 컴퓨터를 떠나지 않아요.', ''], models: true },
+          net: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 네트워크로 나가요. 암호화되어 있어요.', 'warn'], models: true },
+          plain: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 암호화되지 않은 채 네트워크로 나가요.', 'warn'], models: true },
+          down: { pill: '닿지 않음', cls: '', head: '서버에 닿지 않아요', body: '주소를 다시 확인해 주세요. 연결이 거절됐어요.' },
+          cert: { pill: '인증서 문제', cls: '', head: '서버의 인증서를 믿을 수 없어요', body: '아무것도 보내지 않았어요. 주소나 서버의 인증서를 확인해 주세요.' },
+          key: { pill: '키 필요', cls: '', head: '이 서버는 키가 있어야 들어갈 수 있어요', body: '이 앱은 서버 키를 보관할 곳이 아직 없어서 이 서버를 쓸 수 없어요.' },
+          nolist: { pill: '확인 못 함', cls: '', head: '모델 목록이 아닌 답이 왔어요', body: '주소가 서버의 맨 위(보통 …/v1)가 아닌 것 같아요.' },
+          empty: { pill: '모델 없음', cls: '', head: '서버에 불러온 모델이 없어요', body: '서버에 모델을 올린 뒤 다시 확인해 주세요.' },
+        };
+        return stateOf[cur];
+      }
+      const who = K.name;
       return {
         checking: { pill: '확인 중', cls: '', head: who + '에 확인하는 중이에요', body: '' },
         missing: { pill: '찾지 못함', cls: '', head: '이 컴퓨터에서 ' + who + '를 찾지 못했어요', body: who + '를 설치한 뒤 다시 확인해 주세요. 다른 곳에 설치했다면 위치를 직접 알려 줄 수 있어요.', btn: '다시 확인', loc: true },
         signedout: { pill: '로그인 필요', cls: '', head: who + '에 로그인해 주세요', body: '터미널에서 아래 명령 중 하나를 실행하세요. 로그인은 ' + who + '가 직접 처리하고, 이 앱은 계정 정보나 키를 받지 않아요.', cmds: true, btn: '로그인했어요 · 다시 확인' },
-        sub: { pill: '연결됨', cls: 'n', head: plan + '으로 로그인되어 있어요', body: plan + '의 사용 한도 안에서 옮겨 써요.' },
+        sub: { pill: '연결됨', cls: 'n', head: K.plan + '으로 로그인되어 있어요', body: K.plan + '의 사용 한도 안에서 옮겨 써요.' },
         usage: { pill: '연결됨', cls: 'n', head: 'API 사용량 요금으로 로그인되어 있어요', body: '옮겨 쓴 만큼 요금이 나가요.' },
         unusable: { pill: '쓸 수 없음', cls: '', head: '이 로그인은 이 앱에서 쓸 수 없어요', body: who + '가 알려 준 로그인 방식을 이 앱은 쓰지 않아요. 아래 방식으로 다시 로그인해 주세요.', cmds: true, btn: '다시 로그인했어요 · 다시 확인' },
         unverified: { pill: '확인 안 된 버전', cls: '', head: '이 ' + who + ' 버전은 아직 확인되지 않았어요', body: '이 앱이 확인한 버전에서만 ' + who + '를 써요. 확인된 버전으로 바꾼 뒤 다시 확인해 주세요.', btn: '다시 확인' },
         unknown: { pill: '확인 못 함', cls: '', head: who + '에 물어보지 못했어요', body: '로그인이 안 되어 있다는 뜻은 아니에요. 시간 안에 답이 없었어요.', btn: '다시 확인' },
-      };
-    };
-    const server = {
-      this: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-check', '이 컴퓨터에 있는 서버예요. 문서가 이 컴퓨터를 떠나지 않아요.', ''], models: true },
-      net: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 네트워크로 나가요. 암호화되어 있어요.', 'warn'], models: true },
-      plain: { pill: '연결됨', cls: 'n', head: '서버가 모델 2개를 알려 줬어요', body: '쓸 모델을 고르세요.', reach: ['ic-alert', '다른 컴퓨터에 있는 서버예요. 문서가 암호화되지 않은 채 네트워크로 나가요.', 'warn'], models: true },
-      down: { pill: '닿지 않음', cls: '', head: '서버에 닿지 않아요', body: '주소를 다시 확인해 주세요. 연결이 거절됐어요.' },
-      cert: { pill: '인증서 문제', cls: '', head: '서버의 인증서를 믿을 수 없어요', body: '아무것도 보내지 않았어요. 주소나 서버의 인증서를 확인해 주세요.' },
-      key: { pill: '키 필요', cls: '', head: '이 서버는 키가 있어야 들어갈 수 있어요', body: '이 앱은 서버 키를 보관할 곳이 아직 없어서 이 서버를 쓸 수 없어요.' },
-      nolist: { pill: '확인 못 함', cls: '', head: '모델 목록이 아닌 답이 왔어요', body: '주소가 서버의 맨 위(보통 …/v1)가 아닌 것 같아요.' },
-      empty: { pill: '모델 없음', cls: '', head: '서버에 불러온 모델이 없어요', body: '서버에 모델을 올린 뒤 다시 확인해 주세요.' },
-    };
-    const say = tab === 'local' ? server[cur] : client(tab)[cur];
-
-    // the commands: fixed words, and what each one signs in for
-    const cmds = tab === 'claude'
-      ? [['Claude 구독으로 로그인 (월 정액)', 'claude auth login'], ['API 사용량 요금으로 로그인', 'claude auth login --console']]
-      : [['ChatGPT 구독으로 로그인 (월 정액)', 'codex login -c …'], ['API 사용량 요금으로 로그인', 'codex login --with-api-key -c …']];
-    const cmdNote = tab === 'claude'
-      ? '로그인은 이 앱이 대신 열지 않아요. 터미널에서 직접 실행하면 Claude Code가 알아서 처리해요.'
-      : 'API 키는 터미널에서 Codex에 직접 입력해요. 이 앱에는 입력하지 않아요. 명령의 나머지 부분은 이 앱이 정확하게 보여 줘요.';
-
-    const usable = !isLocked && !!good[cur] && (tab !== 'local' || (cur === 'this' || cur === 'net' || cur === 'plain'));
-    const isUsing = nowUsing === tab;
+      }[cur];
+    })();
     const reach = say.reach || ['', '', ''];
+    const usable = !!conn && !isLocked && !!good[cur];
+    const isUsing = !!conn && nowUsing === id;
 
-    const vals = {
-      demoLabel: isLocked ? '회사 정책으로 막힌 종류예요' : names[tab] + ' 상태 고르기',
-      tabClaude: tab === 'claude' ? 'on' : '', tabCodex: tab === 'codex' ? 'on' : '', tabLocal: tab === 'local' ? 'on' : '',
-      sdClaude: locked('claude') ? '' : good[st.claude] ? 'ok' : st.claude === 'checking' ? '' : 'attn',
-      sdCodex: locked('codex') ? '' : good[st.codex] ? 'ok' : st.codex === 'checking' ? '' : 'attn',
-      sdLocal: good[st.local] ? 'ok' : 'attn',
-      lockClaude: locked('claude') ? '' : 'hide', lockCodex: locked('codex') ? '' : 'hide',
-      goClaude: () => this.setState({ tab: 'claude', copied: '', tried: false, saved: false }),
-      goCodex: () => this.setState({ tab: 'codex', copied: '', tried: false, saved: false }),
-      goLocal: () => this.setState({ tab: 'local', copied: '', tried: false, saved: false }),
-
-      lockedHide: isLocked ? '' : 'hide',
-      openHide: isLocked ? 'hide' : '',
-      pIcon: icons[tab], pName: names[tab],
-      pMeta: tab === 'local' ? '' : metaOf(tab), metaHide: tab === 'local' || noMeta[cur] ? 'hide' : '',
-      pPill: say.pill, pillClass: say.cls,
-      pHead: say.head, pBody: say.body,
-      localHide: tab === 'local' ? '' : 'hide',
-      reachHide: say.reach ? '' : 'hide',
-      reachIcon: reach[0], reachText: reach[1],
-      reachNote: '', reachStyle: reach[2] === 'warn' ? '' : 'background: var(--accent-tint); color: var(--accent-ink)',
-      cmdHide: say.cmds ? '' : 'hide',
-      c1Label: cmds[0][0], c1Cmd: cmds[0][1], c2Label: cmds[1][0], c2Cmd: cmds[1][1],
-      c1Copy: copied === 'c1' ? '복사했어요' : '복사', c2Copy: copied === 'c2' ? '복사했어요' : '복사',
-      copy1: () => this.setState({ copied: 'c1' }), copy2: () => this.setState({ copied: 'c2' }),
-      cmdNote,
-      modelsHide: say.models ? '' : 'hide',
-      mk1: model === 1 ? 'sel' : '', mk2: model === 2 ? 'sel' : '',
-      pickM1: () => this.setState({ model: 1 }), pickM2: () => this.setState({ model: 2 }),
-      btnsHide: tab === 'local' || !say.btn ? 'hide' : '',
-      b1Label: say.btn || '', b2Hide: say.loc ? '' : 'hide',
-      recheck: () => {
-        const next = tab === 'local'
-          ? { down: 'this', cert: 'net', nolist: 'this', empty: 'this' }
-          : { checking: 'sub', missing: 'signedout', signedout: 'sub', unusable: 'sub', unknown: 'sub' };
-        this.setState({ st: { ...st, [tab]: next[cur] || cur }, copied: '' });
-      },
-
-      footNote: tab === 'local'
-        ? '키나 비밀번호가 들어간 주소는 받지 않아요.'
-        : '선택한 AI에 문서가 전송돼요. 로그인 정보는 사양에 들어가지 않아요.',
-      usingText: '지금 사용 중: ' + names[nowUsing] + (nowUsing === tab && !usable && !isLocked ? ' · 연결을 확인해 주세요' : ''),
-      usingStyle: nowUsing === tab && !usable && !isLocked ? 'color: var(--attn)' : 'color: var(--ink-2)',
-      useHide: usable && !isUsing ? '' : 'hide',
-      offHide: !usable && !isUsing && !isLocked ? '' : 'hide',
-      useThis: () => this.setState({ using: tab }),
-    };
     // the rules of a connection, as the application states them (core/src/connection.rs)
-    const s = set[tab];
     const control = /[\u0000-\u001f\u007f]/;
     const oneLine = (t, max) => t.length >= 1 && t.length <= max && t === t.trim() && !control.test(t);
     const range = (text, min, max, unit) => {
@@ -366,58 +377,107 @@ class Component extends DCLogic {
       if (t === '') return '';
       if (!/^\d+$/.test(t)) return '숫자로 적어 주세요';
       const n = Number(t);
-      return n < min || n > max
-        ? min.toLocaleString('ko-KR') + unit + '에서 ' + max.toLocaleString('ko-KR') + unit + ' 사이로 적어 주세요'
-        : '';
+      return n < min || n > max ? min.toLocaleString('ko-KR') + unit + '에서 ' + max.toLocaleString('ko-KR') + unit + ' 사이로 적어 주세요' : '';
     };
-    const isLocal = tab === 'local';
-    const custom = !isLocal && s.mode === 'custom';
+    const has = (l) => !!conn && K.limits && K.limits.includes(l);
+    const customModel = !!conn && K.model === 'text' && s.mode === 'custom';
     const err = {
-      name: s.name === '' ? (isLocal && tried ? '이름을 적어 주세요' : '') : oneLine(s.name, 80) ? '' : '앞뒤 공백 없이 한 줄로, 80자 안으로 적어 주세요',
-      model: custom ? (s.model === '' ? (tried ? '모델 이름을 적어 주세요' : '') : oneLine(s.model, 200) ? '' : '앞뒤 공백 없이 한 줄로, 200자 안으로 적어 주세요') : '',
-      turns: range(s.turns, 1, 500, ''),
-      mins: range(s.mins, 1, 1440, '분'),
-      ctx: isLocal ? range(s.ctx, 4096, 4000000, '') : '',
-      pct: isLocal ? range(s.pct, 10, 95, '%') : '',
-      hand: isLocal ? range(s.hand, 0, 10, '') : '',
+      name: !conn ? '' : s.name === '' ? (K.nameRequired && tried ? '이름을 적어 주세요' : '') : oneLine(s.name, 80) ? '' : '앞뒤 공백 없이 한 줄로, 80자 안으로 적어 주세요',
+      model: customModel ? (s.model === '' ? (tried ? '모델 이름을 적어 주세요' : '') : oneLine(s.model, 200) ? '' : '앞뒤 공백 없이 한 줄로, 200자 안으로 적어 주세요') : '',
+      turns: has('turns') ? range(s.turns, 1, 500, '') : '',
+      mins: has('mins') ? range(s.mins, 1, 1440, '분') : '',
+      ctx: has('ctx') ? range(s.ctx, 4096, 4000000, '') : '',
+      pct: has('pct') ? range(s.pct, 10, 95, '%') : '',
+      hand: has('hand') ? range(s.hand, 0, 10, '') : '',
     };
-    const blocking = (isLocal && s.name === '') || (custom && s.model === '');
+    const blocking = !!conn && ((K.nameRequired && s.name === '') || (customModel && s.model === ''));
     const bad = Object.values(err).some(Boolean) || blocking;
-    const field = (k) => (e) => this.setState({ set: { ...set, [tab]: { ...set[tab], [k]: e && e.target ? e.target.value : '' } }, saved: false });
-    const hole = (k, key) => {
-      vals['v' + key] = s[k] || '';
-      vals['in' + key] = field(k);
-      vals['e' + key] = err[k] || '';
-      vals['e' + key + 'Hide'] = err[k] ? '' : 'hide';
-    };
-    hole('name', 'Name'); hole('model', 'Model'); hole('turns', 'Turns'); hole('mins', 'Mins');
-    hole('ctx', 'Ctx'); hole('pct', 'Pct'); hole('hand', 'Hand');
-    Object.assign(vals, {
+    const edit = (patch) => this.setState({ set: { ...set, [id]: { ...set[id], ...patch } }, saved: false });
+
+    const vals = {
+      // the list of connections
+      addOn: showAdd ? 'on' : '',
+      goAdd: () => this.setState({ view: 'add', copied: '', confirm: false }),
+      paneTitle: showAdd ? '연결 추가' : labelOf(conn),
+      addHide: showAdd ? '' : 'hide',
+      connHide: showAdd ? 'hide' : '',
+
+      // what the person picks from when adding
+      demoHide: showAdd ? 'hide' : '',
+      demoLabel: isLocked ? '회사 정책으로 막힌 종류예요' : conn ? K.name + ' 상태 고르기' : '',
+
+      lockedHide: isLocked ? '' : 'hide',
+      openHide: isLocked ? 'hide' : '',
+      pIcon: K.icon, pName: K.name,
+      pMeta: isServer || !conn ? '' : '버전 ' + K.found[0] + ' · ' + (where[id] || K.found[1]) + (where[id] ? ' · 직접 지정함' : ''),
+      metaHide: isServer || noMeta[cur] ? 'hide' : '',
+      pPill: say.pill, pillClass: say.cls,
+      pHead: say.head, pBody: say.body,
+      addrHide: isServer ? '' : 'hide',
+      reachHide: say.reach ? '' : 'hide',
+      reachIcon: reach[0], reachText: reach[1],
+      reachStyle: reach[2] === 'warn' ? '' : 'background: var(--accent-tint); color: var(--accent-ink)',
+      cmdHide: say.cmds ? '' : 'hide',
+      c1Label: K.cmds ? K.cmds[0][0] : '', c1Cmd: K.cmds ? K.cmds[0][1] : '', c2Label: K.cmds ? K.cmds[1][0] : '', c2Cmd: K.cmds ? K.cmds[1][1] : '',
+      c1Copy: copied === 'c1' ? '복사했어요' : '복사', c2Copy: copied === 'c2' ? '복사했어요' : '복사',
+      copy1: () => this.setState({ copied: 'c1' }), copy2: () => this.setState({ copied: 'c2' }),
+      cmdNote: K.cmdNote || '',
+      modelsHide: say.models ? '' : 'hide',
+      mk1: picked[id] === 2 ? '' : 'sel', mk2: picked[id] === 2 ? 'sel' : '',
+      pickM1: () => this.setState({ picked: { ...picked, [id]: 1 } }), pickM2: () => this.setState({ picked: { ...picked, [id]: 2 } }),
+      btnsHide: isServer || !say.btn ? 'hide' : '',
+      b1Label: say.btn || '', b2Hide: say.loc ? '' : 'hide',
+      recheck: () => {
+        const nextOf = isServer
+          ? { idle: 'this', down: 'this', cert: 'net', nolist: 'this', empty: 'this' }
+          : { checking: 'sub', missing: 'signedout', signedout: 'sub', unusable: 'sub', unknown: 'sub' };
+        this.setState({ st: { ...st, [id]: nextOf[cur] || cur }, copied: '' });
+      },
+      footNote: isServer
+        ? '키나 비밀번호가 들어간 주소는 받지 않아요.'
+        : '선택한 AI에 문서가 전송돼요. 로그인 정보는 사양에 들어가지 않아요.',
+      usingText: nowUsing ? '지금 사용 중: ' + labelOf(conns.find((c) => c.id === nowUsing)) + (isUsing && !usable && !isLocked ? ' · 연결을 확인해 주세요' : '') : '지금 사용 중인 AI가 없어요',
+      usingStyle: isUsing && !usable && !isLocked ? 'color: var(--attn)' : 'color: var(--ink-2)',
+      useHide: usable && !isUsing ? '' : 'hide',
+      offHide: conn && !usable && !isUsing && !isLocked ? '' : 'hide',
+      useThis: () => this.setState({ using: id }),
+
+      // removing a connection
+      delHide: confirm ? 'hide' : '',
+      delAskHide: confirm ? '' : 'hide',
+      askDel: () => this.setState({ confirm: true }),
+      noDel: () => this.setState({ confirm: false }),
+      doDel: () => {
+        const rest = conns.filter((c) => c.id !== id);
+        this.setState({ conns: rest, sel: rest.length ? rest[0].id : null, view: rest.length ? 'conn' : 'add', using: using === id ? null : using, confirm: false, more: false });
+      },
+
+      // settings
       moreHide: more ? '' : 'hide', moreDeg: more ? 90 : 0, ariaMore: String(more),
       toggleMore: () => this.setState({ more: !more }),
-      clientHide: isLocal ? 'hide' : '', localOnlyHide: isLocal ? '' : 'hide',
-      nameLabel: isLocal ? '이름' : '이름 (선택)',
-      namePh: isLocal ? '예: 사무실 모델 서버' : names[tab],
-      nameHint: isLocal
+      textModelHide: K.model === 'text' ? '' : 'hide', listModelHide: K.model === 'list' ? '' : 'hide',
+      serverLimitsHide: has('ctx') ? '' : 'hide',
+      nameLabel: K.nameRequired ? '이름' : '이름 (선택)',
+      namePh: K.nameRequired ? '예: 사무실 모델 서버' : K.name,
+      nameHint: K.nameRequired
         ? '문서가 어디로 가는지 알아볼 수 있는 이름을 적어 주세요. 주소가 127.0.0.1이어도 다른 컴퓨터로 이어진 터널일 수 있어요.'
-        : '목록에 보이는 이름이에요. 비워 두면 "' + names[tab] + '"로 보여요.',
-      mmAuto: custom ? '' : 'on', mmCustom: custom ? 'on' : '',
-      modelAuto: () => this.setState({ set: { ...set, [tab]: { ...set[tab], mode: 'auto' } }, saved: false }),
-      modelCustom: () => this.setState({ set: { ...set, [tab]: { ...set[tab], mode: 'custom' } }, saved: false }),
-      modelTextHide: custom ? '' : 'hide',
+        : '목록에 보이는 이름이에요. 비워 두면 "' + K.name + '"로 보여요.',
+      mmAuto: customModel ? '' : 'on', mmCustom: customModel ? 'on' : '',
+      modelAuto: () => edit({ mode: 'auto' }), modelCustom: () => edit({ mode: 'custom' }),
+      modelTextHide: customModel ? '' : 'hide',
       savedHide: saved && !bad ? '' : 'hide',
       triedHide: tried && bad ? '' : 'hide',
       save: () => (bad ? this.setState({ tried: true, saved: false }) : this.setState({ saved: true, tried: false })),
 
       // where a client is, when the search did not find it
-      pathLinksHide: isLocal || noMeta[cur] ? 'hide' : '',
-      autoHide: where[tab] ? '' : 'hide',
-      autoPath: () => this.setState({ where: { ...where, [tab]: '' } }),
-      openPath: () => this.setState({ path: { open: true, text: where[tab] || '', demo: 'found', res: null } }),
+      pathLinksHide: isServer || noMeta[cur] || !conn ? 'hide' : '',
+      autoHide: where[id] ? '' : 'hide',
+      autoPath: () => this.setState({ where: { ...where, [id]: '' } }),
+      openPath: () => this.setState({ path: { open: true, text: where[id] || '', demo: 'found', res: null } }),
       closePath: () => this.setState({ path: { ...path, open: false } }),
-      pathWrapHide: path.open && !isLocal && !isLocked ? '' : 'hide',
+      pathWrapHide: path.open && conn && !isServer && !isLocked ? '' : 'hide',
       pathText: path.text,
-      pathPh: tab === 'codex' ? '/usr/local/bin/codex' : '/usr/local/bin/claude',
+      pathPh: K.found ? K.found[1] : '',
       typePath: (e) => this.setState({ path: { ...path, text: e && e.target ? e.target.value : '', res: null } }),
       pd1: path.demo === 'found' ? 'on' : '', pd2: path.demo === 'mute' ? 'on' : '', pd3: path.demo === 'none' ? 'on' : '',
       pdFound: () => this.setState({ path: { ...path, demo: 'found', res: null } }),
@@ -437,18 +497,65 @@ class Component extends DCLogic {
       rUseHide: path.res === 'found' ? '' : 'hide',
       rCheckHide: path.res === 'found' ? 'hide' : '',
       usePath: () => this.setState({
-        where: { ...where, [tab]: path.text },
-        st: st[tab] === 'missing' ? { ...st, [tab]: 'signedout' } : st,
+        where: { ...where, [id]: path.text },
+        st: st[id] === 'missing' ? { ...st, [id]: 'signedout' } : st,
         path: { ...path, open: false, res: null },
       }),
+    };
+
+    const field = (k, key) => {
+      vals['v' + key] = s[k] || '';
+      vals['in' + key] = (e) => edit({ [k]: e && e.target ? e.target.value : '' });
+      vals['e' + key] = err[k] || '';
+      vals['e' + key + 'Hide'] = err[k] ? '' : 'hide';
+    };
+    field('name', 'Name'); field('model', 'Model'); field('turns', 'Turns'); field('mins', 'Mins');
+    field('ctx', 'Ctx'); field('pct', 'Pct'); field('hand', 'Hand');
+
+    // the rows of the list: at most six on this screen
+    for (let i = 1; i <= 6; i++) {
+      const c = conns[i - 1];
+      const cl = c ? lockedKind(c.kind) : false;
+      vals['rh' + i] = c ? '' : 'hide';
+      vals['rn' + i] = c ? labelOf(c) : '';
+      vals['rk' + i] = c && labelOf(c) !== KINDS[c.kind].name ? KINDS[c.kind].name : '';
+      vals['rd' + i] = !c || cl ? '' : good[st[c.id]] ? 'ok' : st[c.id] === 'checking' ? '' : 'attn';
+      vals['ron' + i] = c && !showAdd && c.id === sel ? 'on' : '';
+      vals['ru' + i] = c && c.id === nowUsing ? '' : 'hide';
+      vals['rg' + i] = () => c && this.setState({ sel: c.id, view: 'conn', copied: '', tried: false, saved: false, confirm: false });
+    }
+
+    // the kinds that can be added, as the add step lists them
+    ORDER.forEach((k, i) => {
+      const KK = KINDS[k];
+      const n = i + 1;
+      const unsupported = KK.supported === false;
+      const locked = lockedKind(k);
+      vals['kn' + n] = KK.name; vals['kd' + n] = KK.desc; vals['ki' + n] = KK.icon;
+      vals['kc' + n] = unsupported || locked ? 'off' : '';
+      vals['kw' + n] = unsupported ? '지원하지 않아요' : locked ? '회사 정책으로 막힘' : '';
+      vals['kt' + n] = unsupported || locked ? '' : 'hide';
+      vals['kg' + n] = () => {
+        if (unsupported || locked || conns.length >= 6) return;
+        const newId = 'c' + next;
+        const blank = KK.flow === 'server' ? this.blank.server('') : this.blank.client();
+        this.setState({
+          conns: [...conns, { id: newId, kind: k }], next: next + 1, sel: newId, view: 'conn',
+          st: { ...st, [newId]: KK.flow === 'server' ? 'idle' : 'signedout' },
+          set: { ...set, [newId]: blank }, where: { ...where, [newId]: '' },
+          more: KK.nameRequired, tried: false, saved: false, copied: '',
+        });
+      };
     });
-    const list = demo[tab];
+
+    // the states a person can look at, for the selected connection
+    const chips = conn && K.chips ? K.chips : [];
     for (let i = 1; i <= 8; i++) {
-      const item = list[i - 1];
+      const item = chips[i - 1];
       vals['dl' + i] = item ? item[1] : '';
       vals['dc' + i] = item && item[0] === cur ? 'on' : '';
       vals['dh' + i] = item && !isLocked ? '' : 'hide';
-      vals['dp' + i] = () => item && this.setState({ st: { ...st, [tab]: item[0] }, copied: '' });
+      vals['dp' + i] = () => item && this.setState({ st: { ...st, [id]: item[0] }, copied: '' });
     }
     return vals;
   }
