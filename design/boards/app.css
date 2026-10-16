@@ -322,6 +322,43 @@ ins{background:var(--ins-bg);color:var(--ins-ink);text-decoration:none;border-ra
 .th.metafile{background:repeating-linear-gradient(135deg,var(--empty-a) 0 8px,var(--empty-b) 8px 16px);color:var(--ink-2)}
 .th.remote,.th.missing{background:var(--card);border-style:dashed;border-color:var(--line-strong);color:var(--ink-3)}
 .th .badge-s{position:absolute;right:6px;bottom:6px;font:600 10px/1 var(--font);padding:3px 6px;border-radius:999px;background:rgba(20,25,34,.72);color:#fff}
+/* the spec's own screen: the text, the pseudocode read against it, questions, requirements, accepting */
+.ban{display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-radius:16px}
+.ban.attn{background:var(--attn-tint);color:var(--attn)}
+.ban.ai{background:var(--ai-tint);color:var(--ai)}
+.ban.ok{background:var(--accent-tint);color:var(--accent-ink)}
+.ban.mute{background:var(--chip);color:var(--ink-2)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs button{display:inline-flex;align-items:center;gap:8px;flex:none;height:46px;padding:0 16px;border:0;border-bottom:2.5px solid transparent;margin-bottom:-1px;background:transparent;color:var(--ink-2);font:500 15px/1 var(--font);cursor:pointer;white-space:nowrap}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:700}
+.tabs .n{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--attn-tint);color:var(--attn);font:600 12px/20px var(--font);text-align:center}
+.tabs .n.ok{background:var(--accent-tint);color:var(--accent-ink)}
+.sent{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:12px;font:400 16px/28px "Noto Serif KR",serif;color:var(--ink)}
+.sent.hot{background:var(--chg-bg);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.sent .rid{flex:none;margin-top:5px;font:600 11px/18px var(--font);padding:0 7px;border-radius:999px;background:var(--chip);color:var(--ink-2)}
+.code{margin:0;padding:12px 0;border-radius:12px;background:var(--page);border:1px solid var(--line);font:400 13px/22px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);overflow-x:auto}
+.cl{display:flex;gap:14px;padding:0 14px;white-space:pre}
+.cl i{flex:none;width:22px;text-align:right;font-style:normal;color:var(--ink-3)}
+.cl.lit{background:var(--ins-bg)}
+.cl.open{background:var(--attn-tint);color:var(--attn)}
+.cl.add{background:var(--ins-bg)}
+.cl.del{background:var(--del-bg);color:var(--del-ink);text-decoration:line-through}
+.qcard{padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.qcard + .qcard{margin-top:12px}
+.qq{font:600 15px/24px var(--font)}
+.qg{margin:8px 0 0;padding:8px 12px;border-left:3px solid var(--line-strong);border-radius:0 8px 8px 0;background:var(--page);font:400 14px/22px "Noto Serif KR",serif;color:var(--ink-2)}
+.area{display:block;width:100%;min-height:84px;margin-top:10px;padding:12px 14px;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--card);color:var(--ink);font:400 15px/24px var(--font);resize:vertical}
+.area:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.rt{width:100%;border-collapse:collapse;font:400 14px/22px var(--font)}
+.rt th{padding:10px 12px;text-align:left;font:500 12px/18px var(--font);color:var(--ink-3);border-bottom:1px solid var(--line)}
+.rt td{padding:12px;vertical-align:top;border-bottom:1px solid var(--line)}
+.rt tr:last-child td{border-bottom:0}
+.fig{display:flex;align-items:center;justify-content:center;gap:0;padding:22px;border-radius:12px;background:var(--page);border:1px solid var(--line);flex-wrap:wrap}
+.st-box{padding:12px 22px;border:2px solid var(--ink-2);border-radius:14px;font:600 14px/20px var(--font);background:var(--card)}
+.st-arr{display:flex;flex-direction:column;align-items:center;padding:0 12px;font:400 12px/16px var(--font);color:var(--ink-3)}
+.st-arr b{display:block;width:70px;height:2px;background:var(--ink-3);position:relative;margin:4px 0}
+.st-arr b::after{content:"";position:absolute;right:-1px;top:-4px;border-left:8px solid var(--ink-3);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.st-arr.back b::after{right:auto;left:-1px;border-left:0;border-right:8px solid var(--ink-3)}
 .pm{display:block;font:400 12px/18px var(--font);color:var(--ink-3)}
 .pm.bad{color:var(--attn)}
 .pic{display:flex;gap:16px;align-items:flex-start;padding:18px 20px}

@@ -36,6 +36,7 @@ the logic of a board is checked by running its `<script>` against a stub `DCLogi
 | `Review` | An AI conversion checked beside its original, one decision per flagged row |
 | `ScanReview` | The same for a scanned PDF: what was read from the picture, what was not readable |
 | `MdReview` | A Markdown file compared with the current spec; no AI is involved |
+| `Spec` | One spec after it is saved: the text, the pseudocode read against it, the AI's questions and the owner's answers, the requirements, accepting the design |
 | `Pictures` | The pictures of an original: what is read, seen, sent and decided, one row each, with the one switch that lets an AI read them |
 | `Waiting` | A request waiting for its connection: the reasons the application keeps, said plainly, and what to do |
 | `Request` | The other states of a request: running, interrupted, failed, cancelled, ended by a save, finished; asking while one is open; saving while one is running |
@@ -157,6 +158,41 @@ or failed (`옮겨 쓰지 못했어요`) is amber with a line saying it can be a
 `Request`, which says in plain words what the application keeps: an interrupted request published
 nothing, a failed one carries the AI's own words, which are shown as written.
 
+**Two things are accepted, and they have two words.** Bringing a document in ends with **saving it as
+the spec** (`사양으로 저장`): the owner checked a conversion against the original. Everything after
+ends with **accepting the design** (`수락`): the owner read the pseudocode against the text, knowing
+what it leaves open. A list row says `수락함` only for the second. The application's own word
+"accept" means the second, and nothing on the import path uses it.
+
+**A spec has five steps, in the order a person does them** (`Spec`; the application shows the same
+parts as panels on one page, `ui/src/app.ts`):
+
+1. **Text.** The spec itself, split into the requirements SCE read from it (R1...), with a mark where the
+   AI asked something. Saving the text ends a request that is being written and makes the pseudocode
+   older than the text.
+2. **Pseudocode.** The page SCE writes of the AI's model, beside the text. SCE says the model is well
+   formed; the screen says in the same place that this is *not* a claim that it agrees with the text,
+   because only the owner's reading can say that. Pressing a sentence lights the lines that name the
+   states its requirement is carried by; a requirement carried by no state lights nothing and says why
+   (missing, or only open places), not "nothing found". Lines SCE marks as left open are yellow. The
+   model drawn as a state picture and what changed from the model before sit here too. An older
+   pseudocode says it was written for the earlier text and asks to be written again before it is read
+   against the present text.
+3. **Questions and answers.** What the text does not say. An answer does not change the model: the screen
+   says so at the top, and each answer says where it is: typed, saved, being written into a new model,
+   in the model shown (the question is no longer asked), or still asked after the new model. Answers to
+   questions the model no longer asks are kept apart and can be taken back. Regenerating from the
+   answers can issue every requirement a new number, and says what that costs.
+4. **Requirements.** What SCE found for each: implemented, scenario passed, missing, open, and the other
+   results it can give, with where each sits in the text and where the design carries it.
+5. **Accepting.** What would be accepted (counts), the reasons accepting is withheld in the order a person
+   can fix them (unsaved text or answers, no pseudocode, being written, refused, older than the text),
+   the acceptance's state (holds, lapsed and why, as SCE said it) and, after one, what changed since.
+   Saving text or answers, or a new pseudocode, lapses an acceptance; the screen shows it at once.
+
+`Request` and `Waiting` now say which of the two requests they are about: converting a document, or
+writing the pseudocode. Their states are the same and the words differ.
+
 **Pictures of the original** (ADR 0032). A picture can carry a rule, so none is skipped in a review;
 the review of a conversion has a count of them in its bar and a row where each sits, and `Pictures` is
 where each is decided. Every picture is unread by default and is not sent anywhere: one switch, off,
@@ -194,10 +230,13 @@ carry no full stop. Copy is in the polite `-해요` register. No exclamation mar
   its lines as paper), a zoom on a picture, and the pictures of an attachment (a workbook inside a
   document). The ADR leaves open the renderer, the size above which a picture is reduced, and whether
   text in a picture is read by OCR first.
-- The modelling stage: the pseudocode read against the text, the AI's questions and the owner's answers,
-  coverage, accepting a design, and what a new model changed. None of it is drawn, and "accept" means two
-  different things in the application (a design) and in these screens (a converted document); the words
-  have to be separated before it is.
+- Parts of a spec the application has and `Spec` does not draw: the text editor itself (the text is shown,
+  not edited), the history of saved revisions and loading one back, removing a spec, the model's SCXML
+  as text, the pages SCE writes (acceptance page, change report) opened in full, and the state of
+  a model SCE could not draw but saved. The pseudocode, line marks and the example's lines are
+  invented to show the flow; a real page is whatever SCE writes.
+- The requirement outcomes the table shows are the four an ordinary spec meets; the seven others are
+  named in a line, not drawn one by one.
 - Reordering connections, and more connections than the screen's six slots (a limit of the
   prototype, which writes its rows out: it is not a limit of the application).
 - Sign-in to a team server and what a member may do: nothing to draw until authentication and

@@ -25,7 +25,10 @@ body{margin:0}
   </header>
   <main style="width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 24px 96px; display: flex; flex-direction: column; gap: 22px">
     <div class="demo" style="max-width: none; margin: 0">
-      <span>시안용 · 요청의 상태</span>
+      <span>시안용 · 무엇을 쓰는 요청</span>
+      <button type="button" class="{{wd}}" onClick="{{setDoc}}">문서를 옮겨 쓰기</button>
+      <button type="button" class="{{wc}}" onClick="{{setCode}}">수도코드 쓰기</button>
+      <span style="margin-left: 8px">상태</span>
       <button type="button" class="{{dc1}}" onClick="{{dp1}}">{{dl1}}</button>
       <button type="button" class="{{dc2}}" onClick="{{dp2}}">{{dl2}}</button>
       <button type="button" class="{{dc3}}" onClick="{{dp3}}">{{dl3}}</button>
@@ -58,7 +61,7 @@ body{margin:0}
     </div>
 
     <div class="{{asked}}" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-      <a class="btn {{reviewHide}}" href="Review.dc.html"><span class="ic ic-check"></span>확인하러 가기</a>
+      <a class="btn {{reviewHide}}" href="{{reviewHref}}"><span class="ic ic-check"></span>{{reviewLabel}}</a>
       <button class="btn {{againHide}}" type="button" onClick="{{ask}}">다시 요청</button>
       <button class="btn quiet {{cancelHide}}" type="button" onClick="{{askCancel}}">요청 취소</button>
     </div>
@@ -87,7 +90,7 @@ body{margin:0}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { r: 'running', confirm: false, done: '', dismissed: false };
+    this.state = { r: 'running', confirm: false, done: '', dismissed: false, what: 'doc' };
   }
 
   // The states of a request that the application has, and what the person may do in each
@@ -126,7 +129,7 @@ class Component extends DCLogic {
       },
       completed: {
         label: '끝남', tone: 'ok', icon: 'ic-check', head: 'AI가 다 옮겨 썼어요', sub: '확인할 차례예요',
-        body: '원본과 나란히 놓고 확인한 뒤 수락하면 사양으로 저장돼요.', meta: '민이 어제 올림', review: true,
+        body: '원본과 나란히 놓고 확인한 뒤 저장하면 사양이 돼요.', meta: '민이 어제 올림', review: true,
       },
       active: {
         label: '이미 열린 요청', tone: 'ai', spin: true, head: 'AI가 옮겨 쓰는 중', sub: '2번째 시도 · Claude Code',
@@ -142,15 +145,26 @@ class Component extends DCLogic {
   }
 
   renderVals() {
-    const { r, confirm, done, dismissed } = this.state;
+    const { r, confirm, done, dismissed, what } = this.state;
     const S = this.states();
+    // the words of the second kind of request; the states and what a person may do are the same
+    const t = (s) => (what === 'code'
+      ? s.replace('AI가 옮겨 쓰는 중', 'AI가 수도코드를 쓰는 중').replace('AI가 옮겨 쓰지 못했어요', 'AI가 수도코드를 쓰지 못했어요').replace('AI가 다 옮겨 썼어요', 'AI가 수도코드를 다 썼어요')
+        .replace('끝나면 원본과 나란히 놓고 확인할 수 있어요.', '끝나면 수도코드를 글과 나란히 읽을 수 있어요.').replace('원본과 나란히 놓고 확인한 뒤 저장하면 사양이 돼요.', '글과 나란히 읽어 보고, 맞다고 생각하면 설계를 수락하세요.')
+        .replace('확인할 차례예요', '읽을 차례예요').replace('모델을 쓰던 AI가', '수도코드를 쓰던 AI가')
+      : s);
     const cur = S[r];
     const order = ['running', 'interrupted', 'failed', 'unsaid', 'cancelled', 'superseded', 'completed', 'active', 'save'];
     const idle = !done;
     const vals = {
       title: '소방 점검',
+      // two requests exist: one converts a document into the spec's text, one writes the pseudocode from it
+      wd: what === 'doc' ? 'on' : '', wc: what === 'code' ? 'on' : '',
+      setDoc: () => this.setState({ what: 'doc' }), setCode: () => this.setState({ what: 'code' }),
+      reviewHref: what === 'code' ? 'Spec.dc.html' : 'Review.dc.html',
+      reviewLabel: what === 'code' ? '수도코드 읽으러 가기' : '확인하러 가기',
       tone: cur.tone, spinHide: cur.spin ? '' : 'hide', iconHide: cur.spin ? 'hide' : '', icon: cur.icon || '',
-      head: cur.head, sub: cur.sub, body: cur.body, meta: cur.meta,
+      head: t(cur.head), sub: t(cur.sub), body: t(cur.body), meta: cur.meta,
       rawHide: cur.raw ? '' : 'hide', raw: cur.raw || '',
       asked: done ? 'hide' : '',
       reviewHide: cur.review ? '' : 'hide',
