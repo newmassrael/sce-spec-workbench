@@ -190,6 +190,7 @@ fn codex(fake: &Fake, auth: AuthSource, support: Support) -> Codex {
         CodexConfig {
             model: Some("gpt-test".to_string()),
             timeout: Duration::from_secs(20),
+            ..CodexConfig::default()
         },
         auth,
         fake.home(),
@@ -409,6 +410,7 @@ fn no_model_is_asked_for_when_the_connection_names_none() {
         CodexConfig {
             model: None,
             timeout: Duration::from_secs(20),
+            ..CodexConfig::default()
         },
         AuthSource::AppStore,
         fake.home(),
@@ -794,6 +796,7 @@ fn a_client_that_takes_longer_than_its_time_is_stopped_and_the_run_failed() {
         CodexConfig {
             model: None,
             timeout: Duration::from_millis(400),
+            ..CodexConfig::default()
         },
         AuthSource::AppStore,
         fake.home(),

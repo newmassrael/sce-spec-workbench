@@ -139,11 +139,11 @@ pub trait Generator: Send + Sync {
         vec!["generate".to_string(), "cancel".to_string()]
     }
 
-    /// How many requests of one connection of this kind run at once. One unless the kind says it
-    /// takes more: a model on the person's own computer given two documents at once writes both
-    /// slower, until both run out their time. The store counts the running requests of a
-    /// connection and refuses a claim past this (`lane-full`); a kind never raises it past what it
-    /// can bear, and a person may lower it.
+    /// How many requests of one connection run at once. One unless the connection says it takes
+    /// more (`limits.places`): a model on the person's own computer given two documents at once
+    /// writes both slower, until both run out their time, and only the person who runs the server
+    /// knows how many conversations it holds. The store counts the running requests of a
+    /// connection and refuses a claim past this (`lane-full`).
     fn places(&self) -> usize {
         1
     }

@@ -524,6 +524,7 @@ fn run(attack: bool) {
         CodexConfig {
             model: std::env::var("SCE_LIVE_MODEL").ok(),
             timeout: Duration::from_secs(15 * 60),
+            ..CodexConfig::default()
         },
         AuthSource::OfficialLogin,
         root.join("app-home"),

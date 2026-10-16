@@ -68,6 +68,8 @@ pub struct CodexConfig {
     pub model: Option<String>,
     /// How long a run may take before it is killed.
     pub timeout: Duration,
+    /// How many requests of the connection run at once.
+    pub places: usize,
 }
 
 impl Default for CodexConfig {
@@ -75,6 +77,7 @@ impl Default for CodexConfig {
         CodexConfig {
             model: None,
             timeout: Duration::from_secs(30 * 60),
+            places: 1,
         }
     }
 }
@@ -673,6 +676,10 @@ pub(crate) fn version_within(binary: &Path, timeout: Duration) -> Option<String>
 impl Generator for Codex {
     fn kind(&self) -> &str {
         "codex"
+    }
+
+    fn places(&self) -> usize {
+        self.config.places
     }
 
     fn version(&self) -> Option<String> {

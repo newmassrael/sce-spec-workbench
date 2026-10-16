@@ -442,6 +442,28 @@ fn what_a_person_says_of_a_models_context_is_bounded_too() {
 }
 
 #[test]
+fn the_places_of_a_connection_are_a_count_from_one_to_eight() {
+    for (places, ok) in [
+        (None, true),
+        (Some(1), true),
+        (Some(8), true),
+        (Some(0), false),
+        (Some(9), false),
+    ] {
+        let mut connection = claude("main");
+        connection.limits = Limits {
+            places,
+            ..Limits::default()
+        };
+        if ok {
+            accepted(&connection);
+        } else {
+            assert!(refusal(&connection).contains("places"));
+        }
+    }
+}
+
+#[test]
 fn a_model_a_name_and_an_executable_must_be_text_a_person_can_read() {
     let mut connection = claude("main");
     connection.model = Some(String::new());

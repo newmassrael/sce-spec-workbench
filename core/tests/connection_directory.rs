@@ -26,7 +26,7 @@ use sce_spec_workbench_core::claude_code::{
 };
 use sce_spec_workbench_core::directory::{ClaudeLaunch, Connections};
 use sce_spec_workbench_core::local::LocalConfig;
-use sce_spec_workbench_core::runner::{Directory, Unrunnable};
+use sce_spec_workbench_core::runner::{Directory, Generator, Unrunnable};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Observed, Policy, Route,
 };
@@ -408,6 +408,44 @@ fn what_a_connection_does_not_limit_is_left_to_the_defaults_of_a_model_server_ru
     assert_eq!(server.config().handoffs, defaults.handoffs);
     assert_eq!(server.config().handoff_percent, defaults.handoff_percent);
     assert_eq!(server.config().context_tokens, None);
+    // A connection that says nothing of its places takes one request at a time.
+    assert_eq!(server.places(), 1);
+}
+
+#[test]
+fn the_places_a_connection_says_it_has_are_what_the_executor_claims_with() {
+    let rig = Rig::new("dir-places", SUBSCRIPTION);
+
+    let mut several = local();
+    several.limits = Limits {
+        places: Some(3),
+        ..Limits::default()
+    };
+    let several_pin = rig.pin(&several);
+    let server = rig
+        .directory(Policy::shipped())
+        .local_for(&several_pin)
+        .unwrap();
+    assert_eq!(server.places(), 3);
+
+    let mut client = claude();
+    client.limits = Limits {
+        places: Some(2),
+        ..Limits::default()
+    };
+    let claude = rig
+        .directory(Policy::shipped())
+        .claude_for(&rig.pin(&client))
+        .unwrap();
+    assert_eq!(claude.places(), 2);
+
+    // A request is held to what the connection said when the request was made, so the generator
+    // the directory hands back through the trait says it too.
+    let through_the_trait = rig
+        .directory(Policy::shipped())
+        .generator_for(&several_pin)
+        .unwrap();
+    assert_eq!(through_the_trait.places(), 3);
 }
 
 #[test]

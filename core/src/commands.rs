@@ -58,7 +58,11 @@ pub const COMMANDS: &[&str] = &[
 /// were versioned apart (specs 25), and `describe`'s `entrance` (`desktop` or `browser`; the
 /// `tool` an `sce-spec` of that set said is the specs' to answer now, and says nothing of who
 /// asked), `settings`, `writes_settings` and `starts_programs`.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 1;
+///
+/// 2: a connection's `limits` has `places`, how many requests of it run at once. A core of the
+/// last version refuses a connection that says it (an argument it does not know), so a screen
+/// that sends it is held to this one.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 2;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {

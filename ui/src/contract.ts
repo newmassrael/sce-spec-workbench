@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 27;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 1;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 2;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -333,9 +333,11 @@ export interface Connection {
  * What one generation may spend, as a connection says it; `null` is the application's default. The
  * last three are for a model server: how many times its conversation is begun again when the
  * model's context is full, the model's context in tokens when a person knows it, and how full (in
- * percent) a conversation may be before it is begun again. The server section has a field for each
- * of those three; the turns and the seconds have none, and every screen carries what it has no
- * field for through a save, so that editing another setting does not lose them.
+ * percent) a conversation may be before it is begun again. `places` is how many requests of the
+ * connection run at once (one when `null`), which the person who runs a server knows. The server
+ * section has a field for each of those four; the turns and the seconds have none, and every
+ * screen carries what it has no field for through a save, so that editing another setting does
+ * not lose them.
  */
 export interface Limits {
   readonly turns: number | null;
@@ -343,6 +345,7 @@ export interface Limits {
   readonly handoffs: number | null;
   readonly context_tokens: number | null;
   readonly handoff_percent: number | null;
+  readonly places: number | null;
 }
 
 /** A connection that limits nothing. */
@@ -352,6 +355,7 @@ export const NO_LIMITS: Limits = {
   handoffs: null,
   context_tokens: null,
   handoff_percent: null,
+  places: null,
 };
 
 /** A connection as it is kept, with the revision it is kept under. */
@@ -1430,6 +1434,7 @@ function parseLimits(limits: Obj, where: string): Limits {
     handoffs: nullableCount(limits, "handoffs", where),
     context_tokens: nullableCount(limits, "context_tokens", where),
     handoff_percent: nullableCount(limits, "handoff_percent", where),
+    places: nullableCount(limits, "places", where),
   };
 }
 

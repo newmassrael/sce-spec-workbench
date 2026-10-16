@@ -370,6 +370,9 @@ const en = {
   aiServerHandoffs: "Times begun again",
   aiServerHandoffsNote:
     "How many times one request may begin its conversation again (0 to 10; 0 gives up at the first). Empty is 2.",
+  aiServerPlaces: "Requests at once",
+  aiServerPlacesNote:
+    "How many requests this server may write at the same time, across all your specs (1 to 8). Empty is 1. Raise it only if the server holds that many conversations at once (its parallel slots); a server given more than it holds writes every one of them slower, until they run out their time.",
   aiServerLimitDefault: "default",
   aiServerLimitNotCount: "This is not a whole number. Type digits only, or leave it empty for the default.",
   aiServerSentTo: "The specification text and your answers are sent to this server when you generate.",
@@ -782,6 +785,9 @@ const ko: Record<Key, string> = {
   aiServerHandoffs: "새로 시작하는 횟수",
   aiServerHandoffsNote:
     "한 요청에서 대화를 새로 시작할 수 있는 최대 횟수입니다(0~10, 0이면 처음 넘칠 때 포기). 비우면 2입니다.",
+  aiServerPlaces: "동시에 쓰는 요청 수",
+  aiServerPlacesNote:
+    "모든 사양을 통틀어 이 서버가 동시에 쓸 수 있는 요청 수입니다(1~8). 비우면 1입니다. 서버가 그만큼의 대화를 한꺼번에 다룰 때(병렬 슬롯)만 올리세요. 서버가 다룰 수 있는 수보다 많이 주면 모든 요청이 느려지다가 시간이 다 차서 실패합니다.",
   aiServerLimitDefault: "기본값",
   aiServerLimitNotCount: "정수가 아닙니다. 숫자만 입력하거나, 기본값을 쓰려면 비워 두세요.",
   aiServerSentTo: "생성하면 사양 텍스트와 답변이 이 서버로 전송됩니다.",

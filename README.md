@@ -918,6 +918,17 @@ than 10 hand-overs. The model server's section of the settings has a field for e
 refused by the store in its own words); the turns and the seconds have none yet, and a save keeps
 what a screen has no field for.
 
+**How many requests of one connection run at once is the connection's to say.** A model server given
+two documents at once writes both slower, and a spec that took 8 to 15 minutes alone ran out its time
+twice when three were sent to one server together. So a connection runs one request at a time across
+all the specs unless its `places` (1 to 8, a field of the server's section) says more, which is for the
+person who runs a server that holds several conversations. The request that waits says behind which
+connection it waits (`read_queue`), and the rule is the request's life document's, not the program's
+(`lane_full`). A connection for Claude Code and one for a server are separate lanes: the first is
+written while the second's request is at its turn (measured with both real: Claude Code finished in a
+minute while the server was at its first request of seventeen, and the second request for the server
+took its place when the first ended).
+
 **A draft need not write the design out a second time.** A model's last message is its draft, and a
 design of tens of thousands of characters written out again is a second chance to drop a brace or a
 line (measured with a local model: the last `}` of a draft, twice). `"documents": "accepted"` in

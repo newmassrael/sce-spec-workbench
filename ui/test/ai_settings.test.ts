@@ -1563,7 +1563,7 @@ describe("a model server of the person's", () => {
     expect(r.settings.targetLine()).toBe("Will ask: office GPU box (qwen3-coder:30b)");
   });
 
-  it("is saved with the context, the percent and the times it may begin again when they are typed", async () => {
+  it("is saved with the context, the percent, the times it may begin again and its places when they are typed", async () => {
     const r = await chooseServer({ servers: [[OLLAMA, listed(OLLAMA, ["m"])]] });
     typeInto(r.root, "#ai-server-name", "box");
     click(r.root, `[data-address="${OLLAMA}"]`);
@@ -1572,6 +1572,7 @@ describe("a model server of the person's", () => {
     typeInto(r.root, "#ai-server-context-tokens", " 40000 ");
     typeInto(r.root, "#ai-server-handoff-percent", "70");
     typeInto(r.root, "#ai-server-handoffs", "4");
+    typeInto(r.root, "#ai-server-places", "2");
 
     click(r.root, "#ai-save");
     await settle();
@@ -1582,6 +1583,7 @@ describe("a model server of the person's", () => {
       context_tokens: 40000,
       handoff_percent: 70,
       handoffs: 4,
+      places: 2,
     });
   });
 

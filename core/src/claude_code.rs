@@ -76,6 +76,8 @@ pub struct ClaudeCodeConfig {
     pub max_budget_usd: Option<f64>,
     /// How long a run may take before it is killed.
     pub timeout: Duration,
+    /// How many requests of the connection run at once.
+    pub places: usize,
 }
 
 impl Default for ClaudeCodeConfig {
@@ -85,6 +87,7 @@ impl Default for ClaudeCodeConfig {
             max_turns: 60,
             max_budget_usd: None,
             timeout: Duration::from_secs(30 * 60),
+            places: 1,
         }
     }
 }
@@ -177,6 +180,10 @@ const MCP_FILE: &str = "mcp.json";
 impl Generator for ClaudeCode {
     fn kind(&self) -> &str {
         "claude-code"
+    }
+
+    fn places(&self) -> usize {
+        self.config.places
     }
 
     fn version(&self) -> Option<String> {

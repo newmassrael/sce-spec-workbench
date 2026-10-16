@@ -55,13 +55,14 @@ const PRESETS: readonly { readonly name: string; readonly address: string }[] = 
 const STATUS_ID = "ai-server-status";
 
 /** The limits of a connection that are the model server's own to describe, in the order they are drawn. */
-type ServerLimit = "context_tokens" | "handoff_percent" | "handoffs";
+type ServerLimit = "context_tokens" | "handoff_percent" | "handoffs" | "places";
 
 /** What each is called and explained as, by the words the screen has for them. */
 const SERVER_LIMITS: readonly { readonly key: ServerLimit; readonly label: Key; readonly note: Key }[] = [
   { key: "context_tokens", label: "aiServerContext", note: "aiServerContextNote" },
   { key: "handoff_percent", label: "aiServerPercent", note: "aiServerPercentNote" },
   { key: "handoffs", label: "aiServerHandoffs", note: "aiServerHandoffsNote" },
+  { key: "places", label: "aiServerPlaces", note: "aiServerPlacesNote" },
 ];
 
 /**
@@ -164,6 +165,7 @@ export class ServerSection {
       context_tokens: typed("context_tokens"),
       handoff_percent: typed("handoff_percent"),
       handoffs: typed("handoffs"),
+      places: typed("places"),
     };
   }
 

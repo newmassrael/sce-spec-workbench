@@ -261,6 +261,8 @@ pub struct LocalConfig {
     /// How full, in percent of `context_tokens`, a conversation may be before it is begun again.
     /// Room is left for what the next tool call gives back, which can be a document.
     pub handoff_percent: u32,
+    /// How many requests of the connection run at once: how many conversations the server holds.
+    pub places: usize,
 }
 
 impl LocalConfig {
@@ -273,6 +275,7 @@ impl LocalConfig {
             handoffs: 2,
             context_tokens: None,
             handoff_percent: 80,
+            places: 1,
         }
     }
 }
@@ -645,6 +648,10 @@ impl Local {
 impl Generator for Local {
     fn kind(&self) -> &str {
         "local"
+    }
+
+    fn places(&self) -> usize {
+        self.config.places
     }
 
     /// Named by what the model is told, what it must answer in, which tools it is offered, and how

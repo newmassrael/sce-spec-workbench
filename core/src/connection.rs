@@ -28,6 +28,8 @@ pub const TURNS_MAX: u32 = 500;
 pub const SECONDS_MAX: u32 = 86_400;
 /// The most times a local model's conversation may be begun again because its context was full.
 pub const HANDOFFS_MAX: u32 = 10;
+/// The most requests of one connection that may run at once.
+pub const PLACES_MAX: u32 = 8;
 /// The context a model may be said to have, in tokens: below the least a hand-over itself would
 /// fill it, above the most any model is offered.
 pub const CONTEXT_TOKENS_MIN: u32 = 4_096;
@@ -114,6 +116,12 @@ pub struct Limits {
     /// it is begun again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff_percent: Option<u32>,
+    /// How many requests of this connection run at once, across every spec; one when it is not
+    /// said. A model on one computer given two documents writes both slower, until both run out
+    /// their time, so one is the safe count. Whoever runs a server that holds several
+    /// conversations (its parallel slots) is the one who knows how many it takes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub places: Option<u32>,
 }
 
 impl Limits {
@@ -123,6 +131,7 @@ impl Limits {
             && self.handoffs.is_none()
             && self.context_tokens.is_none()
             && self.handoff_percent.is_none()
+            && self.places.is_none()
     }
 
     fn validate(&self) -> Result<(), StoreError> {
@@ -160,6 +169,13 @@ impl Limits {
                 return Err(bad(format!(
                     "a hand-over at {percent} percent is not between {HANDOFF_PERCENT_MIN} and \
                      {HANDOFF_PERCENT_MAX}"
+                )));
+            }
+        }
+        if let Some(places) = self.places {
+            if !(1..=PLACES_MAX).contains(&places) {
+                return Err(bad(format!(
+                    "{places} places is not between 1 and {PLACES_MAX}"
                 )));
             }
         }

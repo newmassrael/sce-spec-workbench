@@ -269,6 +269,7 @@ impl Connections {
                 .limits
                 .seconds
                 .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
+            places: run.limits.places.map_or(defaults.places, |p| p as usize),
         };
         Ok(ClaudeCode::new(binary, launch.author.clone(), config))
     }
@@ -302,6 +303,7 @@ impl Connections {
                 .limits
                 .seconds
                 .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
+            places: run.limits.places.map_or(defaults.places, |p| p as usize),
         }))
     }
 
@@ -383,6 +385,7 @@ impl Connections {
                 .limits
                 .handoff_percent
                 .unwrap_or(defaults.handoff_percent),
+            places: run.limits.places.map_or(defaults.places, |p| p as usize),
             ..defaults
         };
         Ok(Local::new(endpoint, author, config))
