@@ -3894,6 +3894,38 @@ describe("asking for a model", () => {
     expect(button("generate")?.textContent).toBe("Generate again");
   });
 
+  it("says, where the request finished, how many requirements SCE found the design leaves unsettled", async () => {
+    core.setAdapters([{ name: "desktop" }]);
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+
+    // A design every check accepted, and one requirement of the list that nothing in it carries.
+    core.completeRequest("alpha", "<scxml><!-- MISSING --></scxml>");
+    await ticker.fire();
+
+    const total = String(root.querySelectorAll(".acceptance .measure ul.tally li .count").length > 0
+      ? [...root.querySelectorAll(".acceptance .measure ul.tally li .count")].reduce((n, c) => n + Number(c.textContent), 0)
+      : 0);
+    expect(generationStatus()).toBe(
+      `The last request finished. SCE says 1 of the ${total} requirements are still unsettled in the design: read them below before relying on it.`,
+    );
+  });
+
+  it("says nothing more than that the request finished when the design settles every requirement", async () => {
+    core.setAdapters([{ name: "desktop" }]);
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+
+    core.completeRequest("alpha");
+    await ticker.fire();
+
+    expect(generationStatus()).toBe("The last request finished.");
+  });
+
   it("calls the open request off, and says the owner did", async () => {
     await click("Alpha");
     await press("generate");

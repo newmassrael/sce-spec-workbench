@@ -18,6 +18,7 @@ import {
   restanded,
   standingIsOfWhatIsShown,
   tally,
+  unsettledOf,
   worthAskingAgain,
   type AcceptancePanel,
   type AcceptanceState,
@@ -2181,8 +2182,18 @@ export class App {
         return this.t("generationCancelled");
       case "superseded":
         return this.t("generationSuperseded");
-      case "completed":
-        return this.t("generationCompleted");
+      case "completed": {
+        // The product measured the design against the list, and a design can be accepted by every
+        // check and still leave requirements unsettled (a room of sixty named for fifty): say so
+        // here, in the product's counts, where the person reads that the request finished.
+        const left = this.acceptance?.phase === "read" ? unsettledOf(this.acceptance.state) : null;
+        return left === null
+          ? this.t("generationCompleted")
+          : `${this.t("generationCompleted")} ${this.t("generationCompletedUnsettled", {
+              unsettled: String(left.unsettled),
+              total: String(left.total),
+            })}`;
+      }
     }
   }
 

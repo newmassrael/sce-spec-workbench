@@ -360,6 +360,28 @@ export function tally(outcomes: readonly RequirementOutcome[]): ReadonlyArray<re
   return [...known, ...others].map((word) => [word, counts.get(word) ?? 0] as const);
 }
 
+/** How many requirements the design leaves unsettled, of how many SCE measured it against. */
+export interface Unsettled {
+  readonly unsettled: number;
+  readonly total: number;
+}
+
+/**
+ * What SCE's measure says of a finished design that the owner should know before reading its
+ * pseudocode: how many requirements are left unsettled (`isUnsettled`), by SCE's own words and no
+ * other. `null` when the design settles every requirement it was measured against, when SCE
+ * measured none, and when the measure is not of the design and list as they stand to the text
+ * (`modelStanding` and `requirementsStanding` are not both `current`): a report of an earlier text
+ * says nothing of the design that was just written. Nothing is inferred beyond the product's words.
+ */
+export function unsettledOf(state: AcceptanceState): Unsettled | null {
+  const report = state.report;
+  if (report === null || report.outcomes.length === 0) return null;
+  if (report.model_standing !== "current" || report.requirements_standing !== "current") return null;
+  const unsettled = report.outcomes.filter((outcome) => isUnsettled(outcome.outcome)).length;
+  return unsettled === 0 ? null : { unsettled, total: report.outcomes.length };
+}
+
 export function accepting(state: AcceptanceState): AcceptanceState {
   return { ...state, accepting: true, refusal: null };
 }

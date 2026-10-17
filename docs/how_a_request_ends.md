@@ -153,16 +153,43 @@ cost no object. Each decision below is that choice, and says what it is made of.
    of the list no part of the design carries, from the product's own coverage report, and claims
    nothing beyond it.
 
-## 6. Order of work
+## 6. Order of work, and where it stands (2026-10-18)
 
-1. The kind of failure as data the core stores beside the reason (F, T, M, X4), so the screen can
-   branch on it. No wording in the core's classification is invented by the screen.
-2. The failure block on the screen, per the table above, with the actions that fit.
-3. A progress line while running (R1 to R6) for connections that can report, and the plain
-   statement for those that cannot.
-4. The last draft of a failed request kept (M6), if decided.
-5. One clock (T2), if decided.
-6. The completeness line (E2), if decided.
+All six steps are built and each landed with tests for the rows it changes.
 
-Each step lands with a test for every row it changes, and the live runs of 20, 40 and 60 rooms are
-the check that the rows are the ones that happen.
+1. **Built.** The kind of failure and a cause word are data the core stores beside the reason
+   (F1 to F5, T1, T3, T4, M1 to M5, X4). Command set 28. The screen branches on the data and reads
+   no sentence.
+2. **Built.** The failure block on the screen: whose it is to fix, the cause, what to do, and the
+   executor's own words folded. Every cause the executors name has words in both languages, held
+   by a test that reads the executors' list.
+3. **Built.** The journal of a run (R1 to R6): typed events kept beside the request, added up by
+   the core in one place, shown as counts and minutes by the core's clock. Connections that do not
+   report (Claude Code, Codex) are said not to, after a minute of silence. No percentage is shown.
+4. **Built.** The last design a failed run held is kept as the request's candidate and shown
+   folded and said to be neither accepted nor the spec's model (M6). Command set 29.
+5. **Built.** One clock for the request (T2): the deadline is fixed when the request is taken and
+   is shared by every try. A try is not begun once the time is gone (`clock-ran-out`).
+6. **Built.** Where a request finished, the screen says how many requirements SCE found the design
+   leaves unsettled, in SCE's six words for that and no others (E2).
+
+### What is not covered, and is said so
+
+- **Whether a model that is not accepted could be.** The last design is kept and shown, and
+  nothing here says how near it was beyond the counts of the refusals. A near miss is not a
+  verdict.
+- **Claude Code and Codex report no turns.** Their runs have a try and a clock and no journal of
+  turns or checks: that is what the client program gives, and the screen says so rather than show
+  nothing.
+- **Q3**, how long the request ahead in a connection's queue has run, is not built.
+- **The cause of a failed generator that is neither of ours.** An executor that says no kind is
+  recorded as `unclassified`, and is said as that.
+- **Why the 40- and 60-room runs ended in empty messages.** The records now say it was reasoning
+  with no answer, once cut at the server's output limit. Whether the model can be run so that it
+  answers is a setting of the connection (the server's reasoning effort) that this application
+  has no control for yet, and the screen's advice does not send a person to one that does not
+  exist.
+
+The live runs of 20, 40 and 60 rooms against a real model server are the check that the rows are
+the ones that happen: 20 rooms finished, 40 and 60 did not, and what the screen now says of them
+is what the records hold.

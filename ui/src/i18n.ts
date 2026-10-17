@@ -292,6 +292,8 @@ const en = {
   generationSuperseded:
     "The last request ended because the text or the answers it was about were saved. Generate again to write from what is saved now.",
   generationCompleted: "The last request finished.",
+  generationCompletedUnsettled:
+    "SCE says {unsettled} of the {total} requirements are still unsettled in the design: read them below before relying on it.",
   generationMoved:
     "The text or the answers changed while the request was being made, so nothing was asked. What is saved now is shown; press the button again.",
   generationActive: "A request is already open for this spec. Replace it with a new one?",
@@ -768,6 +770,8 @@ const ko: Record<Key, string> = {
   generationSuperseded:
     "요청이 기준으로 삼은 사양이나 답변이 저장되어 마지막 요청이 끝났습니다. 지금 저장된 내용으로 다시 생성하세요.",
   generationCompleted: "마지막 요청이 끝났습니다.",
+  generationCompletedUnsettled:
+    "SCE는 요구사항 {total}개 중 {unsettled}개가 설계에서 아직 정해지지 않았다고 합니다: 의지하기 전에 아래에서 읽어 보세요.",
   generationMoved:
     "요청하는 동안 사양이나 답변이 바뀌어 아무것도 요청하지 않았습니다. 지금 저장된 내용을 보여 드렸으니 버튼을 다시 누르세요.",
   generationActive: "이 사양에는 이미 열린 요청이 있습니다. 새 요청으로 대체할까요?",

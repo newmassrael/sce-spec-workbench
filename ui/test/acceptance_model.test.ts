@@ -20,6 +20,7 @@ import {
   restanded,
   standingIsOfWhatIsShown,
   tally,
+  unsettledOf,
   worthAskingAgain,
   type AcceptanceState,
   type Shown,
@@ -431,6 +432,55 @@ describe("the accept button", () => {
     expect(
       gate(state({ report: report({ model_standing: "behind" }) }), false, { ...shown, answers: undefined }),
     ).toBe("behind");
+  });
+});
+
+describe("what a finished design leaves unsettled", () => {
+  const sixty = (named: number) =>
+    Array.from({ length: 60 }, (_, i) => outcome(`R${i + 1}`, i < named ? "implemented" : "missing"));
+
+  it("is the requirements SCE says nothing carries, of those it measured the design against", () => {
+    expect(unsettledOf(state({ report: report({ outcomes: sixty(50) }) }))).toEqual({
+      unsettled: 10,
+      total: 60,
+    });
+  });
+
+  it("counts every one of SCE's words for unsettled and none of the others", () => {
+    const outcomes = [
+      outcome("R1", "missing"),
+      outcome("R2", "unresolved"),
+      outcome("R3", "dangling"),
+      outcome("R4", "contradicted"),
+      outcome("R5", "scenario-failed"),
+      outcome("R6", "needs-scenario"),
+      // These settle a requirement, or say another document or the deployment does.
+      outcome("R7", "implemented"),
+      outcome("R8", "scenario-passed"),
+      outcome("R9", "delegated"),
+      outcome("R10", "out-of-scope"),
+      outcome("R11", "system-level"),
+      // A word a later SCE writes is not guessed at.
+      outcome("R12", "waived"),
+    ];
+
+    expect(unsettledOf(state({ report: report({ outcomes }) }))).toEqual({ unsettled: 6, total: 12 });
+  });
+
+  it("is nothing for a design that settles every requirement, and for a measure of nothing", () => {
+    expect(unsettledOf(state({ report: report({ outcomes: sixty(60) }) }))).toBeNull();
+    expect(unsettledOf(state({ report: report({ outcomes: [] }) }))).toBeNull();
+  });
+
+  it("is nothing when SCE did not measure, and says nothing of a measure made for another text", () => {
+    expect(unsettledOf(state({ report: null }))).toBeNull();
+    for (const over of [
+      { model_standing: "behind" as const },
+      { requirements_standing: "behind" as const },
+      { model_standing: "unstated" as const },
+    ]) {
+      expect(unsettledOf(state({ report: report({ outcomes: sixty(50), ...over }) })), JSON.stringify(over)).toBeNull();
+    }
   });
 });
 
