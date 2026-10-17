@@ -1557,6 +1557,91 @@ fn the_message_that_ends_a_run_unusable_is_a_step_too_and_says_what_the_request_
     assert_eq!(whys.last(), Some(&told));
 }
 
+/// A message of the model as the server ends it: its words, its reasoning, how the server ended
+/// it and how many tokens it came to.
+fn ended_as(content: &str, reasoning: &str, finish: &str, tokens: u64) -> Script {
+    Script::Reply(
+        200,
+        json!({"object": "chat.completion", "choices": [{
+            "index": 0,
+            "finish_reason": finish,
+            "message": {"role": "assistant", "content": content, "reasoning_content": reasoning},
+        }], "usage": {"prompt_tokens": 10, "completion_tokens": tokens}})
+        .to_string(),
+    )
+}
+
+fn why_of_the_last_message(label: &str, script: Vec<Script>) -> String {
+    let rig = Rig::new(label, script);
+    let refused = rig.run().unwrap_err();
+    let GenerateError::Unusable(told) = refused else {
+        panic!("expected Unusable, got {refused:?}");
+    };
+    told
+}
+
+#[test]
+fn a_message_that_is_empty_says_whether_the_server_cut_it_or_it_held_only_reasoning() {
+    let cut = why_of_the_last_message(
+        "local-ended-length",
+        vec![
+            ended_as("", "", "length", 8192),
+            ended_as("", "", "length", 8192),
+            ended_as("", "", "length", 8192),
+        ],
+    );
+    assert!(cut.starts_with("the message is empty"), "{cut}");
+    assert!(cut.contains("stopped it at its output limit"), "{cut}");
+    assert!(cut.contains("finish_reason `length`"), "{cut}");
+    assert!(cut.contains("8192 tokens"), "{cut}");
+
+    let thought = why_of_the_last_message(
+        "local-ended-reasoning",
+        vec![
+            ended_as("", &"x".repeat(1500), "stop", 700),
+            ended_as("", &"x".repeat(1500), "stop", 700),
+            ended_as("", &"x".repeat(1500), "stop", 700),
+        ],
+    );
+    assert!(
+        thought.contains("holds reasoning and no answer"),
+        "{thought}"
+    );
+    assert!(
+        thought.contains("1500 characters of reasoning"),
+        "{thought}"
+    );
+    assert!(!thought.contains("output limit"), "{thought}");
+}
+
+#[test]
+fn a_draft_cut_in_the_middle_is_said_to_have_been_cut_and_a_message_that_is_just_wrong_is_not() {
+    let truncated = why_of_the_last_message(
+        "local-ended-cut-draft",
+        vec![
+            ended_as("{\"model\": {\"documents\": [", "", "length", 4096),
+            ended_as("{\"model\": {\"documents\": [", "", "length", 4096),
+            ended_as("{\"model\": {\"documents\": [", "", "length", 4096),
+        ],
+    );
+    assert!(
+        truncated.contains("stopped it at its output limit"),
+        "{truncated}"
+    );
+
+    // A message that ended as it should and is wrong in its own words carries nothing added.
+    let plain = why_of_the_last_message(
+        "local-ended-plain",
+        vec![
+            ended_as("nope", "", "stop", 3),
+            ended_as("nope", "", "stop", 3),
+            ended_as("nope", "", "stop", 3),
+        ],
+    );
+    assert!(!plain.contains("finish_reason"), "{plain}");
+    assert!(!plain.contains("output limit"), "{plain}");
+}
+
 #[test]
 fn a_run_with_nobody_watching_is_the_same_run() {
     let rig = Rig::new("local-untraced", vec![says(&draft("<scxml/>"))]);

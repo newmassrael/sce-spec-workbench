@@ -102,6 +102,14 @@ fn told() -> String {
 }
 
 /// What a model that answered with something that is not the draft is told.
+/// What is wrong with a message, and when how the server ended it explains that, how.
+fn with_how_it_ended(wrong: String, ended: &Ended, said: &str) -> String {
+    match ended.explains(said) {
+        Some(how) => format!("{wrong}: {how}"),
+        None => wrong,
+    }
+}
+
 fn repair_words(wrong: &str) -> String {
     format!(
         "Your last message is not the draft: {wrong}\n\nAnswer again with only the JSON object in \
@@ -318,11 +326,12 @@ pub enum Step {
 
 /// What asking the model once came to.
 enum Turn {
-    /// The model's message, and how many tokens the server says the conversation it was asked
-    /// about came to (not every server says).
+    /// The model's message, how many tokens the server says the conversation it was asked about
+    /// came to (not every server says), and how the server ended the message.
     Message {
         message: Value,
         prompt_tokens: Option<u64>,
+        ended: Ended,
     },
     /// The server could not read a tool call of the model: why, and the server's own words for
     /// when it is not put right.
@@ -330,6 +339,75 @@ enum Turn {
     /// The conversation is longer than the model's context allows: the server's own words, for
     /// when it is not begun again.
     ContextFull { said: String },
+}
+
+/// How the server ended one message, as far as it said. An empty message, or one that stops in
+/// the middle of its JSON, has two very different causes that the words alone do not tell apart:
+/// the server cut it at its output limit, or the model gave what it had to its reasoning. The
+/// first is put right by asking for less or raising the limit, the second by another model, and a
+/// run that said only "the message is empty" (measured on 2026-10-17, twice at the end of a
+/// two-hour run) left the owner to guess.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Ended {
+    /// The server's `finish_reason`: `stop`, `length`, `tool_calls`.
+    finish: Option<String>,
+    /// How many tokens the server says the message came to.
+    tokens: Option<u64>,
+    /// How many characters of reasoning the message carried beside its answer.
+    reasoning_chars: usize,
+}
+
+impl Ended {
+    fn of(reply: &Value) -> Self {
+        let message = &reply["choices"][0]["message"];
+        let reasoning = ["reasoning_content", "reasoning"]
+            .iter()
+            .filter_map(|key| message[*key].as_str())
+            .map(|text| text.chars().count())
+            .max()
+            .unwrap_or(0);
+        Self {
+            finish: reply["choices"][0]["finish_reason"]
+                .as_str()
+                .map(str::to_string),
+            tokens: reply["usage"]["completion_tokens"].as_u64(),
+            reasoning_chars: reasoning,
+        }
+    }
+
+    /// What is added to what is wrong with a message, when how it ended explains it: the server
+    /// cut it at its limit, or there was nothing but reasoning in it. Nothing for a message that
+    /// ended as any other and is wrong in its own words.
+    fn explains(&self, said: &str) -> Option<String> {
+        let cut = self.finish.as_deref() == Some("length");
+        let silent = said.trim().is_empty();
+        if !cut && !silent {
+            return None;
+        }
+        let mut facts = Vec::new();
+        if let Some(finish) = &self.finish {
+            facts.push(format!("finish_reason `{finish}`"));
+        }
+        if let Some(tokens) = self.tokens {
+            facts.push(format!("{tokens} tokens"));
+        }
+        if self.reasoning_chars > 0 {
+            facts.push(format!("{} characters of reasoning", self.reasoning_chars));
+        }
+        let cause = if cut {
+            "the server stopped it at its output limit"
+        } else if self.reasoning_chars > 0 {
+            "it holds reasoning and no answer"
+        } else {
+            "the server gave no words"
+        };
+        let facts = if facts.is_empty() {
+            "the server said nothing of how it ended".to_string()
+        } else {
+            facts.join(", ")
+        };
+        Some(format!("{cause} ({facts})"))
+    }
 }
 
 /// Somebody who is told each step of a run.
@@ -592,6 +670,7 @@ impl Local {
             Ok(Turn::Message {
                 message,
                 prompt_tokens: reply["usage"]["prompt_tokens"].as_u64(),
+                ended: Ended::of(&reply),
             })
         } else {
             Err(GenerateError::Failed(
@@ -721,15 +800,16 @@ impl Generator for Local {
                 turn,
                 messages: messages.len(),
             });
-            let message = match self.ask(&messages, &offered, deadline, cancel)? {
+            let (message, ended) = match self.ask(&messages, &offered, deadline, cancel)? {
                 Turn::Message {
                     message,
                     prompt_tokens: reported,
+                    ended,
                 } => {
                     // What it counted was the conversation as it was asked, which is as long as
                     // `messages` is now.
                     prompt_tokens = reported.map(|counted| (counted, messages.len()));
-                    message
+                    (message, ended)
                 }
                 Turn::Unreadable { why, .. } if unread < REPAIRS => {
                     self.trace.say(|| Step::NotReadable { why: why.clone() });
@@ -792,12 +872,14 @@ impl Generator for Local {
             match draft_in(&said, listed.as_ref(), checked.as_ref()) {
                 Ok(draft) => return Ok(draft),
                 Err(wrong) if repairs < REPAIRS => {
+                    let wrong = with_how_it_ended(wrong, &ended, &said);
                     self.trace.say(|| Step::NotTheDraft { why: wrong.clone() });
                     repairs += 1;
                     messages.push(json!({"role": "assistant", "content": said}));
                     messages.push(json!({"role": "user", "content": repair_words(&wrong)}));
                 }
                 Err(wrong) => {
+                    let wrong = with_how_it_ended(wrong, &ended, &said);
                     self.trace.say(|| Step::NotTheDraft { why: wrong.clone() });
                     return Err(GenerateError::Unusable(wrong));
                 }
