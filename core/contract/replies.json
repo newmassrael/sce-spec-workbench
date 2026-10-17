@@ -21,6 +21,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": "2026-10-03T09:00:00Z",
+        "failure": null,
         "fresh_ids": false,
         "id": "<cancelled-request-id>",
         "inputs": {
@@ -45,6 +46,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -79,6 +81,7 @@
         },
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": "2026-10-03T09:00:00Z",
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -248,6 +251,10 @@
         },
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": "2026-10-03T09:00:00Z",
+        "failure": {
+          "cause": "checks-refused",
+          "kind": "model"
+        },
         "fresh_ids": false,
         "id": "<failed-request-id>",
         "inputs": {
@@ -321,6 +328,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -396,6 +404,7 @@
           "candidate": null,
           "created_at": "2026-10-03T09:00:00Z",
           "ended_at": null,
+          "failure": null,
           "fresh_ids": false,
           "id": "<request-id>",
           "inputs": {
@@ -422,6 +431,7 @@
           "candidate": null,
           "created_at": "2026-10-03T09:00:00Z",
           "ended_at": "2026-10-03T09:00:00Z",
+          "failure": null,
           "fresh_ids": false,
           "id": "<cancelled-request-id>",
           "inputs": {
@@ -448,6 +458,10 @@
           },
           "created_at": "2026-10-03T09:00:00Z",
           "ended_at": "2026-10-03T09:00:00Z",
+          "failure": {
+            "cause": "checks-refused",
+            "kind": "model"
+          },
           "fresh_ids": false,
           "id": "<failed-request-id>",
           "inputs": {
@@ -479,6 +493,7 @@
           },
           "created_at": "2026-10-03T09:00:00Z",
           "ended_at": "2026-10-03T09:00:00Z",
+          "failure": null,
           "fresh_ids": false,
           "id": "<request-id>",
           "inputs": {
@@ -1747,6 +1762,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -2172,6 +2188,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -2197,6 +2214,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {
@@ -2222,6 +2240,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": true,
         "id": "<fresh-request-id>",
         "inputs": {
@@ -2247,6 +2266,7 @@
         "candidate": null,
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<pinned-request-id>",
         "inputs": {
@@ -2469,6 +2489,7 @@
         },
         "created_at": "2026-10-03T09:00:00Z",
         "ended_at": null,
+        "failure": null,
         "fresh_ids": false,
         "id": "<request-id>",
         "inputs": {

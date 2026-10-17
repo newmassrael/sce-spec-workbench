@@ -58,6 +58,7 @@ const detail = (over: Partial<GenerationRequest> = {}): GenerationRequest => ({
   fresh_ids: false,
   ended_at: null,
   note: null,
+  failure: null,
   ...over,
 });
 
@@ -252,13 +253,30 @@ describe("where the latest request stands", () => {
     expect(statusOf(head("failed"), detail({ state: "failed", note: "no cards named" }), null)).toEqual({
       kind: "failed",
       reason: "no cards named",
+      failure: null,
     });
-    expect(statusOf(head("failed"), null, null)).toEqual({ kind: "failed", reason: null });
+    expect(statusOf(head("failed"), null, null)).toEqual({ kind: "failed", reason: null, failure: null });
+  });
+
+  it("gives how a request failed, as the core recorded it, and not as a sentence says", () => {
+    const failure = { kind: "model", cause: "output-limit" } as const;
+    expect(
+      statusOf(head("failed"), detail({ state: "failed", note: "the installation is broken", failure }), null),
+    ).toEqual({ kind: "failed", reason: "the installation is broken", failure });
   });
 
   it("does not use what was read of another request", () => {
-    const other = detail({ id: "req-0", note: "an old failure", state: "failed" });
-    expect(statusOf(head("failed", 1, "req-1"), other, null)).toEqual({ kind: "failed", reason: null });
+    const other = detail({
+      id: "req-0",
+      note: "an old failure",
+      state: "failed",
+      failure: { kind: "time", cause: null },
+    });
+    expect(statusOf(head("failed", 1, "req-1"), other, null)).toEqual({
+      kind: "failed",
+      reason: null,
+      failure: null,
+    });
   });
 
   it("names every other state as it is", () => {

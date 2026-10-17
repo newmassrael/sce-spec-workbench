@@ -39,6 +39,8 @@ interface FakeRequest {
   answers: string | null;
   holder: string | null;
   note: string | null;
+  /** How it failed, as the core records it, for a request that did. */
+  failure: { kind: string; cause: string | null } | null;
   /** The connection it was made for, as the core would copy it, or none. */
   pin: { connection: string; revision: string; model: string | null } | null;
   /** The owner asked for every requirement to be issued a new id. */
@@ -202,11 +204,12 @@ class FakeCore implements Transport {
   }
 
   /** The executor could not, and says why. */
-  failRequest(id: string, note: string): void {
+  failRequest(id: string, note: string, failure: { kind: string; cause: string | null } | null = null): void {
     const request = this.latestRequest(id);
     if (request === undefined) throw new Error(`${id} has no request`);
     request.state = "failed";
     request.note = note;
+    request.failure = failure;
   }
 
   /** The executor is done and the core published what it wrote: the model and the list, for the text the request was about. */
@@ -266,6 +269,7 @@ class FakeCore implements Transport {
       fresh_ids: request.freshIds,
       ended_at: null,
       note: request.note,
+      failure: request.failure,
     };
   }
 
@@ -518,6 +522,7 @@ class FakeCore implements Transport {
           answers: expect.answers ?? null,
           holder: null,
           note: null,
+          failure: null,
           pin:
             named === undefined
               ? null
@@ -3589,17 +3594,60 @@ describe("asking for a model", () => {
     expect(button("generate")).toBeNull();
   });
 
-  it("shows the reason a request failed", async () => {
+  it("shows how a request failed from the core's record, and the reason it gave folded beneath", async () => {
     await click("Alpha");
     await press("generate");
     core.takeRequest("alpha");
     await ticker.fire();
 
-    core.failRequest("alpha", "The text never says which cards open the door.");
+    core.failRequest("alpha", "The text never says which cards open the door.", {
+      kind: "specification",
+      cause: null,
+    });
     await ticker.fire();
 
-    expect(generationStatus()).toBe("The AI could not write the model: The text never says which cards open the door.");
+    expect(generationStatus()).toBe(
+      "The text does not let a design be written, or the request no longer matches the text.",
+    );
+    const block = root.querySelector("#generation-failure");
+    expect(block?.getAttribute("data-kind")).toBe("specification");
+    expect(root.querySelector("#generation-failure-actions")?.textContent).toContain("Change the text");
+    const words = root.querySelector<HTMLDetailsElement>("#generation-failure-words");
+    expect(words?.textContent).toContain("The text never says which cards open the door.");
+    expect(words?.open).toBe(false);
     expect(button("generate")?.textContent).toBe("Generate again");
+  });
+
+  it("says what the AI's server did when the core recorded a cause the screen knows", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+
+    core.failRequest("alpha", "the message is empty: the server stopped it at its output limit", {
+      kind: "model",
+      cause: "output-limit",
+    });
+    await ticker.fire();
+
+    expect(root.querySelector("#generation-failure")?.getAttribute("data-kind")).toBe("model");
+    expect(root.querySelector("#generation-failure-cause")?.textContent).toContain("output limit");
+    expect(root.querySelector("#generation-failure-actions")?.textContent).toContain("Try another model");
+  });
+
+  it("does not guess a kind for a request that failed before kinds were recorded", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+
+    core.failRequest("alpha", "an old failure", null);
+    await ticker.fire();
+
+    expect(generationStatus()).toContain("did not say what kind of problem it was");
+    expect(root.querySelector("#generation-failure")?.getAttribute("data-kind")).toBe("unclassified");
+    expect(root.querySelector("#generation-failure-cause")).toBeNull();
+    expect(root.querySelector("#generation-failure-words")?.textContent).toContain("an old failure");
   });
 
   it("offers to replace a request that was let go of, and asks for the replacement as one", async () => {

@@ -29,6 +29,7 @@ const request = (state: RequestState, answers: string | null): { head: Inputs["h
     fresh_ids: false,
     ended_at: null,
     note: null,
+    failure: null,
   },
 });
 

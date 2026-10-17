@@ -91,6 +91,7 @@ import {
   takeTheirs,
   type EditorModel,
 } from "./editor_model";
+import { adviceFor } from "./failure_view";
 import { findQuote, groundOf, linesNaming, quotesOf, statesOf } from "./grounding_model";
 import {
   connectedNames,
@@ -2046,6 +2047,7 @@ export class App {
         { id: "generation-status", class: "status", role: "status", "aria-live": "polite" },
         busyWords ?? this.generationWords(status, modelHere),
       ),
+      status.kind === "failed" ? this.failureBlock(status) : null,
       this.ai === null ? null : h("p", { id: "generation-target", class: "muted" }, this.ai.targetLine()),
       controls.canGenerate ? this.freshIdsOption() : null,
       this.requestNotice === null
@@ -2088,9 +2090,7 @@ export class App {
       case "interrupted":
         return this.t("generationInterrupted");
       case "failed":
-        return status.reason === null
-          ? this.t("generationFailedUnsaid")
-          : this.t("generationFailed", { reason: status.reason });
+        return this.t(adviceFor(status.failure).headline);
       case "cancelled":
         return this.t("generationCancelled");
       case "superseded":
@@ -2098,6 +2098,31 @@ export class App {
       case "completed":
         return this.t("generationCompleted");
     }
+  }
+
+  /**
+   * What a failed request met and what the person can do about it, from the core's record of the
+   * failure (`adviceFor`). The executor's own words stay under it, folded: they say what happened,
+   * and what is above says whose it is to fix. A failure with no cause the screen knows is said
+   * as its kind says it, and no cause is made up for it.
+   */
+  private failureBlock(status: Extract<Status, { kind: "failed" }>): HTMLElement {
+    const advice = adviceFor(status.failure);
+    return h(
+      "div",
+      { id: "generation-failure", class: "failure", "data-kind": advice.kind },
+      advice.cause === null ? null : h("p", { id: "generation-failure-cause" }, this.t(advice.cause)),
+      h("h4", {}, this.t("failureActionsHeading")),
+      h("ul", { id: "generation-failure-actions" }, ...advice.actions.map((action) => h("li", {}, this.t(action)))),
+      status.reason === null
+        ? null
+        : h(
+            "details",
+            { id: "generation-failure-words" },
+            h("summary", {}, this.t("failureWordsHeading")),
+            h("pre", {}, status.reason),
+          ),
+    );
   }
 
   /**

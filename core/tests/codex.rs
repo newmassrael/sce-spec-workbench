@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use sce_spec_workbench_core::claude_code::{AuthorServer, ALLOWED_TOOLS};
 use sce_spec_workbench_core::codex::{Codex, CodexConfig, AUTHOR_TOOLS};
 use sce_spec_workbench_core::codex_support::Support;
-use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
+use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job, Trouble};
 use sce_spec_workbench_core::AuthSource;
 use sce_specs::{Revision, SpecId};
 use serde_json::{json, Value};
@@ -260,7 +260,7 @@ fn a_codex_nobody_verified_is_not_started() {
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
     assert!(said.contains("has not been verified"), "{said}");
@@ -308,7 +308,7 @@ fn a_feature_that_is_on_and_that_nobody_switched_off_or_reviewed_is_not_run_besi
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
     assert!(said.contains("unified_exec"), "{said}");
@@ -617,7 +617,7 @@ fn an_answer_that_names_a_file_is_refused_before_the_checker_opens_it() {
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Unusable(said) = refused else {
+    let GenerateError::Unusable(Trouble { words: said, .. }) = refused else {
         panic!("not an answer that cannot be used: {refused:?}");
     };
     assert!(said.contains("the answer is not usable"), "{said}");
@@ -684,7 +684,7 @@ fn a_connection_that_chose_a_key_the_environment_does_not_have_is_not_run_on_any
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
     assert!(said.contains("CODEX_API_KEY"), "{said}");
@@ -736,7 +736,7 @@ fn a_client_that_wrote_no_last_message_has_not_answered() {
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Unusable(said) = refused else {
+    let GenerateError::Unusable(Trouble { words: said, .. }) = refused else {
         panic!("expected an unusable reply, got {refused:?}");
     };
     assert!(said.contains("last message"), "{said}");
@@ -749,7 +749,7 @@ fn a_client_that_stops_with_an_error_is_a_failure_that_shows_what_it_said() {
 
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
     assert!(said.contains("not logged in"), "{said}");
@@ -810,7 +810,7 @@ fn a_client_that_takes_longer_than_its_time_is_stopped_and_the_run_failed() {
     let begun = Instant::now();
     let refused = generate(&client).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
     // The limit is said as it was given, not rounded up to a minute.

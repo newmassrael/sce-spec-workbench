@@ -36,7 +36,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sce_specs::commands::complete_generation;
-use sce_specs::requests::State;
+use sce_specs::requests::{Failure, FailureKind, State};
 use sce_specs::{
     AdapterReport, Answers, CandidateWrite, Clock, CommandError, ConnectionId, ConnectionRef,
     ModelFiles, Pin, Product, RequestView, Requirements, Revision, SpecId, SpecStore, StoreError,
@@ -104,17 +104,135 @@ pub struct Draft {
     pub requirements: Requirements,
 }
 
+/// The causes a generator names for what went wrong, as the words the store keeps beside a kind
+/// (`Failure::cause`). They are this application's: the store holds the kinds and takes any cause
+/// that is a word, so a cause is added here and in the screen's wording and nowhere in the store.
+/// A cause says what happened inside its kind, and the kind says whose it is to fix.
+pub mod cause {
+    /// The server stopped a message at its output limit, with nothing of an answer in it.
+    pub const OUTPUT_LIMIT: &str = "output-limit";
+    /// The message holds the model's reasoning and no answer.
+    pub const REASONING_ONLY: &str = "reasoning-only";
+    /// The server gave no words and no reasoning.
+    pub const NO_ANSWER: &str = "no-answer";
+    /// The draft was cut off in the middle of its JSON.
+    pub const DRAFT_CUT: &str = "draft-cut";
+    /// A message with no draft in it.
+    pub const NO_DRAFT: &str = "no-draft";
+    /// The core refused the model every time the tries allowed.
+    pub const CHECKS_REFUSED: &str = "checks-refused";
+    /// The turns the run was allowed came to an end without a draft.
+    pub const TURN_LIMIT: &str = "turn-limit";
+    /// The server could not read a call of a tool that the model made, again and again.
+    pub const UNREADABLE_CALL: &str = "unreadable-call";
+    /// A checking tool could not judge: the program it checks with is missing or crashed.
+    pub const CHECKER_UNAVAILABLE: &str = "checker-unavailable";
+    /// The authoring server of the run could not be started or went away.
+    pub const AUTHORING_SERVER: &str = "authoring-server";
+    /// The model server refused the key.
+    pub const KEY_REFUSED: &str = "key-refused";
+    /// The model server could not be reached.
+    pub const UNREACHABLE: &str = "unreachable";
+    /// The model server answered with an error of its own.
+    pub const SERVER_ERROR: &str = "server-error";
+    /// The model server's answer is not one of a chat.
+    pub const BAD_ANSWER: &str = "bad-answer";
+    /// The model server's address answered that there is nothing there.
+    pub const ADDRESS_NOT_FOUND: &str = "address-not-found";
+    /// The model server is there and its certificate was refused.
+    pub const CERTIFICATE_REFUSED: &str = "certificate-refused";
+    /// The connection to the model server broke, or it said what is not HTTP.
+    pub const CONNECTION_BROKEN: &str = "connection-broken";
+    /// The model server's answer is longer than the most that is read.
+    pub const ANSWER_TOO_LARGE: &str = "answer-too-large";
+    /// The conversation outgrew the model's context more often than a hand-over helps.
+    pub const CONTEXT_FULL: &str = "context-full";
+    /// The client program could not be started or read.
+    pub const CLIENT_FAULT: &str = "client-fault";
+    /// A folder the run needs could not be made.
+    pub const WORK_FOLDER: &str = "work-folder";
+}
+
+/// How a generator could not do what it was asked: the failure in the store's terms, and the
+/// words the owner reads. The kind is not left to be read out of the words, which are a
+/// sentence for a person and change when it reads better.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trouble {
+    pub failure: Failure,
+    pub words: String,
+}
+
+impl Trouble {
+    pub fn new(kind: FailureKind, words: impl Into<String>) -> Self {
+        Trouble {
+            failure: Failure::of(kind),
+            words: words.into(),
+        }
+    }
+
+    /// The same trouble, for `cause` (one of [`cause`]).
+    pub fn because(self, cause: &str) -> Self {
+        Trouble {
+            failure: self.failure.because(cause),
+            ..self
+        }
+    }
+}
+
+impl std::fmt::Display for Trouble {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.words)
+    }
+}
+
 /// Why a generator did not write a draft.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GenerateError {
     /// It was told to stop ([`Cancel`]) and did.
     Cancelled,
-    /// It could not, and says why in a sentence the owner reads.
-    Failed(String),
+    /// It could not, and says what kind of failure it is and why in a sentence the owner reads.
+    Failed(Trouble),
     /// It wrote something that is not a draft (a list that is not JSON, a set whose documents
     /// name each other wrongly). Not the end: it is told what was wrong, as it is told what the
-    /// core refused, and writes again.
-    Unusable(String),
+    /// core refused, and writes again. A run that ends on one fails as a `model` failure with the
+    /// cause it carries.
+    Unusable(Trouble),
+}
+
+impl GenerateError {
+    pub fn installation(words: impl Into<String>) -> Self {
+        GenerateError::Failed(Trouble::new(FailureKind::Installation, words))
+    }
+
+    pub fn connection(words: impl Into<String>) -> Self {
+        GenerateError::Failed(Trouble::new(FailureKind::Connection, words))
+    }
+
+    pub fn time(words: impl Into<String>) -> Self {
+        GenerateError::Failed(Trouble::new(FailureKind::Time, words))
+    }
+
+    pub fn size(words: impl Into<String>) -> Self {
+        GenerateError::Failed(Trouble::new(FailureKind::Size, words))
+    }
+
+    pub fn model(words: impl Into<String>) -> Self {
+        GenerateError::Failed(Trouble::new(FailureKind::Model, words))
+    }
+
+    /// The same error, for `cause` (one of [`cause`]); a cancellation has none.
+    pub fn because(self, cause: &str) -> Self {
+        match self {
+            GenerateError::Failed(trouble) => GenerateError::Failed(trouble.because(cause)),
+            GenerateError::Unusable(trouble) => GenerateError::Unusable(trouble.because(cause)),
+            GenerateError::Cancelled => GenerateError::Cancelled,
+        }
+    }
+
+    /// A message that is not the draft: a `model` trouble, told to the model as `wrong`.
+    pub fn unusable(wrong: impl Into<String>) -> Self {
+        GenerateError::Unusable(Trouble::new(FailureKind::Model, wrong))
+    }
 }
 
 /// Whatever writes a model from a specification.
@@ -240,6 +358,7 @@ pub enum Outcome {
         spec: SpecId,
         request: String,
         reason: String,
+        failure: Failure,
     },
     /// The request stopped being the runner's: the owner called it off, or the text it was
     /// asked about was saved. Nothing was failed.
@@ -543,19 +662,31 @@ where
         let holder = self.config.name.as_str();
         let mut job = match self.job_for(spec, request, attempt) {
             Ok(job) => job,
-            Err(reason) => return self.fail(spec, request, attempt, reason),
+            // The request or the spec could not be read: nothing says whose that is to fix.
+            Err(reason) => {
+                return self.fail(
+                    spec,
+                    request,
+                    attempt,
+                    Trouble::new(FailureKind::Unclassified, reason),
+                )
+            }
         };
         let mut last_refusal = String::new();
+        // What the last draft that was not accepted was not accepted for, as the failure the
+        // request ends with if no later one is.
+        let mut last_failure = Failure::of(FailureKind::Model);
         for _ in 0..=self.config.repairs {
             let draft = match generator.generate(&job, cancel) {
                 Ok(draft) => draft,
-                Err(GenerateError::Failed(reason)) => {
-                    return self.fail(spec, request, attempt, reason)
+                Err(GenerateError::Failed(trouble)) => {
+                    return self.fail(spec, request, attempt, trouble)
                 }
                 Err(GenerateError::Cancelled) => return Ok(self.ended(spec, request, lost)),
-                Err(GenerateError::Unusable(wrong)) => {
-                    last_refusal = wrong.clone();
-                    job.refusal = Some(wrong);
+                Err(GenerateError::Unusable(trouble)) => {
+                    last_refusal = trouble.words.clone();
+                    last_failure = trouble.failure;
+                    job.refusal = Some(trouble.words);
                     continue;
                 }
             };
@@ -609,6 +740,7 @@ where
                         || refused.kind == "fresh-ids-not-issued" =>
                 {
                     last_refusal = refusal_text(&refused);
+                    last_failure = Failure::of(FailureKind::Model).because(cause::CHECKS_REFUSED);
                     job.refusal = Some(last_refusal.clone());
                 }
                 Err(refused) if ENDED_KINDS.contains(&refused.kind.as_str()) => {
@@ -618,17 +750,28 @@ where
                         kind: refused.kind,
                     })
                 }
-                Err(other) => return self.fail(spec, request, attempt, other.message),
+                // The core refused for what the draft is not about: the spec, or the request as
+                // it stands to it. The core's own word for it is the cause, when it is one.
+                Err(other) => {
+                    let mut trouble = Trouble::new(FailureKind::Specification, other.message);
+                    if Failure::is_cause(&other.kind) {
+                        trouble = trouble.because(&other.kind);
+                    }
+                    return self.fail(spec, request, attempt, trouble);
+                }
             }
         }
         self.fail(
             spec,
             request,
             attempt,
-            format!(
-                "no draft the core accepted in {} try(ies); the last thing said of it was: {last_refusal}",
-                self.config.repairs + 1
-            ),
+            Trouble {
+                failure: last_failure,
+                words: format!(
+                    "no draft the core accepted in {} try(ies); the last thing said of it was: {last_refusal}",
+                    self.config.repairs + 1
+                ),
+            },
         )
     }
 
@@ -697,16 +840,25 @@ where
         spec: &SpecId,
         request: &str,
         attempt: u32,
-        reason: String,
+        trouble: Trouble,
     ) -> Result<Outcome, StoreError> {
-        match self
-            .store
-            .fail_request(spec, request, &self.config.name, attempt, &reason)
-        {
+        let Trouble {
+            failure,
+            words: reason,
+        } = trouble;
+        match self.store.fail_request(
+            spec,
+            request,
+            &self.config.name,
+            attempt,
+            &reason,
+            failure.clone(),
+        ) {
             Ok(_) => Ok(Outcome::Failed {
                 spec: spec.clone(),
                 request: request.to_string(),
                 reason,
+                failure,
             }),
             Err(StoreError::Refused { kind, .. }) if ENDED_KINDS.contains(&kind) => {
                 Ok(Outcome::Lost {

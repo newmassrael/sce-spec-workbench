@@ -26,7 +26,8 @@ use sce_spec_workbench_core::claude_code::AuthorServer;
 use sce_spec_workbench_core::codex::AUTHOR_TOOLS;
 use sce_spec_workbench_core::http_client::Endpoint;
 use sce_spec_workbench_core::local::{list_models, Local, LocalConfig, ModelsError, Step};
-use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
+use sce_spec_workbench_core::runner::{cause, Cancel, GenerateError, Generator, Job, Trouble};
+use sce_specs::requests::{Failure, FailureKind};
 use sce_specs::{Revision, SpecId};
 use serde_json::{json, Value};
 
@@ -248,9 +249,18 @@ fn a_checking_tool_that_could_not_judge_ends_the_run_and_the_model_is_not_sent_t
 
     let ended = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = ended else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = ended
+    else {
         panic!("a run that could not be checked ends as a failure: {ended:?}");
     };
+    // The kind is the installation's, which is whose it is to fix, and the cause says which part.
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Installation).because(cause::CHECKER_UNAVAILABLE)
+    );
     assert!(said.contains("validate_scxml_set"), "{said}");
     assert!(said.contains("no change to the design"), "{said}");
     // What the tool said is what the owner reads, so that what to put right is named.
@@ -399,7 +409,7 @@ fn a_model_that_never_gives_the_draft_is_unusable_after_the_repairs_and_the_requ
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Unusable(wrong) = refused else {
+    let GenerateError::Unusable(Trouble { words: wrong, .. }) = refused else {
         panic!("expected Unusable, got {refused:?}");
     };
     assert!(wrong.contains("no JSON object"), "{wrong}");
@@ -615,9 +625,17 @@ fn a_model_that_only_calls_tools_runs_out_of_turns() {
         .generate(&job(), &Cancel::new())
         .unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Model).because(cause::TURN_LIMIT)
+    );
     assert!(said.contains("did not give its draft in 3 turns"), "{said}");
     assert_eq!(rig.server.requests().len(), 3);
 }
@@ -908,9 +926,18 @@ fn a_conversation_that_keeps_outgrowing_the_context_is_begun_again_only_so_many_
         .generate(&job(), &Cancel::new())
         .unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    // A conversation too long for the model is the size's, not the server's or the model's.
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Size).because(cause::CONTEXT_FULL)
+    );
     assert!(
         said.contains("leaves no room"),
         "the server's words: {said}"
@@ -1059,9 +1086,17 @@ fn a_model_server_that_refuses_is_said_in_its_words() {
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::SERVER_ERROR)
+    );
     assert!(said.contains("answered 400"), "{said}");
     assert!(said.contains("model 'qwen-test' not found"), "{said}");
 }
@@ -1075,9 +1110,17 @@ fn an_answer_that_is_not_a_chat_completion_is_said_not_to_be() {
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::BAD_ANSWER)
+    );
     assert!(said.contains("not JSON"), "{said}");
 }
 
@@ -1121,9 +1164,17 @@ fn a_model_server_that_is_not_there_is_said_so() {
 
     let refused = local.generate(&job(), &Cancel::new()).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::UNREACHABLE)
+    );
     assert!(said.contains("could not be reached"), "{said}");
 }
 
@@ -1220,9 +1271,18 @@ fn a_model_whose_tool_calls_are_never_read_is_given_a_few_tries_and_then_the_ser
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    // The model could not be read by the server: the model's, and told so by the kind.
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Model).because(cause::UNREADABLE_CALL)
+    );
     assert!(said.contains("the server answered 500"), "{said}");
     assert!(said.contains("error parsing tool call"), "{said}");
     // The first, and a try after each of the two repairs: not an endless asking.
@@ -1244,9 +1304,17 @@ fn a_server_error_that_is_not_a_tool_call_it_could_not_read_is_not_put_to_the_mo
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::SERVER_ERROR)
+    );
     assert!(said.contains("the model runner has crashed"), "{said}");
     assert_eq!(rig.server.requests().len(), 1);
 }
@@ -1265,9 +1333,14 @@ fn a_model_server_that_does_not_answer_ends_the_run_at_its_time() {
         .generate(&job(), &Cancel::new())
         .unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(failure, Failure::of(FailureKind::Time));
     assert!(said.contains("longer than 1500 milliseconds"), "{said}");
     assert!(
         began.elapsed() < Duration::from_secs(10),
@@ -1306,9 +1379,17 @@ fn a_server_that_is_not_there_fails_the_run_at_once_and_says_so_without_its_addr
     let began = Instant::now();
     let refused = local.generate(&job(), &Cancel::new()).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::UNREACHABLE)
+    );
     says_the_server_went_away(&said, NOBODY);
     assert!(
         began.elapsed() < Duration::from_secs(10),
@@ -1323,9 +1404,17 @@ fn a_server_that_closes_the_connection_in_the_middle_fails_the_run_and_says_so()
 
     let refused = rig.run().unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Connection).because(cause::CONNECTION_BROKEN)
+    );
     says_the_server_went_away(&said, &rig.server.address);
 }
 
@@ -1382,9 +1471,17 @@ fn an_authoring_server_that_lacks_a_tool_the_task_needs_is_said_to_lack_it_and_t
         .generate(&job(), &Cancel::new())
         .unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Installation).because(cause::AUTHORING_SERVER)
+    );
     assert!(said.contains("does not offer decisions"), "{said}");
     assert!(rig.server.requests().is_empty());
 }
@@ -1404,9 +1501,17 @@ fn an_authoring_server_that_cannot_be_started_is_said_so_and_the_model_is_not_as
 
     let refused = local.generate(&job(), &Cancel::new()).unwrap_err();
 
-    let GenerateError::Failed(said) = refused else {
+    let GenerateError::Failed(Trouble {
+        failure,
+        words: said,
+    }) = refused
+    else {
         panic!("expected a failure, got {refused:?}");
     };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Installation).because(cause::AUTHORING_SERVER)
+    );
     assert!(said.contains("could not be started"), "{said}");
     assert!(server.requests().is_empty());
 }
@@ -1539,7 +1644,7 @@ fn the_message_that_ends_a_run_unusable_is_a_step_too_and_says_what_the_request_
         .generate(&job(), &Cancel::new())
         .unwrap_err();
 
-    let GenerateError::Unusable(told) = refused else {
+    let GenerateError::Unusable(Trouble { words: told, .. }) = refused else {
         panic!("expected Unusable, got {refused:?}");
     };
     let whys: Vec<String> = steps
@@ -1571,18 +1676,24 @@ fn ended_as(content: &str, reasoning: &str, finish: &str, tokens: u64) -> Script
     )
 }
 
-fn why_of_the_last_message(label: &str, script: Vec<Script>) -> String {
+/// What the last message of a run that never got a draft was wrong with, in words and as the
+/// failure the request would end with.
+fn why_of_the_last_message(label: &str, script: Vec<Script>) -> (String, Failure) {
     let rig = Rig::new(label, script);
     let refused = rig.run().unwrap_err();
-    let GenerateError::Unusable(told) = refused else {
+    let GenerateError::Unusable(Trouble {
+        failure,
+        words: told,
+    }) = refused
+    else {
         panic!("expected Unusable, got {refused:?}");
     };
-    told
+    (told, failure)
 }
 
 #[test]
 fn a_message_that_is_empty_says_whether_the_server_cut_it_or_it_held_only_reasoning() {
-    let cut = why_of_the_last_message(
+    let (cut, cut_failure) = why_of_the_last_message(
         "local-ended-length",
         vec![
             ended_as("", "", "length", 8192),
@@ -1594,8 +1705,12 @@ fn a_message_that_is_empty_says_whether_the_server_cut_it_or_it_held_only_reason
     assert!(cut.contains("stopped it at its output limit"), "{cut}");
     assert!(cut.contains("finish_reason `length`"), "{cut}");
     assert!(cut.contains("8192 tokens"), "{cut}");
+    assert_eq!(
+        cut_failure,
+        Failure::of(FailureKind::Model).because(cause::OUTPUT_LIMIT)
+    );
 
-    let thought = why_of_the_last_message(
+    let (thought, thought_failure) = why_of_the_last_message(
         "local-ended-reasoning",
         vec![
             ended_as("", &"x".repeat(1500), "stop", 700),
@@ -1612,11 +1727,30 @@ fn a_message_that_is_empty_says_whether_the_server_cut_it_or_it_held_only_reason
         "{thought}"
     );
     assert!(!thought.contains("output limit"), "{thought}");
+    assert_eq!(
+        thought_failure,
+        Failure::of(FailureKind::Model).because(cause::REASONING_ONLY)
+    );
+
+    // Nothing in it at all, and nothing said of how it ended: not the server's limit and not
+    // reasoning, so it is not said to be either.
+    let (_, silent_failure) = why_of_the_last_message(
+        "local-ended-silent",
+        vec![
+            ended_as("", "", "stop", 0),
+            ended_as("", "", "stop", 0),
+            ended_as("", "", "stop", 0),
+        ],
+    );
+    assert_eq!(
+        silent_failure,
+        Failure::of(FailureKind::Model).because(cause::NO_ANSWER)
+    );
 }
 
 #[test]
 fn a_draft_cut_in_the_middle_is_said_to_have_been_cut_and_a_message_that_is_just_wrong_is_not() {
-    let truncated = why_of_the_last_message(
+    let (truncated, truncated_failure) = why_of_the_last_message(
         "local-ended-cut-draft",
         vec![
             ended_as("{\"model\": {\"documents\": [", "", "length", 4096),
@@ -1628,9 +1762,13 @@ fn a_draft_cut_in_the_middle_is_said_to_have_been_cut_and_a_message_that_is_just
         truncated.contains("stopped it at its output limit"),
         "{truncated}"
     );
+    assert_eq!(
+        truncated_failure,
+        Failure::of(FailureKind::Model).because(cause::DRAFT_CUT)
+    );
 
     // A message that ended as it should and is wrong in its own words carries nothing added.
-    let plain = why_of_the_last_message(
+    let (plain, plain_failure) = why_of_the_last_message(
         "local-ended-plain",
         vec![
             ended_as("nope", "", "stop", 3),
@@ -1640,6 +1778,10 @@ fn a_draft_cut_in_the_middle_is_said_to_have_been_cut_and_a_message_that_is_just
     );
     assert!(!plain.contains("finish_reason"), "{plain}");
     assert!(!plain.contains("output limit"), "{plain}");
+    assert_eq!(
+        plain_failure,
+        Failure::of(FailureKind::Model).because(cause::NO_DRAFT)
+    );
 }
 
 #[test]

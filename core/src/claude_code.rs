@@ -38,7 +38,7 @@ use crate::client_run::{
     blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise, tail, Ended,
     Scratch, SERVER, SPEC_SCOPE, SYSTEM_PROMPT,
 };
-use crate::runner::{Cancel, Draft, GenerateError, Generator, Job};
+use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 /// The tools the client may use, of the authoring server's. Reading a spec and checking a draft;
 /// not saving, not taking a request, not accepting. Everything not named here is refused.
@@ -206,19 +206,25 @@ impl Generator for ClaudeCode {
     }
 
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
-        let scratch = Scratch::new("sce-claude")
-            .map_err(|e| GenerateError::Failed(format!("a folder for the client: {e}")))?;
+        let scratch = Scratch::new("sce-claude").map_err(|e| {
+            GenerateError::installation(format!("a folder for the client: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
         fs::write(
             scratch.path().join(MCP_FILE),
             mcp_config(&scoped_to(&self.author, job.spec.as_str())).to_string(),
         )
-        .map_err(|e| GenerateError::Failed(format!("the client's server list: {e}")))?;
+        .map_err(|e| {
+            GenerateError::installation(format!("the client's server list: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
 
         let child = self.command(scratch.path()).spawn().map_err(|e| {
-            GenerateError::Failed(format!(
+            GenerateError::installation(format!(
                 "{} could not be started: {e}",
                 self.binary.display()
             ))
+            .because(cause::CLIENT_FAULT)
         })?;
         let ended = supervise(
             child,
@@ -226,11 +232,14 @@ impl Generator for ClaudeCode {
             cancel,
             self.config.timeout,
         )
-        .map_err(|e| GenerateError::Failed(format!("the client could not be read: {e}")))?;
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
-            Ended::TimedOut => Err(GenerateError::Failed(format!(
+            Ended::TimedOut => Err(GenerateError::time(format!(
                 "the client took longer than {} and was stopped",
                 span_words(self.config.timeout)
             ))),
@@ -251,23 +260,30 @@ fn read_answer(status: ExitStatus, stdout: &str, stderr: &str) -> Result<Draft, 
         } else {
             stderr
         };
-        return Err(GenerateError::Failed(format!(
+        return Err(GenerateError::installation(format!(
             "the client stopped with {status}: {}",
             tail(said.trim(), 2000)
-        )));
+        ))
+        .because(cause::CLIENT_FAULT));
     }
     let result: Value = serde_json::from_str(stdout.trim()).map_err(|_| {
-        GenerateError::Failed(format!(
+        GenerateError::installation(format!(
             "the client answered something that is not JSON: {}",
             tail(stdout.trim(), 2000)
         ))
+        .because(cause::CLIENT_FAULT)
     })?;
     let subtype = result["subtype"].as_str().unwrap_or("unknown");
     if result["is_error"].as_bool().unwrap_or(false) || subtype != "success" {
-        return Err(GenerateError::Failed(format!(
+        let reported = GenerateError::model(format!(
             "the client reported {subtype}: {}",
             tail(result["result"].as_str().unwrap_or("").trim(), 2000)
-        )));
+        ));
+        return Err(if subtype == "error_max_turns" {
+            reported.because(cause::TURN_LIMIT)
+        } else {
+            reported
+        });
     }
     // The answer the schema asked for. A client that did not use the schema's channel may still
     // have answered in the form, as the text of its reply.
@@ -281,11 +297,12 @@ fn read_answer(status: ExitStatus, stdout: &str, stderr: &str) -> Result<Draft, 
                 .and_then(|text| serde_json::from_str(text.trim()).ok())
         })
         .ok_or_else(|| {
-            GenerateError::Unusable(
-                "the reply is not the draft asked for: it has no structured answer".to_string(),
+            GenerateError::unusable(
+                "the reply is not the draft asked for: it has no structured answer",
             )
+            .because(cause::NO_DRAFT)
         })?;
-    draft_from(&answer).map_err(GenerateError::Unusable)
+    draft_from(&answer).map_err(|wrong| GenerateError::unusable(wrong).because(cause::NO_DRAFT))
 }
 
 /// The servers the client may reach: the SCE authoring server, and no other.

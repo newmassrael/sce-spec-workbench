@@ -42,7 +42,8 @@ use crate::client_run::{
 };
 use crate::http_client::{self, Endpoint, HttpError, Request};
 use crate::mcp_client::{McpClient, McpError, Tool};
-use crate::runner::{Cancel, Draft, GenerateError, Generator, Job};
+use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job, Trouble};
+use sce_specs::requests::FailureKind;
 
 /// The most of one answer of the server that is read.
 const ANSWER_MAX: usize = 64 * 1024 * 1024;
@@ -101,15 +102,17 @@ fn told() -> String {
     )
 }
 
-/// What a model that answered with something that is not the draft is told.
-/// What is wrong with a message, and when how the server ended it explains that, how.
-fn with_how_it_ended(wrong: String, ended: &Ended, said: &str) -> String {
-    match ended.explains(said) {
+/// What a message that is not the draft comes to: what is wrong with it, with how the server ended
+/// it when that explains it, as the `model` trouble it is, and the cause that is the way it ended.
+fn trouble_of(wrong: String, ended: &Ended, said: &str) -> Trouble {
+    let words = match ended.explains(said) {
         Some(how) => format!("{wrong}: {how}"),
         None => wrong,
-    }
+    };
+    Trouble::new(FailureKind::Model, words).because(ended.cause(said))
 }
 
+/// What a model that answered with something that is not the draft is told.
 fn repair_words(wrong: &str) -> String {
     format!(
         "Your last message is not the draft: {wrong}\n\nAnswer again with only the JSON object in \
@@ -375,6 +378,20 @@ impl Ended {
         }
     }
 
+    /// What a message that is not the draft was, by how it ended: nothing said and the server cut
+    /// it, nothing said and only reasoning, nothing said at all, a draft the server cut, or a
+    /// message with no draft in it.
+    fn cause(&self, said: &str) -> &'static str {
+        let cut = self.finish.as_deref() == Some("length");
+        match (said.trim().is_empty(), cut) {
+            (true, true) => cause::OUTPUT_LIMIT,
+            (true, false) if self.reasoning_chars > 0 => cause::REASONING_ONLY,
+            (true, false) => cause::NO_ANSWER,
+            (false, true) => cause::DRAFT_CUT,
+            (false, false) => cause::NO_DRAFT,
+        }
+    }
+
     /// What is added to what is wrong with a message, when how it ended explains it: the server
     /// cut it at its limit, or there was nothing but reasoning in it. Nothing for a message that
     /// ended as any other and is wrong in its own words.
@@ -519,17 +536,27 @@ impl Local {
         match error {
             McpError::Cancelled => GenerateError::Cancelled,
             McpError::TimedOut => self.too_long(),
-            other => GenerateError::Failed(other.to_string()),
+            // The authoring server is a program of the installation, and one that cannot be
+            // started, goes away or does not speak the protocol is the installation's fault.
+            other => {
+                GenerateError::installation(other.to_string()).because(cause::AUTHORING_SERVER)
+            }
         }
     }
 
     /// How an error of the model server ends a run.
     fn http_failure(&self, error: HttpError) -> GenerateError {
-        match error {
-            HttpError::Cancelled => GenerateError::Cancelled,
-            HttpError::TimedOut => self.too_long(),
-            other => GenerateError::Failed(other.to_string()),
-        }
+        let cause = match &error {
+            HttpError::Cancelled => return GenerateError::Cancelled,
+            HttpError::TimedOut => return self.too_long(),
+            HttpError::Connect(_) => cause::UNREACHABLE,
+            HttpError::Certificate(_) => cause::CERTIFICATE_REFUSED,
+            HttpError::Broken(_) => cause::CONNECTION_BROKEN,
+            HttpError::TooLarge => {
+                return GenerateError::size(error.to_string()).because(cause::ANSWER_TOO_LARGE)
+            }
+        };
+        GenerateError::connection(error.to_string()).because(cause)
     }
 
     /// Whether the next request would be as full of the model's context as the connection allows:
@@ -579,7 +606,7 @@ impl Local {
     }
 
     fn too_long(&self) -> GenerateError {
-        GenerateError::Failed(format!(
+        GenerateError::time(format!(
             "the run took longer than {} and was stopped",
             span_words(self.config.timeout)
         ))
@@ -607,10 +634,11 @@ impl Local {
         if lacking.is_empty() {
             Ok(offered)
         } else {
-            Err(GenerateError::Failed(format!(
+            Err(GenerateError::installation(format!(
                 "the authoring server does not offer {}, which the task needs",
                 lacking.join(", ")
-            )))
+            ))
+            .because(cause::AUTHORING_SERVER))
         }
     }
 
@@ -657,13 +685,19 @@ impl Local {
             if response.status == 400 && overflows_context(&error_message(&response.body)) {
                 return Ok(Turn::ContextFull { said });
             }
-            return Err(GenerateError::Failed(said));
+            let cause = match response.status {
+                401 | 403 => cause::KEY_REFUSED,
+                404 => cause::ADDRESS_NOT_FOUND,
+                _ => cause::SERVER_ERROR,
+            };
+            return Err(GenerateError::connection(said).because(cause));
         }
         let reply: Value = serde_json::from_slice(&response.body).map_err(|_| {
-            GenerateError::Failed(format!(
+            GenerateError::connection(format!(
                 "the server's answer is not JSON: {}",
                 short(&String::from_utf8_lossy(&response.body), 200)
             ))
+            .because(cause::BAD_ANSWER)
         })?;
         let message = reply["choices"][0]["message"].clone();
         if message.is_object() {
@@ -673,9 +707,10 @@ impl Local {
                 ended: Ended::of(&reply),
             })
         } else {
-            Err(GenerateError::Failed(
-                "the server's answer has no message: it is not a chat completion".to_string(),
-            ))
+            Err(GenerateError::connection(
+                "the server's answer has no message: it is not a chat completion",
+            )
+            .because(cause::BAD_ANSWER))
         }
     }
 
@@ -721,11 +756,12 @@ impl Local {
         // run lasts (eighty minutes, on 2026-10-17, against a generator that had lost its
         // templates). The run ends, and the owner is told what to put right.
         if called.cannot_judge {
-            return Err(GenerateError::Failed(format!(
+            return Err(GenerateError::installation(format!(
                 "the checking tool `{}` could not judge anything, so the run was stopped: this \
                  is a fault of the installation and no change to the design puts it right. {}",
                 tool.name, called.text
-            )));
+            ))
+            .because(cause::CHECKER_UNAVAILABLE));
         }
         Ok(match (called.is_error, called.text.is_empty()) {
             (true, _) => ToolWords::failed(called.text),
@@ -754,8 +790,10 @@ impl Generator for Local {
 
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
         let deadline = Instant::now() + self.config.timeout;
-        let scratch = Scratch::new("sce-local")
-            .map_err(|e| GenerateError::Failed(format!("a folder for the run: {e}")))?;
+        let scratch = Scratch::new("sce-local").map_err(|e| {
+            GenerateError::installation(format!("a folder for the run: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
         let author = scoped_to(&self.author, job.spec.as_str());
         let mut mcp = McpClient::start(&author, scratch.path(), deadline, cancel)
             .map_err(|e| self.mcp_failure(e))?;
@@ -819,7 +857,7 @@ impl Generator for Local {
                 }
                 Turn::Unreadable { why, said } => {
                     self.trace.say(|| Step::NotReadable { why });
-                    return Err(GenerateError::Failed(said));
+                    return Err(GenerateError::model(said).because(cause::UNREADABLE_CALL));
                 }
                 // The conversation outgrew the model's context. What the run holds (the list the
                 // tool gave, the design last sent to be checked) is what it began again from; the
@@ -831,7 +869,9 @@ impl Generator for Local {
                     (repairs, unread, prompt_tokens) = (0, 0, None);
                     continue;
                 }
-                Turn::ContextFull { said } => return Err(GenerateError::Failed(said)),
+                Turn::ContextFull { said } => {
+                    return Err(GenerateError::size(said).because(cause::CONTEXT_FULL))
+                }
             };
             let calls = calls_of(&message, turn);
             self.trace.say(|| Step::Said {
@@ -872,23 +912,28 @@ impl Generator for Local {
             match draft_in(&said, listed.as_ref(), checked.as_ref()) {
                 Ok(draft) => return Ok(draft),
                 Err(wrong) if repairs < REPAIRS => {
-                    let wrong = with_how_it_ended(wrong, &ended, &said);
-                    self.trace.say(|| Step::NotTheDraft { why: wrong.clone() });
+                    let trouble = trouble_of(wrong, &ended, &said);
+                    self.trace.say(|| Step::NotTheDraft {
+                        why: trouble.words.clone(),
+                    });
                     repairs += 1;
                     messages.push(json!({"role": "assistant", "content": said}));
-                    messages.push(json!({"role": "user", "content": repair_words(&wrong)}));
+                    messages.push(json!({"role": "user", "content": repair_words(&trouble.words)}));
                 }
                 Err(wrong) => {
-                    let wrong = with_how_it_ended(wrong, &ended, &said);
-                    self.trace.say(|| Step::NotTheDraft { why: wrong.clone() });
-                    return Err(GenerateError::Unusable(wrong));
+                    let trouble = trouble_of(wrong, &ended, &said);
+                    self.trace.say(|| Step::NotTheDraft {
+                        why: trouble.words.clone(),
+                    });
+                    return Err(GenerateError::Unusable(trouble));
                 }
             }
         }
-        Err(GenerateError::Failed(format!(
+        Err(GenerateError::model(format!(
             "the model did not give its draft in {} turns",
             self.config.max_turns
-        )))
+        ))
+        .because(cause::TURN_LIMIT))
     }
 }
 

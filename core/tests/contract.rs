@@ -776,7 +776,8 @@ fn replies() -> Value {
             &store,
             "fail_request",
             json!({"id": id, "request": failed_id, "holder": "adapter-a", "attempt": 1,
-                   "reason": "SCE refused the model"}),
+                   "reason": "SCE refused the model",
+                   "failure": {"kind": "model", "cause": "checks-refused"}}),
         ),
     );
     let calling_off = answer(

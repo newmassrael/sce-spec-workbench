@@ -46,7 +46,7 @@ use crate::client_run::{
 use crate::codex_environment::environment_for;
 use crate::codex_support::{enabled_features, Support};
 use crate::connection::AuthSource;
-use crate::runner::{Cancel, Draft, GenerateError, Generator, Job};
+use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 // The authoring server's tools a client may use, said once for every client that has them
 // (`client_run::AUTHOR_TOOLS`), and named here as it always has been.
@@ -693,14 +693,20 @@ impl Generator for Codex {
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
         // Nothing is started before it is known to be a Codex this build has verified, with
         // nothing on that nobody looked at, and a credential to give it.
-        let Run { kept, home } = self.preflight().map_err(GenerateError::Failed)?;
+        let Run { kept, home } = self
+            .preflight()
+            .map_err(|why| GenerateError::installation(why).because(cause::CLIENT_FAULT))?;
 
-        let scratch = Scratch::new("sce-codex")
-            .map_err(|e| GenerateError::Failed(format!("a folder for the client: {e}")))?;
+        let scratch = Scratch::new("sce-codex").map_err(|e| {
+            GenerateError::installation(format!("a folder for the client: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
         let schema_file = scratch.path().join("schema.json");
         let last = scratch.path().join("last.json");
-        fs::write(&schema_file, schema().to_string())
-            .map_err(|e| GenerateError::Failed(format!("the form of the answer: {e}")))?;
+        fs::write(&schema_file, schema().to_string()).map_err(|e| {
+            GenerateError::installation(format!("the form of the answer: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
 
         let mut command = Command::new(&self.binary);
         command
@@ -712,12 +718,14 @@ impl Generator for Codex {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         // The home the connection gave the client, when it gave one.
-        give_home(&mut command, home.as_deref()).map_err(GenerateError::Failed)?;
+        give_home(&mut command, home.as_deref())
+            .map_err(|why| GenerateError::installation(why).because(cause::CLIENT_FAULT))?;
         let child = command.spawn().map_err(|e| {
-            GenerateError::Failed(format!(
+            GenerateError::installation(format!(
                 "{} could not be started: {e}",
                 self.binary.display()
             ))
+            .because(cause::CLIENT_FAULT)
         })?;
         let ended = supervise(
             child,
@@ -725,11 +733,14 @@ impl Generator for Codex {
             cancel,
             self.config.timeout,
         )
-        .map_err(|e| GenerateError::Failed(format!("the client could not be read: {e}")))?;
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
-            Ended::TimedOut => Err(GenerateError::Failed(format!(
+            Ended::TimedOut => Err(GenerateError::time(format!(
                 "the client took longer than {} and was stopped",
                 span_words(self.config.timeout)
             ))),
@@ -744,10 +755,11 @@ impl Generator for Codex {
                     } else {
                         &stderr
                     };
-                    return Err(GenerateError::Failed(format!(
+                    return Err(GenerateError::installation(format!(
                         "the client stopped with {status}: {}",
                         tail(said.trim(), 2000)
-                    )));
+                    ))
+                    .because(cause::CLIENT_FAULT));
                 }
                 read_answer(&last)
             }
@@ -758,15 +770,15 @@ impl Generator for Codex {
 /// The last message the client wrote, as a draft or as the reason there is none.
 fn read_answer(last: &Path) -> Result<Draft, GenerateError> {
     let text = fs::read_to_string(last).map_err(|_| {
-        GenerateError::Unusable(
-            "the client did not write a last message, so there is no draft".to_string(),
-        )
+        GenerateError::unusable("the client did not write a last message, so there is no draft")
+            .because(cause::NO_DRAFT)
     })?;
     let answer: Value = serde_json::from_str(text.trim()).map_err(|_| {
-        GenerateError::Unusable(format!(
+        GenerateError::unusable(format!(
             "the last message is not the draft asked for: it is not JSON: {}",
             tail(text.trim(), 2000)
         ))
+        .because(cause::NO_DRAFT)
     })?;
-    draft_from(&answer).map_err(GenerateError::Unusable)
+    draft_from(&answer).map_err(|wrong| GenerateError::unusable(wrong).because(cause::NO_DRAFT))
 }

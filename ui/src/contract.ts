@@ -611,6 +611,40 @@ export type RequestState =
   | "interrupted"
   | "superseded";
 
+/**
+ * What kind of thing a failed request met, as the core keeps it: whose it is to fix. The core
+ * holds the kinds and the screen branches on them; no sentence is read to find one.
+ */
+export type FailureKind =
+  | "installation"
+  | "connection"
+  | "time"
+  | "size"
+  | "model"
+  | "specification"
+  | "unclassified";
+
+/** Every kind, in the order a person is offered them. */
+export const FAILURE_KINDS: readonly FailureKind[] = [
+  "installation",
+  "connection",
+  "time",
+  "size",
+  "model",
+  "specification",
+  "unclassified",
+];
+
+/**
+ * How a request failed: its kind, and the executor's own word for the cause when it gave one
+ * (`output-limit`). A cause is a word the screen may know and may not: one it does not know is
+ * said as the kind says it.
+ */
+export interface RequestFailure {
+  readonly kind: FailureKind;
+  readonly cause: string | null;
+}
+
 /** The states in which a request can still produce a result. At most one request of a spec is in one. */
 export function isOpenRequest(state: RequestState): boolean {
   return state === "queued" || state === "running" || state === "interrupted";
@@ -673,6 +707,11 @@ export interface GenerationRequest {
   readonly ended_at: string | null;
   /** Why it ended or was let go of, in words. */
   readonly note: string | null;
+  /**
+   * How it failed, for a request that did. `null` for every other, and for one that failed before
+   * the core kept kinds, which is then said as the failure of an unknown kind.
+   */
+  readonly failure: RequestFailure | null;
 }
 
 /** The connection a request was made for (`Pin` in the core). */
@@ -1404,6 +1443,17 @@ export function parseGenerationRequest(value: unknown, where = "request"): Gener
     fresh_ids: optionalFlag(r, "fresh_ids", where),
     ended_at: nullableText(r, "ended_at", where),
     note: nullableText(r, "note", where),
+    failure: parseRequestFailure(r["failure"], `${where}.failure`),
+  };
+}
+
+/** `failure` of a request: absent or `null` for one that did not fail, and a kind the core has otherwise. */
+function parseRequestFailure(value: unknown, where: string): RequestFailure | null {
+  if (value === undefined || value === null) return null;
+  const r = record(value, where);
+  return {
+    kind: oneOf(r, "kind", where, FAILURE_KINDS),
+    cause: nullableText(r, "cause", where),
   };
 }
 

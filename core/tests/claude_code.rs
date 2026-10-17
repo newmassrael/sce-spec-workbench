@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use sce_spec_workbench_core::claude_code::{
     AuthorServer, ClaudeCode, ClaudeCodeConfig, ALLOWED_TOOLS,
 };
-use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job};
+use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job, Trouble};
 use sce_specs::{ModelFiles, Revision, SpecId};
 use serde_json::{json, Value};
 
@@ -446,7 +446,7 @@ fn a_draft_that_is_not_one_is_unusable_and_says_what_is_wrong() {
         let result = generate(&client(&fake), &job());
 
         match result {
-            Err(GenerateError::Unusable(wrong)) => {
+            Err(GenerateError::Unusable(Trouble { words: wrong, .. })) => {
                 assert!(wrong.contains(wanted), "{label}: {wrong}");
             }
             other => panic!("{label}: expected an unusable draft, got {other:?}"),
@@ -464,7 +464,7 @@ fn a_client_that_says_it_failed_is_a_failure_in_its_own_words() {
 
     let failed = generate(&client(&fake), &job());
 
-    let Err(GenerateError::Failed(reason)) = failed else {
+    let Err(GenerateError::Failed(Trouble { words: reason, .. })) = failed else {
         panic!("expected a failure, got {failed:?}");
     };
     assert!(reason.contains("error_max_turns"), "{reason}");
@@ -477,7 +477,7 @@ fn something_that_is_not_json_is_a_failure_that_shows_what_it_was() {
 
     let failed = generate(&client(&fake), &job());
 
-    let Err(GenerateError::Failed(reason)) = failed else {
+    let Err(GenerateError::Failed(Trouble { words: reason, .. })) = failed else {
         panic!("expected a failure, got {failed:?}");
     };
     assert!(reason.contains("not JSON"), "{reason}");
@@ -490,7 +490,7 @@ fn a_client_that_stops_with_a_status_says_what_it_said() {
 
     let failed = generate(&client(&fake), &job());
 
-    let Err(GenerateError::Failed(reason)) = failed else {
+    let Err(GenerateError::Failed(Trouble { words: reason, .. })) = failed else {
         panic!("expected a failure, got {failed:?}");
     };
     assert!(reason.contains("Invalid API key"), "{reason}");
@@ -508,7 +508,7 @@ fn a_client_that_is_not_there_is_a_failure_that_says_so() {
     assert_eq!(gone.version(), None);
     let failed = generate(&gone, &job());
 
-    let Err(GenerateError::Failed(reason)) = failed else {
+    let Err(GenerateError::Failed(Trouble { words: reason, .. })) = failed else {
         panic!("expected a failure, got {failed:?}");
     };
     assert!(reason.contains("could not be started"), "{reason}");
@@ -595,7 +595,7 @@ fn a_client_that_takes_longer_than_its_time_is_stopped_and_the_run_failed() {
     let started = Instant::now();
     let failed = generate(&client, &job());
 
-    let Err(GenerateError::Failed(reason)) = failed else {
+    let Err(GenerateError::Failed(Trouble { words: reason, .. })) = failed else {
         panic!("expected a failure, got {failed:?}");
     };
     // The limit is said as it was given, not rounded up to a minute.

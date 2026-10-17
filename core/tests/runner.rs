@@ -18,9 +18,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sce_spec_workbench_core::runner::{
-    Cancel, Draft, GenerateError, Generator, Job, Outcome, Runner, RunnerConfig,
+    cause, Cancel, Draft, GenerateError, Generator, Job, Outcome, Runner, RunnerConfig, Trouble,
 };
-use sce_specs::requests::{Inputs, State};
+use sce_specs::requests::{Failure, FailureKind, Inputs, State};
 use sce_specs::{
     call, ManualClock, ModelFiles, Registration, Requirements, Revision, SpecId, SpecStore,
 };
@@ -388,23 +388,31 @@ fn a_generator_that_cannot_says_why_and_the_owner_is_told() {
     let request = f.ask("press-1");
     let generator = Scripted::new(|_, _, _| {
         Err(GenerateError::Failed(
-            "The text never says which cards open the door.".to_string(),
+            Trouble::new(
+                FailureKind::Specification,
+                "The text never says which cards open the door.",
+            )
+            .because("contradiction"),
         ))
     });
     let runner = f.runner(&generator, f.config());
 
     let outcome = runner.run_once().unwrap();
 
+    let failure = Failure::of(FailureKind::Specification).because("contradiction");
     assert_eq!(
         outcome,
         Outcome::Failed {
             spec: f.id.clone(),
             request: request.clone(),
             reason: "The text never says which cards open the door.".to_string(),
+            failure: failure.clone(),
         }
     );
     let seen = f.store.read_request(&f.id, &request).unwrap();
     assert_eq!(seen.state, State::Failed);
+    // The kind reaches the record the screen reads, and is not read back out of the words.
+    assert_eq!(seen.request.failure, Some(failure));
     assert_eq!(
         seen.request.note.as_deref(),
         Some("The text never says which cards open the door.")
@@ -461,14 +469,58 @@ fn a_model_the_core_keeps_refusing_fails_the_request_after_the_repairs_with_what
 
     let outcome = runner.run_once().unwrap();
 
-    let Outcome::Failed { reason, .. } = outcome else {
+    let Outcome::Failed {
+        reason, failure, ..
+    } = outcome
+    else {
         panic!("expected a failure, got {outcome:?}");
     };
     assert_eq!(generator.asked().len(), 2, "one try and one repair");
     assert!(reason.contains("2 try(ies)"), "{reason}");
     assert!(reason.contains("validation/invalid-reference"), "{reason}");
+    // The core refused a model the AI wrote: the model's, and the checks are what refused it.
+    let expected = Failure::of(FailureKind::Model).because(cause::CHECKS_REFUSED);
+    assert_eq!(failure, expected);
     assert_eq!(f.state_of(&request), State::Failed);
+    assert_eq!(
+        f.store
+            .read_request(&f.id, &request)
+            .unwrap()
+            .request
+            .failure,
+        Some(expected)
+    );
     assert!(f.store.read_model(&f.id, None).unwrap().is_none());
+}
+
+#[test]
+fn a_run_that_ends_on_something_that_is_not_a_draft_fails_with_the_cause_it_carried() {
+    let f = fixture("runner-unusable-cause");
+    let request = f.ask("press-1");
+    let generator = Scripted::new(|_, _, _| {
+        Err(GenerateError::unusable("the message is empty").because(cause::OUTPUT_LIMIT))
+    });
+    let mut config = f.config();
+    config.repairs = 1;
+    let runner = f.runner(&generator, config);
+
+    let outcome = runner.run_once().unwrap();
+
+    let Outcome::Failed { failure, .. } = outcome else {
+        panic!("expected a failure, got {outcome:?}");
+    };
+    // The cause of the last try is what the request ends with: it is a model that did not
+    // answer, and the AI's server stopped it at its limit.
+    let expected = Failure::of(FailureKind::Model).because(cause::OUTPUT_LIMIT);
+    assert_eq!(failure, expected);
+    assert_eq!(
+        f.store
+            .read_request(&f.id, &request)
+            .unwrap()
+            .request
+            .failure,
+        Some(expected)
+    );
 }
 
 #[test]
@@ -476,8 +528,8 @@ fn something_that_is_not_a_draft_is_told_what_was_wrong_and_written_again() {
     let f = fixture("runner-unusable");
     let request = f.ask("press-1");
     let generator = Scripted::new(|n, _, _| match n {
-        0 => Err(GenerateError::Unusable(
-            "the manifest is not JSON: expected value at line 1".to_string(),
+        0 => Err(GenerateError::unusable(
+            "the manifest is not JSON: expected value at line 1",
         )),
         _ => Ok(draft("two")),
     });
@@ -532,7 +584,7 @@ fn a_request_the_owner_calls_off_stops_the_generator_and_is_not_reported_as_its_
         let limit = Instant::now() + Duration::from_secs(10);
         while !cancel.is_cancelled() {
             if Instant::now() > limit {
-                return Err(GenerateError::Failed("never told to stop".to_string()));
+                return Err(GenerateError::installation("never told to stop"));
             }
             thread::sleep(Duration::from_millis(5));
         }

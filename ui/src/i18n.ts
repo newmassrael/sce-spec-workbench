@@ -221,8 +221,58 @@ const en = {
   generationRunningUnnamed: "The AI is writing the model (attempt {attempt}).",
   generationInterrupted:
     "The AI that was writing the model stopped answering. Nothing was published. You can generate again.",
-  generationFailed: "The AI could not write the model: {reason}",
-  generationFailedUnsaid: "The AI could not write the model, and did not say why.",
+  failureInstallation:
+    "This computer could not run the request: something it needs is missing or stopped working.",
+  failureConnection: "The AI could not be reached, or did not answer properly.",
+  failureTime: "The run was stopped because it used all the time it was given.",
+  failureSize: "What the AI has to hold became longer than it can hold.",
+  failureModel: "The AI worked on it and did not produce a design that the checks accept.",
+  failureSpecification:
+    "The text does not let a design be written, or the request no longer matches the text.",
+  failureUnclassified:
+    "The AI could not write the model, and did not say what kind of problem it was.",
+  failureActionsHeading: "What you can do",
+  failureWordsHeading: "What was said",
+  causeCheckerUnavailable:
+    "The program that checks a design is missing or crashed, so nothing about the design was judged.",
+  causeAuthoringServer:
+    "The part of this application that gives the AI its tools could not start or stopped.",
+  causeClientFault:
+    "The AI's client program could not be started, stopped with an error, or answered something unreadable.",
+  causeWorkFolder: "A working folder for the run could not be made.",
+  causeKeyRefused: "The server refused the key.",
+  causeUnreachable: "The server could not be reached.",
+  causeServerError: "The server answered with an error of its own.",
+  causeBadAnswer: "The server's answer is not a chat answer.",
+  causeAddressNotFound: "Nothing answers at the server's address.",
+  causeCertificateRefused: "The server's certificate was refused.",
+  causeConnectionBroken: "The connection broke in the middle of the answer.",
+  causeContextFull:
+    "The conversation became longer than the model's context, more often than starting it again helps.",
+  causeAnswerTooLarge: "The server's answer was larger than the most this application reads.",
+  causeOutputLimit:
+    "The server stopped the model's message at its output limit before any answer was in it.",
+  causeReasoningOnly: "The model's message held its reasoning and no answer.",
+  causeNoAnswer: "The server gave no words at all.",
+  causeDraftCut:
+    "The design was cut off in the middle: it is longer than the model can write at once.",
+  causeNoDraft: "The model's message did not hold a design.",
+  causeChecksRefused: "The checks refused the design every time the tries allowed.",
+  causeTurnLimit: "The model used all the turns it was allowed without giving a design.",
+  causeUnreadableCall: "The server could not read the tool calls the model wrote.",
+  actionCheckInstall:
+    "Check that the programs this application uses are installed, and read the program's words below.",
+  actionCheckConnection: "Check the connection's address, and that the server is running.",
+  actionThenAgain: "Then ask again.",
+  actionMoreTime: "Allow the connection a longer run.",
+  actionShorterText: "A shorter text, or one split into parts, is easier for the AI to hold.",
+  actionLargerContext: "Use a model or a server setting with a larger context.",
+  actionAgain: "Ask again: a second try can end differently.",
+  actionOtherModel: "Try another model.",
+  actionChangeText: "Change the text, then ask again.",
+  actionCheckKey: "Check the key kept for this connection.",
+  actionCheckAddress:
+    "Check the address: it is the server's root, such as http://127.0.0.1:11434/v1.",
   generationCancelled: "You cancelled the last request.",
   generationSuperseded:
     "The last request ended because the text or the answers it was about were saved. Generate again to write from what is saved now.",
@@ -637,8 +687,53 @@ const ko: Record<Key, string> = {
   generationRunningUnnamed: "AI가 모델을 작성하고 있습니다 ({attempt}번째 시도).",
   generationInterrupted:
     "모델을 쓰던 AI가 응답을 멈췄습니다. 공개된 것은 없습니다. 다시 생성할 수 있습니다.",
-  generationFailed: "AI가 모델을 작성하지 못했습니다: {reason}",
-  generationFailedUnsaid: "AI가 모델을 작성하지 못했고, 이유를 말하지 않았습니다.",
+  failureInstallation:
+    "이 컴퓨터에서 요청을 실행하지 못했습니다: 필요한 것이 없거나 작동을 멈췄습니다.",
+  failureConnection: "AI에 연결하지 못했거나 제대로 된 답을 받지 못했습니다.",
+  failureTime: "주어진 시간을 모두 써서 실행이 중단되었습니다.",
+  failureSize: "AI가 담아야 하는 내용이 담을 수 있는 길이를 넘었습니다.",
+  failureModel: "AI가 작업했지만 검사를 통과하는 설계를 내놓지 못했습니다.",
+  failureSpecification:
+    "명세 글로는 설계를 쓸 수 없거나, 요청이 지금의 글과 더 이상 맞지 않습니다.",
+  failureUnclassified: "AI가 모델을 작성하지 못했고, 어떤 종류의 문제인지 말하지 않았습니다.",
+  failureActionsHeading: "할 수 있는 일",
+  failureWordsHeading: "받은 말",
+  causeCheckerUnavailable:
+    "설계를 검사하는 프로그램이 없거나 멈췄기 때문에 설계에 대해서는 아무것도 판정하지 못했습니다.",
+  causeAuthoringServer: "AI에게 도구를 주는 이 앱의 부분을 시작하지 못했거나 멈췄습니다.",
+  causeClientFault:
+    "AI 클라이언트 프로그램을 시작하지 못했거나, 오류로 멈췄거나, 읽을 수 없는 답을 냈습니다.",
+  causeWorkFolder: "실행에 쓸 작업 폴더를 만들지 못했습니다.",
+  causeKeyRefused: "서버가 키를 거부했습니다.",
+  causeUnreachable: "서버에 연결하지 못했습니다.",
+  causeServerError: "서버가 자체 오류로 답했습니다.",
+  causeBadAnswer: "서버의 답이 대화 응답 형식이 아닙니다.",
+  causeAddressNotFound: "서버 주소에 응답하는 것이 없습니다.",
+  causeCertificateRefused: "서버의 인증서가 거부되었습니다.",
+  causeConnectionBroken: "답을 받는 도중에 연결이 끊어졌습니다.",
+  causeContextFull: "대화가 모델의 문맥 길이를 넘었고, 다시 시작해도 해결되지 않았습니다.",
+  causeAnswerTooLarge: "서버의 답이 이 앱이 읽는 최대 크기를 넘었습니다.",
+  causeOutputLimit: "답이 나오기 전에 서버가 출력 한도에서 모델의 메시지를 잘랐습니다.",
+  causeReasoningOnly: "모델의 메시지가 생각만 담고 답은 담지 않았습니다.",
+  causeNoAnswer: "서버가 아무 내용도 주지 않았습니다.",
+  causeDraftCut: "설계가 중간에 잘렸습니다: 모델이 한 번에 쓸 수 있는 길이를 넘습니다.",
+  causeNoDraft: "모델의 메시지에 설계가 없었습니다.",
+  causeChecksRefused: "허용된 시도마다 검사가 설계를 거절했습니다.",
+  causeTurnLimit: "허용된 턴을 모두 쓰고도 모델이 설계를 내놓지 못했습니다.",
+  causeUnreadableCall: "서버가 모델이 쓴 도구 호출을 읽지 못했습니다.",
+  actionCheckInstall:
+    "이 앱이 쓰는 프로그램이 설치되어 있는지 확인하고, 아래 프로그램의 말을 읽어 보세요.",
+  actionCheckConnection: "연결의 주소와 서버가 실행 중인지 확인하세요.",
+  actionThenAgain: "그다음 다시 요청하세요.",
+  actionMoreTime: "연결의 실행 시간을 더 길게 허용하세요.",
+  actionShorterText: "글을 짧게 하거나 나누면 AI가 담기 쉽습니다.",
+  actionLargerContext: "문맥이 더 큰 모델이나 서버 설정을 쓰세요.",
+  actionAgain: "다시 요청하세요: 두 번째 시도는 다르게 끝날 수 있습니다.",
+  actionOtherModel: "다른 모델을 써 보세요.",
+  actionChangeText: "글을 고친 뒤 다시 요청하세요.",
+  actionCheckKey: "이 연결에 저장한 키를 확인하세요.",
+  actionCheckAddress:
+    "주소를 확인하세요: 서버의 루트이며, 예를 들어 http://127.0.0.1:11434/v1 입니다.",
   generationCancelled: "마지막 요청을 취소했습니다.",
   generationSuperseded:
     "요청이 기준으로 삼은 사양이나 답변이 저장되어 마지막 요청이 끝났습니다. 지금 저장된 내용으로 다시 생성하세요.",

@@ -16,6 +16,7 @@ import {
   type HostListing,
   type Queue,
   type QueueWait,
+  type RequestFailure,
   type RequestHead,
 } from "./contract";
 
@@ -43,7 +44,16 @@ export type Status =
   | { readonly kind: "running"; readonly attempt: number; readonly holder: string | null }
   /** The one that held it stopped answering. Nothing was published. */
   | { readonly kind: "interrupted" }
-  | { readonly kind: "failed"; readonly reason: string | null }
+  /**
+   * It could not be done. `reason` is the executor's own words; `failure` is the core's record of
+   * what kind of failure it was, and is what the screen branches on (`null` when the request was
+   * not read, or failed before kinds were kept).
+   */
+  | {
+      readonly kind: "failed";
+      readonly reason: string | null;
+      readonly failure: RequestFailure | null;
+    }
   | { readonly kind: "cancelled" }
   /** The text or the answers it was about were saved. */
   | { readonly kind: "superseded" }
@@ -142,7 +152,7 @@ export function statusOf(
     case "interrupted":
       return { kind: "interrupted" };
     case "failed":
-      return { kind: "failed", reason: about?.note ?? null };
+      return { kind: "failed", reason: about?.note ?? null, failure: about?.failure ?? null };
     case "cancelled":
       return { kind: "cancelled" };
     case "superseded":

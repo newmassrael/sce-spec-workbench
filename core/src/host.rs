@@ -54,7 +54,7 @@ use crate::connection_store::ConnectionStore;
 use crate::directory::{ClaudeLaunch, Connections, Launches};
 use crate::installed::Installed;
 use crate::runner::{
-    Cancel, Directory, Draft, GenerateError, Generator, Job, Runner, RunnerConfig, Waiting,
+    cause, Cancel, Directory, Draft, GenerateError, Generator, Job, Runner, RunnerConfig, Waiting,
 };
 
 /// Names `SCE_EXECUTOR`, `SCE_CLAUDE`, `SCE_CODEX`, `SCE_AUTHOR_MCP`, `SCE_SPEC`,
@@ -730,9 +730,10 @@ impl Generator for Reporting {
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
         match self.0.reporting() {
             Some(reporter) => reporter.client().generate(job, cancel),
-            None => Err(GenerateError::Failed(
-                "no client is there to write with: it was not found on this computer".to_string(),
-            )),
+            None => Err(GenerateError::installation(
+                "no client is there to write with: it was not found on this computer",
+            )
+            .because(cause::CLIENT_FAULT)),
         }
     }
 }
