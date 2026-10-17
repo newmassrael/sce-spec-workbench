@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 28;
+export const SUPPORTED_COMMAND_SET_VERSION = 29;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -731,10 +731,22 @@ export interface RequestCandidate {
   readonly instructions: string | null;
 }
 
+/**
+ * The model an executor wrote for a request: the text as it was kept, and the documents it is made
+ * of with the entry (`null` for a text that does not read as a model: nothing has checked a
+ * candidate, and what is kept is what the executor said).
+ */
+export interface CandidateModel {
+  readonly revision: Revision;
+  readonly text: string;
+  readonly entry: string | null;
+  readonly documents: readonly ModelDocument[] | null;
+}
+
 /** `read_request_candidate`: what the executor wrote, as texts. */
 export interface RequestCandidateTexts {
   readonly request: string;
-  readonly model: { readonly revision: Revision; readonly text: string } | null;
+  readonly model: CandidateModel | null;
   readonly requirements: { readonly revision: Revision; readonly text: string } | null;
 }
 
@@ -1606,13 +1618,32 @@ function candidateText(value: unknown, where: string): { revision: Revision; tex
   return { revision: revision(r["revision"], `${where}.revision`), text: text(r, "text", where) };
 }
 
+function parseCandidateModel(value: unknown, where: string): CandidateModel | null {
+  if (value === null) return null;
+  const m = record(value, where);
+  const documents = m["documents"];
+  return {
+    revision: revision(m["revision"], `${where}.revision`),
+    text: text(m, "text", where),
+    entry: nullableText(m, "entry", where),
+    documents:
+      documents === null || documents === undefined
+        ? null
+        : list(m, "documents", where).map((d, i) => {
+            const at = `${where}.documents[${i}]`;
+            const document = record(d, at);
+            return { name: text(document, "name", at), text: text(document, "text", at) };
+          }),
+  };
+}
+
 /** `read_request_candidate`. */
 export function parseRequestCandidateTexts(value: unknown): RequestCandidateTexts {
   const where = "read_request_candidate";
   const r = record(value, where);
   return {
     request: text(r, "request", where),
-    model: candidateText(r["model"], `${where}.model`),
+    model: parseCandidateModel(r["model"], `${where}.model`),
     requirements: candidateText(r["requirements"], `${where}.requirements`),
   };
 }

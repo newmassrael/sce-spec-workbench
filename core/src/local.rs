@@ -32,7 +32,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use sce_specs::{Document, Revision};
+use sce_specs::{Document, ModelFiles, Revision};
 use serde_json::{json, Value};
 
 use crate::claude_code::AuthorServer;
@@ -797,6 +797,23 @@ impl Generator for Local {
     }
 
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
+        let mut held = None;
+        self.generate_holding(job, cancel, &mut held)
+            .map_err(|error| error.holding(held))
+    }
+}
+
+impl Local {
+    /// A run of the model. `held` is the last design the run sent to be checked, kept up to date as
+    /// the run goes, so that whatever ends the run (a time, a message that is not a design, a server
+    /// that went away) leaves what the run had made to the one that called it, which keeps it with
+    /// the request.
+    fn generate_holding(
+        &self,
+        job: &Job,
+        cancel: &Cancel,
+        held: &mut Option<ModelFiles>,
+    ) -> Result<Draft, GenerateError> {
         let deadline = Instant::now() + self.config.timeout;
         let scratch = Scratch::new("sce-local").map_err(|e| {
             GenerateError::installation(format!("a folder for the run: {e}"))
@@ -894,6 +911,12 @@ impl Generator for Local {
             if !calls.is_empty() {
                 messages.push(echo_of(&message, &calls));
                 for call in &calls {
+                    // A design sent to be checked is the run's latest work from the moment it is
+                    // sent: if what checks it cannot judge, or the run ends before the answer, it
+                    // is still the design the run held.
+                    if let Some(design) = Checked::model_of(call) {
+                        *held = Some(design);
+                    }
                     let done =
                         self.run_tool(&mut mcp, &tools, call, deadline, cancel, &job.progress)?;
                     job.progress.say(Event::ToolRan {
@@ -1145,9 +1168,19 @@ struct Checked {
 }
 
 impl Checked {
-    /// The design a call of a checking tool sent, and what the tool said of it. `None` when the
-    /// call is not one that sends documents the run can read, which is then not a design it holds.
-    fn of_call(call: &Call, words: &str, failed: bool) -> Option<Checked> {
+    /// The model a call of a checking tool sent: one document is the model as it always was, and
+    /// several are a set with the first as its entry. `None` for a call that sent documents that do
+    /// not make a model, which is not a design the run holds (the one it held before is kept).
+    fn model_of(call: &Call) -> Option<ModelFiles> {
+        match Self::documents_of(call)?.as_slice() {
+            [only] => Some(ModelFiles::single(only.text.clone())),
+            documents => ModelFiles::set(documents.to_vec(), None).ok(),
+        }
+    }
+
+    /// The documents a call of a checking tool sent, as the model wrote them. `None` when the call
+    /// is not one that sends documents the run can read, which is then not a design it holds.
+    fn documents_of(call: &Call) -> Option<Vec<Document>> {
         let arguments = call.arguments.as_ref().ok()?;
         let named = |entry: &Value| match (entry["name"].as_str(), entry["text"].as_str()) {
             (Some(name), Some(text)) => Some(Document {
@@ -1156,12 +1189,12 @@ impl Checked {
             }),
             _ => None,
         };
-        let documents: Vec<Document> = match call.name.as_str() {
+        match call.name.as_str() {
             "validate_scxml_set" => arguments["documents_text"]
                 .as_array()?
                 .iter()
                 .map(named)
-                .collect::<Option<_>>()?,
+                .collect::<Option<_>>(),
             "validate_scxml" => {
                 let first = Document {
                     name: arguments["document_name"]
@@ -1173,10 +1206,16 @@ impl Checked {
                 let companions = arguments["companions_text"].as_array();
                 std::iter::once(Some(first))
                     .chain(companions.into_iter().flatten().map(named))
-                    .collect::<Option<_>>()?
+                    .collect::<Option<_>>()
             }
-            _ => return None,
-        };
+            _ => None,
+        }
+    }
+
+    /// The design a call of a checking tool sent, and what the tool said of it. `None` when the
+    /// call is not one that sends documents the run can read, which is then not a design it holds.
+    fn of_call(call: &Call, words: &str, failed: bool) -> Option<Checked> {
+        let documents = Self::documents_of(call)?;
         // The answer is a JSON object, and for an accepted set the pages of its documents follow
         // it as text of their own: only the first value is the verdict.
         let verdict = serde_json::Deserializer::from_str(words)

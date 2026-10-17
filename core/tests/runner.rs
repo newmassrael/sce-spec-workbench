@@ -524,6 +524,73 @@ fn a_run_that_does_not_say_what_it_does_leaves_a_journal_of_the_tries_alone() {
 }
 
 #[test]
+fn a_request_that_failed_keeps_the_last_design_its_run_held_as_a_candidate_and_never_as_a_model() {
+    let f = fixture("runner-holds");
+    let request = f.ask("press-1");
+    let generator = Scripted::new(|_, _, _| {
+        Err(GenerateError::Failed(
+            Trouble::new(FailureKind::Time, "the run took longer than it was given")
+                .holding(Some(ModelFiles::single("<scxml><!-- nearly --></scxml>"))),
+        ))
+    });
+    let runner = f.runner(&generator, f.config());
+
+    let outcome = runner.run_once().unwrap();
+
+    assert!(matches!(outcome, Outcome::Failed { .. }), "{outcome:?}");
+    assert_eq!(f.state_of(&request), State::Failed);
+    // The design is the request's: it can be read beside the failure.
+    let kept = f.store.read_candidate(&f.id, &request).unwrap();
+    let (_, text) = kept.model.expect("the held design is kept");
+    assert!(text.contains("nearly"), "{text}");
+    assert!(kept.requirements.is_none());
+    // And it is nothing of the spec's: no model was made, no bundle published.
+    assert!(f.store.read_model(&f.id, None).unwrap().is_none());
+    assert!(f.store.read_bundle(&f.id, None).unwrap().is_none());
+}
+
+#[test]
+fn a_run_that_held_nothing_leaves_the_request_with_no_candidate() {
+    let f = fixture("runner-holds-nothing");
+    let request = f.ask("press-1");
+    let generator = Scripted::new(|_, _, _| {
+        Err(GenerateError::Failed(Trouble::new(
+            FailureKind::Connection,
+            "the server could not be reached",
+        )))
+    });
+    let runner = f.runner(&generator, f.config());
+
+    runner.run_once().unwrap();
+
+    let kept = f.store.read_candidate(&f.id, &request).unwrap();
+    assert!(kept.model.is_none());
+}
+
+#[test]
+fn what_the_last_try_held_is_kept_when_the_tries_end_on_something_that_is_not_a_draft() {
+    let f = fixture("runner-holds-unusable");
+    let request = f.ask("press-1");
+    let generator = Scripted::new(|n, _, _| {
+        Err(GenerateError::unusable("the message is empty")
+            .because(cause::OUTPUT_LIMIT)
+            .holding(Some(ModelFiles::single(format!(
+                "<scxml><!-- try {n} --></scxml>"
+            )))))
+    });
+    let mut config = f.config();
+    config.repairs = 1;
+    let runner = f.runner(&generator, config);
+
+    runner.run_once().unwrap();
+
+    // Two tries, and the design of the latest is the one kept.
+    let kept = f.store.read_candidate(&f.id, &request).unwrap();
+    let (_, text) = kept.model.expect("a held design");
+    assert!(text.contains("try 1"), "{text}");
+}
+
+#[test]
 fn a_run_that_ends_on_something_that_is_not_a_draft_fails_with_the_cause_it_carried() {
     let f = fixture("runner-unusable-cause");
     let request = f.ask("press-1");

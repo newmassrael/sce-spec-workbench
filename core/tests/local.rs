@@ -31,7 +31,7 @@ use sce_spec_workbench_core::runner::{
 };
 use sce_specs::journal::{Event, ToolVerdict};
 use sce_specs::requests::{Failure, FailureKind};
-use sce_specs::{Revision, SpecId};
+use sce_specs::{ModelFiles, Revision, SpecId};
 use serde_json::{json, Value};
 
 use common::model_server::{
@@ -260,6 +260,7 @@ fn a_checking_tool_that_could_not_judge_ends_the_run_and_the_model_is_not_sent_t
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = ended
     else {
         panic!("a run that could not be checked ends as a failure: {ended:?}");
@@ -636,6 +637,7 @@ fn a_model_that_only_calls_tools_runs_out_of_turns() {
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -731,6 +733,112 @@ fn a_run_says_each_turn_each_tool_and_each_message_that_was_not_the_draft() {
             },
             Event::TurnAsked { turn: 2 },
         ]
+    );
+}
+
+fn held_by(error: GenerateError) -> Option<ModelFiles> {
+    match error {
+        GenerateError::Failed(trouble) | GenerateError::Unusable(trouble) => trouble.held,
+        GenerateError::Cancelled => panic!("expected a failure"),
+    }
+}
+
+#[test]
+fn a_run_that_ends_without_a_draft_holds_the_last_design_it_sent_to_be_checked() {
+    // The model sent a design to be checked and the run ran out of turns before it gave a draft.
+    let rig = Rig::new(
+        "local-holds",
+        vec![validating("<scxml><!-- version one --></scxml>")],
+    );
+    let config = LocalConfig {
+        max_turns: 1,
+        ..LocalConfig::for_model("qwen-test")
+    };
+
+    let ended = rig
+        .local(config)
+        .generate(&job(), &Cancel::new())
+        .unwrap_err();
+
+    assert_eq!(
+        held_by(ended),
+        Some(ModelFiles::single("<scxml><!-- version one --></scxml>"))
+    );
+}
+
+#[test]
+fn what_is_held_is_the_latest_design_sent_whether_or_not_it_was_accepted() {
+    let rig = Rig::new(
+        "local-holds-latest",
+        vec![
+            validating("<scxml><!-- version one --></scxml>"),
+            validating("<scxml><!-- version two --></scxml>"),
+        ],
+    );
+    let config = LocalConfig {
+        max_turns: 2,
+        ..LocalConfig::for_model("qwen-test")
+    };
+
+    let ended = rig
+        .local(config)
+        .generate(&job(), &Cancel::new())
+        .unwrap_err();
+
+    assert_eq!(
+        held_by(ended),
+        Some(ModelFiles::single("<scxml><!-- version two --></scxml>"))
+    );
+}
+
+#[test]
+fn a_set_of_documents_is_held_as_a_set_and_a_run_that_sent_nothing_holds_nothing() {
+    let rig = Rig::new(
+        "local-holds-set",
+        vec![calls(&[(
+            Some("c1"),
+            "validate_scxml_set",
+            &json!({"documents_text": [
+                {"name": "main.scxml", "text": "<scxml>main</scxml>"},
+                {"name": "events.scxml", "text": "<scxml>events</scxml>"},
+            ]})
+            .to_string(),
+        )])],
+    );
+    let config = LocalConfig {
+        max_turns: 1,
+        ..LocalConfig::for_model("qwen-test")
+    };
+    let held = held_by(
+        rig.local(config)
+            .generate(&job(), &Cancel::new())
+            .unwrap_err(),
+    )
+    .expect("a held design");
+    assert_eq!(held.entry_name(), Some("main.scxml"));
+    assert_eq!(held.documents().len(), 2);
+
+    // A run that never sent a design to a check has nothing to hold.
+    let empty = Rig::new(
+        "local-holds-none",
+        vec![says("nope"), says("nope"), says("nope")],
+    );
+    assert_eq!(held_by(empty.run().unwrap_err()), None);
+}
+
+#[test]
+fn a_design_sent_to_a_check_that_could_not_judge_is_still_the_design_the_run_held() {
+    let rig = Rig::new(
+        "local-holds-cannot",
+        vec![validating("<scxml>sent</scxml>")],
+    );
+    tool_cannot_judge(&rig.folder, "validate_scxml_set", "the generator crashed");
+
+    let ended = rig.run().unwrap_err();
+
+    assert_eq!(
+        held_by(ended),
+        Some(ModelFiles::single("<scxml>sent</scxml>"))
     );
 }
 
@@ -1078,6 +1186,7 @@ fn a_conversation_that_keeps_outgrowing_the_context_is_begun_again_only_so_many_
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1238,6 +1347,7 @@ fn a_model_server_that_refuses_is_said_in_its_words() {
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1262,6 +1372,7 @@ fn an_answer_that_is_not_a_chat_completion_is_said_not_to_be() {
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1316,6 +1427,7 @@ fn a_model_server_that_is_not_there_is_said_so() {
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1423,6 +1535,7 @@ fn a_model_whose_tool_calls_are_never_read_is_given_a_few_tries_and_then_the_ser
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1456,6 +1569,7 @@ fn a_server_error_that_is_not_a_tool_call_it_could_not_read_is_not_put_to_the_mo
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1485,6 +1599,7 @@ fn a_model_server_that_does_not_answer_ends_the_run_at_its_time() {
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1531,6 +1646,7 @@ fn a_server_that_is_not_there_fails_the_run_at_once_and_says_so_without_its_addr
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1556,6 +1672,7 @@ fn a_server_that_closes_the_connection_in_the_middle_fails_the_run_and_says_so()
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1623,6 +1740,7 @@ fn an_authoring_server_that_lacks_a_tool_the_task_needs_is_said_to_lack_it_and_t
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1653,6 +1771,7 @@ fn an_authoring_server_that_cannot_be_started_is_said_so_and_the_model_is_not_as
     let GenerateError::Failed(Trouble {
         failure,
         words: said,
+        ..
     }) = refused
     else {
         panic!("expected a failure, got {refused:?}");
@@ -1833,6 +1952,7 @@ fn why_of_the_last_message(label: &str, script: Vec<Script>) -> (String, Failure
     let GenerateError::Unusable(Trouble {
         failure,
         words: told,
+        ..
     }) = refused
     else {
         panic!("expected Unusable, got {refused:?}");

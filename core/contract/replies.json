@@ -117,7 +117,7 @@
     },
     "describe": {
       "application_command_set_version": 2,
-      "command_set_version": 28,
+      "command_set_version": 29,
       "commands": [
         "describe",
         "list_specs",
@@ -182,7 +182,7 @@
     },
     "describe_desktop": {
       "application_command_set_version": 2,
-      "command_set_version": 28,
+      "command_set_version": 29,
       "commands": [
         "describe",
         "list_specs",
@@ -1787,6 +1787,13 @@
     },
     "read_request_candidate": {
       "model": {
+        "documents": [
+          {
+            "name": "model.scxml",
+            "text": "<scxml><!-- candidate --></scxml>"
+          }
+        ],
+        "entry": "model.scxml",
         "revision": "8e37512f05cf0768db14bf8ccb30378ff51f90bf8256bacea44dc4b2fc74d428",
         "text": "<scxml><!-- candidate --></scxml>"
       },
@@ -2615,7 +2622,7 @@
     }
   },
   "application_command_set_version": 2,
-  "command_set_version": 28,
+  "command_set_version": 29,
   "refusals": {
     "active-request": {
       "detail": {

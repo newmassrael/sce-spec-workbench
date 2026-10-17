@@ -43,6 +43,9 @@ interface FakeProgress {
   last_at: string | null;
 }
 
+/** The revision the fake core gives to the design a run held. */
+const HELD_REVISION = "c".repeat(64);
+
 const NO_PROGRESS: FakeProgress = {
   entries: 0,
   tries: 0,
@@ -116,6 +119,8 @@ class FakeCore implements Transport {
   private acceptSaves = 0;
   private readonly requestsOf = new Map<string, FakeRequest[]>();
   private readonly journals = new Map<string, { progress: FakeProgress; now: string }>();
+  /** What the run of a request last held, as the documents it wrote: the first is the entry. */
+  private readonly candidates = new Map<string, { name: string; text: string }[]>();
   /** Every model a spec had, newest last, and each by its revision: what `model_history` and a review of an earlier one read. */
   private readonly modelHistoryOf = new Map<string, string[]>();
   private readonly modelsByRevision = new Map<
@@ -246,6 +251,16 @@ class FakeCore implements Transport {
   /** How many times the screen asked what a run did. */
   journalReads = 0;
 
+  /** The request's run had held these documents when it ended, the first being the entry. */
+  holdDesign(id: string, documents: { name: string; text: string }[]): void {
+    const request = this.latestRequest(id);
+    if (request === undefined) throw new Error(`${id} has no request`);
+    this.candidates.set(request.id, documents);
+  }
+
+  /** How many times the screen asked for what a run held. */
+  candidateReads = 0;
+
   /** The executor could not, and says why. */
   failRequest(id: string, note: string, failure: { kind: string; cause: string | null } | null = null): void {
     const request = this.latestRequest(id);
@@ -297,7 +312,9 @@ class FakeCore implements Transport {
         request.holder === null
           ? null
           : { holder: request.holder, attempt: request.attempt, granted_at: "2026-10-05T09:00:01Z", expires_at: "2026-10-05T09:01:01Z" },
-      candidate: null,
+      candidate: this.candidates.has(request.id)
+        ? { model: HELD_REVISION, requirements: null, instructions: null }
+        : null,
       outcome: null,
       pin:
         request.pin === null
@@ -584,6 +601,26 @@ class FakeCore implements Transport {
         const found = this.requestsOf.get(id)?.find((r) => r.id === args["request"]);
         if (found === undefined) throw new CommandFailure("not-found", "no such request");
         return { request: this.requestJson(id, found) };
+      }
+      case "read_request_candidate": {
+        this.candidateReads += 1;
+        const id = String(args["id"]);
+        const found = this.requestsOf.get(id)?.find((r) => r.id === args["request"]);
+        if (found === undefined) throw new CommandFailure("not-found", "no such request");
+        const documents = this.candidates.get(found.id);
+        return {
+          request: found.id,
+          model:
+            documents === undefined
+              ? null
+              : {
+                  revision: HELD_REVISION,
+                  text: documents[0]?.text ?? "",
+                  entry: documents[0]?.name ?? null,
+                  documents,
+                },
+          requirements: null,
+        };
       }
       case "read_request_journal": {
         this.journalReads += 1;
@@ -3704,6 +3741,51 @@ describe("asking for a model", () => {
     expect(root.querySelector("#generation-failure")?.getAttribute("data-kind")).toBe("unclassified");
     expect(root.querySelector("#generation-failure-cause")).toBeNull();
     expect(root.querySelector("#generation-failure-words")?.textContent).toContain("an old failure");
+  });
+
+  it("shows the last design a failed run held, folded and said to be neither accepted nor the model", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+
+    core.holdDesign("alpha", [
+      { name: "main.scxml", text: "<scxml><!-- nearly: main --></scxml>" },
+      { name: "events.scxml", text: "<scxml><!-- nearly: events --></scxml>" },
+    ]);
+    core.failRequest("alpha", "ran out of turns", { kind: "model", cause: "turn-limit" });
+    await ticker.fire();
+
+    const held = root.querySelector<HTMLDetailsElement>("#generation-held");
+    expect(held?.open).toBe(false);
+    expect(held?.textContent).toContain("not accepted");
+    expect(held?.textContent).toContain("only a new request can make a model");
+    // The documents it is made of, the entry first, each as the document it is.
+    expect([...(held?.querySelectorAll("h5") ?? [])].map((h5) => h5.textContent)).toEqual([
+      "main.scxml",
+      "events.scxml",
+    ]);
+    expect(held?.textContent).toContain("nearly: main");
+    expect(held?.textContent).toContain("nearly: events");
+    // It is read once for the revision the request names, and not again every question.
+    const read = core.candidateReads;
+    await ticker.fire();
+    await ticker.fire();
+    expect(core.candidateReads).toBe(read);
+  });
+
+  it("shows no held design for a failed request that kept none, and none while it runs", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    await ticker.fire();
+    expect(root.querySelector("#generation-held")).toBeNull();
+
+    core.failRequest("alpha", "the server could not be reached", { kind: "connection", cause: "unreachable" });
+    await ticker.fire();
+
+    expect(root.querySelector("#generation-held")).toBeNull();
+    expect(core.candidateReads).toBe(0);
   });
 
   it("says what a run has done so far while it runs, from the journal the core keeps", async () => {

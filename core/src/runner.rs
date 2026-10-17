@@ -201,6 +201,10 @@ pub mod cause {
 pub struct Trouble {
     pub failure: Failure,
     pub words: String,
+    /// The last design the run held when it could not go on: the one it last sent to be checked,
+    /// whether or not the check accepted it. It is what the run made and the request keeps (as a
+    /// candidate, never as the spec's model), so that a person can read how near it came.
+    pub held: Option<ModelFiles>,
 }
 
 impl Trouble {
@@ -208,6 +212,15 @@ impl Trouble {
         Trouble {
             failure: Failure::of(kind),
             words: words.into(),
+            held: None,
+        }
+    }
+
+    /// The same trouble, the run having held `design` when it ended.
+    pub fn holding(self, design: Option<ModelFiles>) -> Self {
+        Trouble {
+            held: design,
+            ..self
         }
     }
 
@@ -259,6 +272,15 @@ impl GenerateError {
 
     pub fn model(words: impl Into<String>) -> Self {
         GenerateError::Failed(Trouble::new(FailureKind::Model, words))
+    }
+
+    /// The same error, the run having held `design` when it ended; a cancellation holds none.
+    pub fn holding(self, design: Option<ModelFiles>) -> Self {
+        match self {
+            GenerateError::Failed(trouble) => GenerateError::Failed(trouble.holding(design)),
+            GenerateError::Unusable(trouble) => GenerateError::Unusable(trouble.holding(design)),
+            GenerateError::Cancelled => GenerateError::Cancelled,
+        }
     }
 
     /// The same error, for `cause` (one of [`cause`]); a cancellation has none.
@@ -717,6 +739,8 @@ where
         // What the last draft that was not accepted was not accepted for, as the failure the
         // request ends with if no later one is.
         let mut last_failure = Failure::of(FailureKind::Model);
+        // The design the latest try that was not a draft held when it ended, if it held one.
+        let mut last_held: Option<ModelFiles> = None;
         for tried in 1..=self.config.repairs + 1 {
             job.progress.say(Event::TryBegun { n: tried });
             let draft = match generator.generate(&job, cancel) {
@@ -728,6 +752,7 @@ where
                 Err(GenerateError::Unusable(trouble)) => {
                     last_refusal = trouble.words.clone();
                     last_failure = trouble.failure;
+                    last_held = trouble.held.or(last_held);
                     job.refusal = Some(trouble.words);
                     continue;
                 }
@@ -816,6 +841,7 @@ where
                     "no draft the core accepted in {} try(ies); the last thing said of it was: {last_refusal}",
                     self.config.repairs + 1
                 ),
+                held: last_held,
             },
         )
     }
@@ -902,7 +928,34 @@ where
         let Trouble {
             failure,
             words: reason,
+            held,
         } = trouble;
+        // What the run last held is kept with the request before it is failed: a candidate, which
+        // is the request's and never the spec's model, so that a person can read how near the run
+        // came. A design that cannot be kept is not a reason to fail the request differently, so
+        // only a request that ended under the runner changes what is said.
+        if let Some(design) = held {
+            let kept = self.store.save_candidate(
+                spec,
+                request,
+                &self.config.name,
+                attempt,
+                CandidateWrite {
+                    model: Some(design.stored_text()),
+                    requirements: None,
+                    instructions: None,
+                },
+            );
+            if let Err(StoreError::Refused { kind, .. }) = kept {
+                if ENDED_KINDS.contains(&kind) {
+                    return Ok(Outcome::Lost {
+                        spec: spec.clone(),
+                        request: request.to_string(),
+                        kind: kind.to_string(),
+                    });
+                }
+            }
+        }
         match self.store.fail_request(
             spec,
             request,

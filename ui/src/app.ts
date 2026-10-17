@@ -67,6 +67,7 @@ import {
   type Listing,
   type Queue,
   type Refusal,
+  type RequestCandidateTexts,
   type RequestHead,
   type RequestJournal,
   type RequirementOutcome,
@@ -275,6 +276,11 @@ export class App {
     /** Read after the request stopped running: what its run did does not change any more. */
     readonly final: boolean;
   } | null = null;
+  /**
+   * What the latest request, when it failed, had written for it: the last design its run held. It is
+   * the request's and never the spec's model, and is read once for the revision the request names.
+   */
+  private held: { readonly request: string; readonly candidate: RequestCandidateTexts } | null = null;
   /** Which AI adapters are there, and whether the shells host one and why not, as last read. */
   private adapters: AdapterListing | null = null;
   private hosts: HostListing | null = null;
@@ -422,6 +428,7 @@ export class App {
       this.requestHead = null;
       this.requestDetail = null;
       this.journal = null;
+      this.held = null;
       this.requestBusy = null;
       this.requestNotice = null;
       this.offerReplace = false;
@@ -484,6 +491,8 @@ export class App {
     }
     if (await this.noteJournal(id, session, head)) changed = true;
     if (session !== this.session) return;
+    if (await this.noteHeld(id, session, head)) changed = true;
+    if (session !== this.session) return;
     try {
       const listing = await this.api.readAdapterStatus();
       if (session !== this.session) return;
@@ -543,6 +552,31 @@ export class App {
       const before = held === null ? "none" : `${held.request}:${journalKey(held.read, this.statusNow())}`;
       this.journal = { request: head.id, read, final: !running };
       return before !== `${head.id}:${journalKey(read, this.statusNow())}`;
+    } catch (error) {
+      if (session !== this.session) return false;
+      this.askForToken(error);
+      return false;
+    }
+  }
+
+  /**
+   * The last design a failed request's run held, when the request names one. Read once for the
+   * revision it names; a request that did not fail, or kept none, has none. Answers whether what
+   * is drawn changed.
+   */
+  private async noteHeld(id: string, session: number, head: RequestHead | null): Promise<boolean> {
+    const named = this.requestDetail?.candidate?.model ?? null;
+    if (head === null || head.state !== "failed" || named === null || this.requestDetail?.id !== head.id) {
+      const had = this.held !== null;
+      this.held = null;
+      return had;
+    }
+    if (this.held?.request === head.id && this.held.candidate.model?.revision === named) return false;
+    try {
+      const candidate = await this.api.readRequestCandidate(id, head.id);
+      if (session !== this.session) return false;
+      this.held = { request: head.id, candidate };
+      return true;
     } catch (error) {
       if (session !== this.session) return false;
       this.askForToken(error);
@@ -2204,6 +2238,33 @@ export class App {
             h("summary", {}, this.t("failureWordsHeading")),
             h("pre", {}, status.reason),
           ),
+      this.heldDesign(),
+    );
+  }
+
+  /**
+   * The last design the run of a failed request held, folded and said for what it is: the request's,
+   * not the spec's model, and not accepted by the core. Its documents are shown as the documents
+   * they are, the entry first; a text that does not read as a model is shown as it was kept.
+   */
+  private heldDesign(): HTMLElement | null {
+    const held = this.held;
+    if (held === null || held.request !== this.requestHead?.id || held.candidate.model === null) return null;
+    const model = held.candidate.model;
+    const documents = model.documents ?? [{ name: "", text: model.text }];
+    return h(
+      "details",
+      { id: "generation-held" },
+      h("summary", {}, this.t("heldHeading")),
+      h("p", { class: "muted" }, this.t("heldNote")),
+      ...documents.map((document) =>
+        h(
+          "div",
+          { class: "held-document" },
+          document.name === "" ? null : h("h5", {}, document.name),
+          h("pre", {}, document.text),
+        ),
+      ),
     );
   }
 

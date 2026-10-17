@@ -233,6 +233,9 @@ const en = {
     "The AI could not write the model, and did not say what kind of problem it was.",
   failureActionsHeading: "What you can do",
   failureWordsHeading: "What was said",
+  heldHeading: "The last design the run held",
+  heldNote:
+    "This is the last design the run sent to be checked, kept so that you can read how near it came. It is not accepted, and it is not this spec's model: only a new request can make a model.",
   progressTurns: "Turns: {turns}",
   progressChecks: "Checks: {checks} (refused {refused})",
   progressMinutes: "{minutes} min",
@@ -707,6 +710,9 @@ const ko: Record<Key, string> = {
   failureUnclassified: "AI가 모델을 작성하지 못했고, 어떤 종류의 문제인지 말하지 않았습니다.",
   failureActionsHeading: "할 수 있는 일",
   failureWordsHeading: "받은 말",
+  heldHeading: "실행이 마지막으로 가지고 있던 설계",
+  heldNote:
+    "이 실행이 검사하려고 마지막으로 보낸 설계이며, 얼마나 가까이 갔는지 읽을 수 있도록 남겨 둔 것입니다. 받아들여진 것이 아니고 이 명세의 모델도 아닙니다: 모델은 새 요청만 만들 수 있습니다.",
   progressTurns: "턴: {turns}",
   progressChecks: "검사: {checks} (거절 {refused})",
   progressMinutes: "{minutes}분",

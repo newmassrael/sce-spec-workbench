@@ -515,6 +515,10 @@ describe("the replies the core gives", () => {
     const texts = parseRequestCandidateTexts(replies.answers["read_request_candidate"]);
     expect(texts.model?.revision).toBe(written.candidate?.model);
     expect(texts.model?.text).toContain("candidate");
+    // The documents it is made of, as `read_model` says them: one document is one document.
+    expect(texts.model?.documents).toHaveLength(1);
+    expect(texts.model?.documents?.[0]?.text).toContain("candidate");
+    expect(texts.model?.entry).toBe(texts.model?.documents?.[0]?.name);
     const refused = replies.refusals["no-candidate"] as { kind: string; detail: { missing: string[] } };
     expect(refused.kind).toBe("no-candidate");
     expect(refused.detail.missing).toEqual(["model", "requirements"]);
