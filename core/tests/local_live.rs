@@ -81,6 +81,15 @@ fn context_tokens() -> Option<u32> {
         .and_then(|text| text.trim().parse::<u32>().ok())
 }
 
+/// How hard the server is asked to make the model think, when `SCE_LOCAL_EFFORT` names it, in the
+/// word the server uses (the connection's `effort`); the server's own default when it does not.
+fn effort() -> Option<String> {
+    std::env::var("SCE_LOCAL_EFFORT")
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
 fn required(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("{name} names the server and is required"))
 }
@@ -155,6 +164,7 @@ impl Setup {
         };
         let config = LocalConfig {
             timeout: allowed(),
+            effort: effort(),
             context_tokens: context_tokens(),
             ..LocalConfig::for_model(self.model.clone())
         };
@@ -356,27 +366,67 @@ fn write_and_publish(label: &str, title: &str, text: &str) -> String {
     model.text
 }
 
-/// The numbers the model's names carry (`light_12`, `door_7`): a name is a word, an underscore and
-/// the number of its room, and a run of digits after an underscore is one of those numbers.
+/// The numbers of the rooms a model's names carry. A model names a room's parts as it likes
+/// (`light_12`, `room12_ignoring`, `Room 12`, `room-12`), and a check that knew one way of
+/// spelling it called a design that names every room of forty a design that names none (measured
+/// on 2026-10-18). A number is a room's when it follows the word `room` with at most one separator
+/// (a space, `_` or `-`), or follows an underscore in a name (`light_12`).
 fn numbers_named(text: &str) -> std::collections::BTreeSet<u32> {
-    let bytes = text.as_bytes();
+    let lower = text.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
     let mut found = std::collections::BTreeSet::new();
+    let digits_at = |from: usize| -> Option<(u32, usize)> {
+        let end = bytes[from..]
+            .iter()
+            .position(|b| !b.is_ascii_digit())
+            .map_or(bytes.len(), |n| from + n);
+        (end > from)
+            .then(|| {
+                lower[from..end]
+                    .parse::<u32>()
+                    .ok()
+                    .map(|number| (number, end))
+            })
+            .flatten()
+    };
     let mut at = 0;
     while at < bytes.len() {
-        if bytes[at] == b'_' && bytes.get(at + 1).is_some_and(u8::is_ascii_digit) {
-            let end = bytes[at + 1..]
-                .iter()
-                .position(|b| !b.is_ascii_digit())
-                .map_or(bytes.len(), |n| at + 1 + n);
-            if let Ok(number) = text[at + 1..end].parse::<u32>() {
-                found.insert(number);
+        let after = if bytes[at..].starts_with(b"room") {
+            let mut from = at + 4;
+            if matches!(bytes.get(from), Some(b' ' | b'_' | b'-')) {
+                from += 1;
             }
-            at = end;
+            Some(from)
+        } else if bytes[at] == b'_' {
+            Some(at + 1)
         } else {
-            at += 1;
+            None
+        };
+        match after.and_then(digits_at) {
+            Some((number, end)) => {
+                found.insert(number);
+                at = end;
+            }
+            None => at += 1,
         }
     }
     found
+}
+
+#[test]
+fn a_room_is_found_however_the_model_spells_its_name() {
+    let said = |text: &str| numbers_named(text).into_iter().collect::<Vec<_>>();
+
+    assert_eq!(said("room7_ignoring room12_unlisted"), vec![7, 12]);
+    assert_eq!(said("Room 3 and ROOM-4 and room_5"), vec![3, 4, 5]);
+    assert_eq!(said("light_12 door_7"), vec![7, 12]);
+    // A number of a threshold or a duration is not a room's, and a word with no number is nothing.
+    assert_eq!(
+        said("after 300 seconds, 3 times; rooms; room"),
+        Vec::<u32>::new()
+    );
+    assert_eq!(said("room007_x"), vec![7]);
+    assert_eq!(said(""), Vec::<u32>::new());
 }
 
 /// What the screen does, by the commands it sends, and then what the application's own host does
