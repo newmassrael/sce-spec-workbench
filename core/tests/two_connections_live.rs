@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! Two connections at once, for real: Claude Code, and a model on a server the person runs.
+//! Connections at once, for real: Claude Code, and a model on a server the person runs.
 //!
 //! The application's own host, the settings folder and the commands are the real ones, and so are
-//! both models. Three requests are made, the first two for the model server (which takes a single
-//! request at a time and takes many minutes to write one) and the third for Claude Code. What is
-//! held is what a person with two connections sees: the request for Claude Code is written while
-//! the server is still at its first, the second request for the server waits for a place and says
-//! so, and when the first ends the second is taken.
+//! the models. Two things are held.
 //!
-//! Ignored by default, because it runs two models: it takes the server's time for two requests
-//! one after the other, and it costs what Claude Code costs. It needs `claude` on the search path
-//! and signed in, `python3`, the product's generator and `sce-spec` built, and a model server
-//! (`SCE_LOCAL_URL`, `SCE_LOCAL_MODEL`).
+//! - A server that takes a single request at a time (and many minutes to write one) and Claude
+//!   Code are two lanes. Three requests are made, the first two for the server and the third for
+//!   Claude Code: the one for Claude Code is written while the server is still at its first, the
+//!   second request for the server waits for a place and says so, and when the first ends the
+//!   second is taken.
+//! - A connection that says it has two places runs two of its requests at the same moment.
+//!
+//! Ignored by default, because they run models: the first takes the server's time for two
+//! requests one after the other, and both cost what Claude Code costs. They need `claude` on the
+//! search path and signed in, `python3`, the product's generator and `sce-spec` built, and (for the
+//! first) a model server (`SCE_LOCAL_URL`, `SCE_LOCAL_MODEL`).
 //!
 //! ```text
 //! SCE_LOCAL_URL=http://127.0.0.1:18081/v1 SCE_LOCAL_MODEL=qwen3.8-flash-next-iq2_xs \
@@ -28,7 +31,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use sce_spec_workbench_core::host::{start_with, HostSettings};
+use sce_spec_workbench_core::host::{start_with, ExecutorHost, HostSettings};
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy};
 use sce_specs::requests::State;
 use sce_specs::{Product, SceCodegen, SpecId, SpecStore, SystemClock};
@@ -49,112 +52,142 @@ inside closes an open door at once.
 /// with other work) takes far longer than the thirty minutes a connection has when it says nothing.
 const RUN_ALLOWED: Duration = Duration::from_secs(90 * 60);
 
-/// How long the whole run is given: the server writes two requests one after the other.
+/// How long the whole run with the server is given: it writes two requests one after the other.
 const ALLOWED: Duration = Duration::from_secs(RUN_ALLOWED.as_secs() * 2 + 10 * 60);
 
 fn required(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("{name} is required"))
 }
 
-/// One request for the connection `connection`, in a spec of its own, made a moment after the
-/// last so that they are taken in the order they were made.
-fn ask(
-    store: &SpecStore<SystemClock>,
-    ask: &dyn Fn(&str, Value) -> Result<Value, sce_specs::CommandError>,
-    title: &str,
-    connection: (&str, &Value),
-) -> (SpecId, String) {
-    let spec = store.create_spec(title).unwrap().id;
-    let head = match store.save_source(&spec, SPECIFICATION, None).unwrap() {
-        sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
-            revision
+fn finished(state: State) -> bool {
+    matches!(state, State::Completed | State::Failed | State::Cancelled)
+}
+
+/// The application as a person has it: a folder of specs, a folder of settings, and the host that
+/// runs the requests, which the test starts when its requests are made.
+struct Rig {
+    repo: PathBuf,
+    codegen: PathBuf,
+    store: Arc<SpecStore<SystemClock>>,
+    settings: ConnectionStore,
+    product: Arc<dyn Product>,
+    policy: Policy,
+}
+
+impl Rig {
+    fn new(label: &str) -> Rig {
+        let repo = common::sce_root();
+        let codegen = std::env::var_os("SCE_CODEGEN")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| repo.join("target/debug/sce-codegen"));
+        assert!(codegen.is_file(), "{} is not built", codegen.display());
+        let folder = common::scratch(label);
+        Rig {
+            store: Arc::new(SpecStore::with_clock(folder.join("specs"), SystemClock)),
+            settings: ConnectionStore::at(folder.join("settings")),
+            product: Arc::new(SceCodegen::at(&codegen)),
+            policy: Policy::shipped(),
+            repo,
+            codegen,
         }
-    };
-    ask(
-        "request_generation",
-        json!({
-            "id": spec.as_str(), "key": "press-1", "origin": "gui",
-            "expect": { "source": head, "answers": null }, "supersede": false,
-            "connection": { "id": connection.0, "revision": connection.1 },
-        }),
-    )
-    .expect("a request");
-    let request = store.list_requests(&spec).unwrap()[0].request.id.clone();
-    (spec, request)
+    }
+
+    fn call(&self, name: &str, args: Value) -> Result<Value, sce_specs::CommandError> {
+        let context = Context::new(
+            &*self.store,
+            &*self.product,
+            &self.policy,
+            Entrance::Desktop,
+        )
+        .with_connections(Some(&self.settings));
+        call_in(&context, name, args)
+    }
+
+    fn save(&self, connection: Value) -> Value {
+        self.call("save_connection", json!({ "connection": connection }))
+            .expect("the connection is saved")
+    }
+
+    fn claude(&self, id: &str, limits: Value) -> Value {
+        let model = std::env::var("SCE_CLAUDE_MODEL").unwrap_or_else(|_| "sonnet".to_string());
+        self.save(json!({
+            "id": id, "adapter": "claude-code", "display_name": "Claude Code",
+            "model": model, "auth": "official-login", "limits": limits,
+        }))
+    }
+
+    /// One request for `connection` in a spec of its own.
+    fn ask(&self, title: &str, id: &str, saved: &Value) -> (SpecId, String) {
+        let spec = self.store.create_spec(title).unwrap().id;
+        let head = match self.store.save_source(&spec, SPECIFICATION, None).unwrap() {
+            sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
+                revision
+            }
+        };
+        self.call(
+            "request_generation",
+            json!({
+                "id": spec.as_str(), "key": "press-1", "origin": "gui",
+                "expect": { "source": head, "answers": null }, "supersede": false,
+                "connection": { "id": id, "revision": saved["revision"] },
+            }),
+        )
+        .expect("a request");
+        let request = self.store.list_requests(&spec).unwrap()[0]
+            .request
+            .id
+            .clone();
+        (spec, request)
+    }
+
+    fn state(&self, request: &(SpecId, String)) -> State {
+        self.store
+            .read_request(&request.0, &request.1)
+            .unwrap()
+            .state
+    }
+
+    fn start(&self) -> ExecutorHost {
+        let mut shell = HostSettings::from_lookup("desktop", |_| None);
+        shell.author = Some(self.repo.join("scripts/sce_author_mcp.sh"));
+        shell.spec = Some(common::sce_spec());
+        shell.codegen = Some(self.codegen.clone());
+        let host = start_with(
+            Arc::clone(&self.store),
+            Arc::clone(&self.product),
+            shell,
+            Some((self.settings.clone(), Policy::shipped())),
+        );
+        println!("host: not hosted = {:?}", host.not_hosted());
+        assert_eq!(host.not_hosted(), None, "the host did not start");
+        host
+    }
 }
 
 #[test]
 #[ignore = "runs Claude Code and a model on a real server: many minutes, and money"]
 fn a_request_for_claude_is_written_while_the_server_is_busy_and_the_next_waits_for_its_place() {
-    let repo = common::sce_root();
-    let codegen = std::env::var_os("SCE_CODEGEN")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| repo.join("target/debug/sce-codegen"));
-    assert!(codegen.is_file(), "{} is not built", codegen.display());
-    let address = required("SCE_LOCAL_URL");
-    let model = required("SCE_LOCAL_MODEL");
-    let claude_model = std::env::var("SCE_CLAUDE_MODEL").unwrap_or_else(|_| "sonnet".to_string());
-
-    let folder = common::scratch("two-connections-live");
-    let store = Arc::new(SpecStore::with_clock(folder.join("specs"), SystemClock));
-    let settings_store = ConnectionStore::at(folder.join("settings"));
-    let product: Arc<dyn Product> = Arc::new(SceCodegen::at(&codegen));
-    let policy = Policy::shipped();
-    let call = |name: &str, args: Value| {
-        let context = Context::new(&*store, &*product, &policy, Entrance::Desktop)
-            .with_connections(Some(&settings_store));
-        call_in(&context, name, args)
-    };
-
-    // The person has two connections.
-    let server = call(
-        "save_connection",
-        json!({ "connection": {
-            "id": "pc2-qwen", "adapter": "local", "display_name": "model server",
-            "model": model, "auth": "none", "server_url": address,
-            "limits": { "seconds": RUN_ALLOWED.as_secs() },
-        } }),
-    )
-    .expect("the server is saved");
-    let claude = call(
-        "save_connection",
-        json!({ "connection": {
-            "id": "claude", "adapter": "claude-code", "display_name": "Claude Code",
-            "model": claude_model, "auth": "official-login",
-        } }),
-    )
-    .expect("Claude Code is saved");
+    let rig = Rig::new("two-connections-live");
+    let server = rig.save(json!({
+        "id": "pc2-qwen", "adapter": "local", "display_name": "model server",
+        "model": required("SCE_LOCAL_MODEL"), "auth": "none",
+        "server_url": required("SCE_LOCAL_URL"),
+        "limits": { "seconds": RUN_ALLOWED.as_secs() },
+    }));
+    let claude = rig.claude("claude", json!({}));
 
     // Two requests for the server, then one for Claude Code.
-    let (first, first_request) = ask(&store, &call, "Door one", ("pc2-qwen", &server["revision"]));
-    let (second, second_request) =
-        ask(&store, &call, "Door two", ("pc2-qwen", &server["revision"]));
-    let (other, other_request) = ask(&store, &call, "Door three", ("claude", &claude["revision"]));
+    let first = rig.ask("Door one", "pc2-qwen", &server);
+    let second = rig.ask("Door two", "pc2-qwen", &server);
+    let other = rig.ask("Door three", "claude", &claude);
 
-    let mut shell = HostSettings::from_lookup("desktop", |_| None);
-    shell.author = Some(repo.join("scripts/sce_author_mcp.sh"));
-    shell.spec = Some(common::sce_spec());
-    shell.codegen = Some(codegen.clone());
-    let host = start_with(
-        Arc::clone(&store),
-        Arc::clone(&product),
-        shell,
-        Some((settings_store.clone(), Policy::shipped())),
-    );
-    println!("host: not hosted = {:?}", host.not_hosted());
-    assert_eq!(host.not_hosted(), None, "the host did not start");
-
-    let state = |spec: &SpecId, request: &str| store.read_request(spec, request).unwrap().state;
+    let host = rig.start();
     let began = Instant::now();
     let mut seen_waiting = None;
     let mut claude_done_while_server_busy = false;
     let mut last = (State::Queued, State::Queued, State::Queued);
     loop {
-        let now = (
-            state(&first, &first_request),
-            state(&second, &second_request),
-            state(&other, &other_request),
-        );
+        let now = (rig.state(&first), rig.state(&second), rig.state(&other));
         if now != last {
             println!(
                 "[{:>4}s] server one {:?}, server two {:?}, claude {:?}",
@@ -166,8 +199,8 @@ fn a_request_for_claude_is_written_while_the_server_is_busy_and_the_next_waits_f
             last = now;
         }
         if seen_waiting.is_none() && now.1 == State::Queued {
-            let waits = store.lane_waits().unwrap();
-            if let Some(wait) = waits.iter().find(|wait| wait.request == second_request) {
+            let waits = rig.store.lane_waits().unwrap();
+            if let Some(wait) = waits.iter().find(|wait| wait.request == second.1) {
                 println!(
                     "[{:>4}s] the second request for the server waits: {} running of {} places, \
                      {} ahead",
@@ -182,10 +215,7 @@ fn a_request_for_claude_is_written_while_the_server_is_busy_and_the_next_waits_f
         if now.2 == State::Completed && now.0 == State::Running {
             claude_done_while_server_busy = true;
         }
-        if [now.0, now.1, now.2]
-            .iter()
-            .all(|state| matches!(state, State::Completed | State::Failed | State::Cancelled))
-        {
+        if finished(now.0) && finished(now.1) && finished(now.2) {
             break;
         }
         assert!(
@@ -196,14 +226,10 @@ fn a_request_for_claude_is_written_while_the_server_is_busy_and_the_next_waits_f
     }
     drop(host);
 
-    let final_states = (
-        state(&first, &first_request),
-        state(&second, &second_request),
-        state(&other, &other_request),
-    );
-    println!("outcome after {:?}: {final_states:?}", began.elapsed());
+    let outcome = (rig.state(&first), rig.state(&second), rig.state(&other));
+    println!("outcome after {:?}: {outcome:?}", began.elapsed());
     assert_eq!(
-        final_states,
+        outcome,
         (State::Completed, State::Completed, State::Completed)
     );
     assert!(
@@ -214,5 +240,43 @@ fn a_request_for_claude_is_written_while_the_server_is_busy_and_the_next_waits_f
         seen_waiting,
         Some((1, 1, 0)),
         "the second request for the server did not say it waits for the first"
+    );
+}
+
+#[test]
+#[ignore = "runs Claude Code twice at once: some minutes, and money"]
+fn a_connection_that_says_it_has_two_places_writes_two_requests_at_the_same_moment() {
+    let rig = Rig::new("two-places-live");
+    let claude = rig.claude("claude", json!({ "places": 2 }));
+    let first = rig.ask("Door one", "claude", &claude);
+    let second = rig.ask("Door two", "claude", &claude);
+
+    let host = rig.start();
+    let began = Instant::now();
+    let mut together = false;
+    let allowed = Duration::from_secs(30 * 60);
+    loop {
+        let now = (rig.state(&first), rig.state(&second));
+        if now == (State::Running, State::Running) {
+            together = true;
+            println!("[{:>4}s] both are running", began.elapsed().as_secs());
+        }
+        if finished(now.0) && finished(now.1) {
+            break;
+        }
+        assert!(
+            began.elapsed() < allowed,
+            "they did not finish in time: {now:?}"
+        );
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    drop(host);
+
+    let outcome = (rig.state(&first), rig.state(&second));
+    println!("outcome after {:?}: {outcome:?}", began.elapsed());
+    assert_eq!(outcome, (State::Completed, State::Completed));
+    assert!(
+        together,
+        "the two requests were never running at the same moment"
     );
 }

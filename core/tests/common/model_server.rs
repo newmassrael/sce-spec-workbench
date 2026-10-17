@@ -38,6 +38,9 @@ pub enum Script {
     Reply(u16, String),
     /// Reads the request and then says nothing, noting whether the other end went away.
     Hang,
+    /// Reads the request and closes the connection without a word: a tunnel that died, a server
+    /// that was stopped, a machine that went off.
+    Drop,
 }
 
 pub struct ChatServer {
@@ -114,6 +117,7 @@ pub fn chat_server(script: Vec<Script>) -> ChatServer {
                         body.len()
                     );
                 }
+                Script::Drop => drop(stream),
                 Script::Hang => {
                     let mut byte = [0u8; 1];
                     let closed = match stream.read(&mut byte) {

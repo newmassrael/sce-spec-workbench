@@ -1246,6 +1246,59 @@ fn a_model_server_that_does_not_answer_ends_the_run_at_its_time() {
     );
 }
 
+/// What a run says when the server went away, as the request keeps it: the specs folder is shared,
+/// so the sentence names no address.
+fn says_the_server_went_away(said: &str, address: &str) {
+    assert!(
+        said.contains("could not be reached")
+            || said.contains("the connection to the server broke"),
+        "{said}"
+    );
+    assert!(
+        !said.contains(address),
+        "the address is in what is kept: {said}"
+    );
+    assert!(
+        !said.contains("127.0.0.1"),
+        "an address is in what is kept: {said}"
+    );
+}
+
+#[test]
+fn a_server_that_is_not_there_fails_the_run_at_once_and_says_so_without_its_address() {
+    let rig = Rig::new("local-nobody", vec![]);
+    let local = Local::new(
+        Endpoint::parse(NOBODY).unwrap(),
+        authoring_server(&rig.folder, &AUTHOR_TOOLS),
+        LocalConfig::for_model("m"),
+    );
+
+    let began = Instant::now();
+    let refused = local.generate(&job(), &Cancel::new()).unwrap_err();
+
+    let GenerateError::Failed(said) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    says_the_server_went_away(&said, NOBODY);
+    assert!(
+        began.elapsed() < Duration::from_secs(10),
+        "{:?}",
+        began.elapsed()
+    );
+}
+
+#[test]
+fn a_server_that_closes_the_connection_in_the_middle_fails_the_run_and_says_so() {
+    let rig = Rig::new("local-dropped", vec![Script::Drop]);
+
+    let refused = rig.run().unwrap_err();
+
+    let GenerateError::Failed(said) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    says_the_server_went_away(&said, &rig.server.address);
+}
+
 #[test]
 fn a_run_that_is_told_to_stop_stops_and_the_model_server_sees_the_connection_close() {
     let rig = Rig::new("local-cancel", vec![Script::Hang]);
