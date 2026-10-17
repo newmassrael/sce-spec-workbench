@@ -48,7 +48,11 @@ export function minutesBetween(from: string | null, to: string): number {
  * that a person is not told a connection does not report in the first seconds before it has had a
  * chance to.
  */
-export function runWords(journal: RequestJournal | null, status: Status): RunWords | null {
+export function runWords(
+  journal: RequestJournal | null,
+  status: Status,
+  givenSeconds: number | null = null,
+): RunWords | null {
   if (journal === null) return null;
   const { progress } = journal;
   const running = status.kind === "running";
@@ -65,7 +69,15 @@ export function runWords(journal: RequestJournal | null, status: Status): RunWor
       key: "progressChecks",
       values: { checks: String(progress.checks), refused: String(progress.refused) },
     },
-    { key: "progressMinutes", values: { minutes: String(minutes) } },
+    // The minutes used, and of how many the request was given when the connection says so: one
+    // clock for the whole request, so the tries share it. A connection that names no limit is not
+    // guessed at: its time is its own default and is not said.
+    givenSeconds === null
+      ? { key: "progressMinutes", values: { minutes: String(minutes) } }
+      : {
+          key: "progressMinutesOf",
+          values: { minutes: String(minutes), given: String(Math.ceil(givenSeconds / 60)) },
+        },
   ];
   if (progress.tries > 1) parts.push({ key: "progressTries", values: { tries: String(progress.tries) } });
   if (progress.handovers > 0) parts.push({ key: "progressHandovers", values: { n: String(progress.handovers) } });

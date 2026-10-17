@@ -239,6 +239,7 @@ const en = {
   progressTurns: "Turns: {turns}",
   progressChecks: "Checks: {checks} (refused {refused})",
   progressMinutes: "{minutes} min",
+  progressMinutesOf: "{minutes} of {given} min, shared by every try",
   progressTries: "Tries: {tries}",
   progressHandovers: "Conversation begun again: {n}",
   progressNotDrafts: "Messages that were not a design: {n}",
@@ -259,6 +260,8 @@ const en = {
   causeAddressNotFound: "Nothing answers at the server's address.",
   causeCertificateRefused: "The server's certificate was refused.",
   causeConnectionBroken: "The connection broke in the middle of the answer.",
+  causeClockRanOut:
+    "The time was used up by the first tries, so the next one was not begun: every try of a request shares the one time it was given.",
   causeContextFull:
     "The conversation became longer than the model's context, more often than starting it again helps.",
   causeAnswerTooLarge: "The server's answer was larger than the most this application reads.",
@@ -716,6 +719,7 @@ const ko: Record<Key, string> = {
   progressTurns: "턴: {turns}",
   progressChecks: "검사: {checks} (거절 {refused})",
   progressMinutes: "{minutes}분",
+  progressMinutesOf: "{given}분 중 {minutes}분, 모든 시도가 함께 씀",
   progressTries: "시도: {tries}",
   progressHandovers: "대화를 다시 시작한 횟수: {n}",
   progressNotDrafts: "설계가 아니었던 메시지: {n}",
@@ -735,6 +739,8 @@ const ko: Record<Key, string> = {
   causeAddressNotFound: "서버 주소에 응답하는 것이 없습니다.",
   causeCertificateRefused: "서버의 인증서가 거부되었습니다.",
   causeConnectionBroken: "답을 받는 도중에 연결이 끊어졌습니다.",
+  causeClockRanOut:
+    "앞선 시도들이 시간을 다 써서 다음 시도를 시작하지 않았습니다: 한 요청의 모든 시도는 주어진 시간 하나를 함께 씁니다.",
   causeContextFull: "대화가 모델의 문맥 길이를 넘었고, 다시 시작해도 해결되지 않았습니다.",
   causeAnswerTooLarge: "서버의 답이 이 앱이 읽는 최대 크기를 넘었습니다.",
   causeOutputLimit: "답이 나오기 전에 서버가 출력 한도에서 모델의 메시지를 잘랐습니다.",

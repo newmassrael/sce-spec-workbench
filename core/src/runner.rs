@@ -93,6 +93,19 @@ pub struct Job {
     /// not leaves it empty: the screen then says the connection does not report, which is not the
     /// same as a run that did nothing.
     pub progress: Progress,
+    /// When the time the request was given runs out: fixed when the request was taken and the same
+    /// for every try, so that what a generator is left is what remains of it and not a new
+    /// allowance. `None` for a request with no clock (the generator keeps none).
+    pub deadline: Option<Instant>,
+}
+
+impl Job {
+    /// How much of the request's time is left, or `None` when it has no clock. Nothing is left
+    /// once the deadline has passed.
+    pub fn time_left(&self) -> Option<Duration> {
+        self.deadline
+            .map(|deadline| deadline.saturating_duration_since(Instant::now()))
+    }
 }
 
 /// Where a run says what it does, as events the store keeps beside the request (`journal`).
@@ -186,6 +199,9 @@ pub mod cause {
     pub const CONNECTION_BROKEN: &str = "connection-broken";
     /// The model server's answer is longer than the most that is read.
     pub const ANSWER_TOO_LARGE: &str = "answer-too-large";
+    /// The time the request was given ran out between two tries of the generator, so the next was
+    /// not begun.
+    pub const CLOCK_RAN_OUT: &str = "clock-ran-out";
     /// The conversation outgrew the model's context more often than a hand-over helps.
     pub const CONTEXT_FULL: &str = "context-full";
     /// The client program could not be started or read.
@@ -327,6 +343,14 @@ pub trait Generator: Send + Sync {
     /// connection and refuses a claim past this (`lane-full`).
     fn places(&self) -> usize {
         1
+    }
+
+    /// The time one request is given, from the moment it is taken: the one clock of the request,
+    /// which every call of the generator for it shares, so that a try that begins again after a
+    /// refusal does not begin a new one. `None` for a generator that keeps no clock of its own
+    /// (a script in a test), which is then left to run until it ends or is told to stop.
+    fn time_allowed(&self) -> Option<Duration> {
+        None
     }
 
     /// Write a draft for `job`, looking at `cancel` as often as it can: a run that goes on
@@ -741,7 +765,32 @@ where
         let mut last_failure = Failure::of(FailureKind::Model);
         // The design the latest try that was not a draft held when it ended, if it held one.
         let mut last_held: Option<ModelFiles> = None;
+        // The request's one clock, fixed here and given to every try: what a try is left is what
+        // remains of the time the request was given, and not a new allowance.
+        let allowed = generator.time_allowed();
+        job.deadline = allowed.map(|span| Instant::now() + span);
         for tried in 1..=self.config.repairs + 1 {
+            // A try that begins again after a refusal does so only if there is time to begin it:
+            // the time is the request's, and a generator handed none would end at once and say
+            // that it ran out of a time that is not its own.
+            if tried > 1 && job.time_left() == Some(Duration::ZERO) {
+                let given = allowed.map_or_else(String::new, |span| {
+                    format!(" {}", crate::client_run::span_words(span))
+                });
+                return self.fail(
+                    spec,
+                    request,
+                    attempt,
+                    Trouble {
+                        failure: Failure::of(FailureKind::Time).because(cause::CLOCK_RAN_OUT),
+                        words: format!(
+                            "the request used the{given} it was given, and was stopped before \
+                             try {tried}; the last thing said of the draft was: {last_refusal}",
+                        ),
+                        held: last_held,
+                    },
+                );
+            }
             job.progress.say(Event::TryBegun { n: tried });
             let draft = match generator.generate(&job, cancel) {
                 Ok(draft) => draft,
@@ -902,6 +951,7 @@ where
             refusal: None,
             fresh_ids: view.request.fresh_ids,
             progress: self.progress_for(spec, request, attempt),
+            deadline: None,
         })
     }
 

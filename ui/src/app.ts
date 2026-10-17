@@ -2193,8 +2193,10 @@ export class App {
    */
   private progressBlock(status: Status): HTMLElement | null {
     const held = this.journal;
+    // What the request was given, when the connection it was made for says so.
+    const given = this.requestDetail?.pin?.limits.seconds ?? null;
     const words =
-      held !== null && held.request === this.requestHead?.id ? runWords(held.read, status) : null;
+      held !== null && held.request === this.requestHead?.id ? runWords(held.read, status, given) : null;
     if (words === null) return null;
     if (words.silent) return h("p", { id: "generation-progress", class: "muted" }, this.t("progressSilent"));
     return h(

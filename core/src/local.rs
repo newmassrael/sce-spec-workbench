@@ -796,6 +796,10 @@ impl Generator for Local {
         Some(format!("local/{}", &digest[..12]))
     }
 
+    fn time_allowed(&self) -> Option<Duration> {
+        Some(self.config.timeout)
+    }
+
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
         let mut held = None;
         self.generate_holding(job, cancel, &mut held)
@@ -814,7 +818,11 @@ impl Local {
         cancel: &Cancel,
         held: &mut Option<ModelFiles>,
     ) -> Result<Draft, GenerateError> {
-        let deadline = Instant::now() + self.config.timeout;
+        // The request's clock when it has one: what is left of the time the request was given, and
+        // not a new allowance for each try. A generator called with none keeps its own.
+        let deadline = job
+            .deadline
+            .unwrap_or_else(|| Instant::now() + self.config.timeout);
         let scratch = Scratch::new("sce-local").map_err(|e| {
             GenerateError::installation(format!("a folder for the run: {e}"))
                 .because(cause::WORK_FOLDER)

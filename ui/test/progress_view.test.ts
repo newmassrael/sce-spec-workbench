@@ -69,6 +69,23 @@ describe("what a run is said to have done", () => {
     ]);
   });
 
+  it("says of how many minutes the request was given when the connection names it, the tries sharing them", () => {
+    const words = runWords(journal({ ...said, tries: 2 }), running, 5400);
+
+    expect(words?.parts.map((p) => translate("en", p.key, p.values))).toContain(
+      "30 of 90 min, shared by every try",
+    );
+    // A limit that does not come to whole minutes is said as the minutes that hold it.
+    expect(runWords(journal(said), running, 100)?.parts.at(2)?.values["given"]).toBe("2");
+  });
+
+  it("does not guess what a connection that names no limit gives", () => {
+    const words = runWords(journal(said), running, null);
+
+    expect(words?.parts.at(2)?.key).toBe("progressMinutes");
+    expect(words?.parts.map((p) => p.key)).not.toContain("progressMinutesOf");
+  });
+
   it("measures a run that is going on to the core's now, and one that ended to its last event", () => {
     // Running: from the first event to the moment the core read the clock at.
     expect(runWords(journal(said), running)?.parts.at(2)?.values["minutes"]).toBe("30");

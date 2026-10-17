@@ -114,6 +114,7 @@ fn job() -> Job {
         refusal: None,
         fresh_ids: false,
         progress: Default::default(),
+        deadline: None,
     }
 }
 
@@ -320,6 +321,47 @@ fn a_draft_the_core_refused_is_put_to_the_client_in_the_products_words() {
     assert!(
         told.contains("validation/invalid-reference (line 3)"),
         "{told}"
+    );
+}
+
+#[test]
+fn a_request_with_no_time_left_does_not_start_the_client_and_says_it_ran_out() {
+    let fake = Fake::new("claude-clock-gone", "echo should-not-run");
+    let gone = Job {
+        deadline: Some(Instant::now()),
+        ..job()
+    };
+
+    let refused = generate(&client(&fake), &gone).unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure.kind.word(), "time");
+    assert!(!fake.record.join("cwd").exists(), "the client was started");
+}
+
+#[test]
+fn what_is_left_of_the_requests_time_and_not_the_clients_own_is_what_it_is_given() {
+    // The connection allows half an hour; the request has a second and a half left of it.
+    // `exec`: the shell is replaced by the sleep, so stopping the client stops all of it.
+    let fake = Fake::new("claude-clock-left", "exec sleep 60");
+    let tight = Job {
+        deadline: Some(Instant::now() + Duration::from_millis(1500)),
+        ..job()
+    };
+    let began = Instant::now();
+
+    let refused = generate(&client(&fake), &tight).unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure.kind.word(), "time");
+    assert!(
+        began.elapsed() < Duration::from_secs(20),
+        "{:?}",
+        began.elapsed()
     );
 }
 

@@ -149,6 +149,7 @@ fn job() -> Job {
         refusal: None,
         fresh_ids: false,
         progress: Default::default(),
+        deadline: None,
     }
 }
 
@@ -252,6 +253,49 @@ fn a_program_that_will_not_say_its_version_has_none() {
     );
 
     assert_eq!(client.version(), None);
+}
+
+#[test]
+fn a_request_with_no_time_left_does_not_start_codex_and_says_it_ran_out() {
+    let fake = Fake::answering("codex-clock-gone", &answer("<scxml/>"));
+    let client = verified(&fake);
+    let gone = Job {
+        deadline: Some(Instant::now()),
+        ..job()
+    };
+
+    let refused = client.generate(&gone, &Cancel::new()).unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure.kind.word(), "time");
+    assert!(!fake.started());
+}
+
+#[test]
+fn what_is_left_of_the_requests_time_and_not_the_connections_own_is_what_the_client_is_given() {
+    // The connection allows half an hour; the request has a second and a half left of it.
+    // `exec`: the shell is replaced by the sleep, so stopping the client stops all of it.
+    let fake = Fake::new("codex-clock-left", "exec sleep 60");
+    let client = verified(&fake);
+    let tight = Job {
+        deadline: Some(Instant::now() + Duration::from_millis(1500)),
+        ..job()
+    };
+
+    let began = Instant::now();
+    let refused = client.generate(&tight, &Cancel::new()).unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure.kind.word(), "time");
+    assert!(
+        began.elapsed() < Duration::from_secs(20),
+        "{:?}",
+        began.elapsed()
+    );
 }
 
 #[test]

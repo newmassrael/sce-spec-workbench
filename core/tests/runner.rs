@@ -36,6 +36,8 @@ type Step = Box<dyn Fn(usize, &Job, &Cancel) -> Result<Draft, GenerateError> + S
 struct Scripted {
     jobs: Mutex<Vec<Job>>,
     step: Step,
+    /// The time one request is given, when the script keeps a clock.
+    allowed: Option<Duration>,
 }
 
 impl Scripted {
@@ -45,6 +47,19 @@ impl Scripted {
         Arc::new(Scripted {
             jobs: Mutex::new(Vec::new()),
             step: Box::new(step),
+            allowed: None,
+        })
+    }
+
+    /// A script that keeps a clock: `allowed` is what a request is given.
+    fn with_clock(
+        allowed: Duration,
+        step: impl Fn(usize, &Job, &Cancel) -> Result<Draft, GenerateError> + Send + Sync + 'static,
+    ) -> Arc<Self> {
+        Arc::new(Scripted {
+            jobs: Mutex::new(Vec::new()),
+            step: Box::new(step),
+            allowed: Some(allowed),
         })
     }
 
@@ -64,6 +79,10 @@ impl Generator for Scripted {
 
     fn instructions(&self) -> Option<String> {
         Some("scripted/v1".to_string())
+    }
+
+    fn time_allowed(&self) -> Option<Duration> {
+        self.allowed
     }
 
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
@@ -588,6 +607,84 @@ fn what_the_last_try_held_is_kept_when_the_tries_end_on_something_that_is_not_a_
     let kept = f.store.read_candidate(&f.id, &request).unwrap();
     let (_, text) = kept.model.expect("a held design");
     assert!(text.contains("try 1"), "{text}");
+}
+
+#[test]
+fn every_try_of_a_request_is_given_the_one_deadline_it_was_taken_with() {
+    let f = fixture("runner-one-clock");
+    let request = f.ask("press-1");
+    let generator = Scripted::with_clock(Duration::from_secs(600), |n, _, _| match n {
+        0 | 1 => Err(GenerateError::unusable("not a draft")),
+        _ => Ok(draft("three")),
+    });
+    let runner = f.runner(&generator, f.config());
+    let before = Instant::now();
+
+    let outcome = runner.run_once().unwrap();
+
+    assert!(matches!(outcome, Outcome::Completed { .. }), "{outcome:?}");
+    let jobs = generator.asked();
+    assert_eq!(jobs.len(), 3);
+    // One deadline for three tries: the time of the request, and not an allowance for each.
+    let deadlines: Vec<Instant> = jobs
+        .iter()
+        .map(|job| job.deadline.expect("a deadline"))
+        .collect();
+    assert_eq!(deadlines[0], deadlines[1]);
+    assert_eq!(deadlines[1], deadlines[2]);
+    assert!(deadlines[0] >= before + Duration::from_secs(600));
+    assert!(deadlines[0] <= Instant::now() + Duration::from_secs(600));
+    assert_eq!(f.state_of(&request), State::Completed);
+}
+
+#[test]
+fn a_try_that_would_begin_after_the_time_of_the_request_is_gone_is_not_begun() {
+    let f = fixture("runner-clock-ran-out");
+    let request = f.ask("press-1");
+    // The request is given a quarter of a second, and the first try takes longer than that and
+    // is not a draft: a second try would be given a time that is not there.
+    let generator = Scripted::with_clock(Duration::from_millis(250), |_, _, _| {
+        thread::sleep(Duration::from_millis(400));
+        Err(GenerateError::unusable("not a draft")
+            .because(cause::NO_DRAFT)
+            .holding(Some(ModelFiles::single("<scxml>held</scxml>"))))
+    });
+    let runner = f.runner(&generator, f.config());
+
+    let outcome = runner.run_once().unwrap();
+
+    assert_eq!(generator.asked().len(), 1, "no second try was begun");
+    let Outcome::Failed {
+        reason, failure, ..
+    } = outcome
+    else {
+        panic!("expected a failure, got {outcome:?}");
+    };
+    assert_eq!(
+        failure,
+        Failure::of(FailureKind::Time).because(cause::CLOCK_RAN_OUT)
+    );
+    assert!(reason.contains("250 milliseconds"), "{reason}");
+    assert!(reason.contains("before try 2"), "{reason}");
+    // What the first try held is still kept, with the request.
+    let kept = f.store.read_candidate(&f.id, &request).unwrap();
+    assert!(kept.model.expect("a held design").1.contains("held"));
+}
+
+#[test]
+fn a_generator_with_no_clock_is_given_no_deadline_and_is_not_stopped_between_tries() {
+    let f = fixture("runner-no-clock");
+    f.ask("press-1");
+    let generator = Scripted::new(|n, _, _| match n {
+        0 => Err(GenerateError::unusable("not a draft")),
+        _ => Ok(draft("two")),
+    });
+    let runner = f.runner(&generator, f.config());
+
+    let outcome = runner.run_once().unwrap();
+
+    assert!(matches!(outcome, Outcome::Completed { .. }), "{outcome:?}");
+    assert!(generator.asked().iter().all(|job| job.deadline.is_none()));
 }
 
 #[test]

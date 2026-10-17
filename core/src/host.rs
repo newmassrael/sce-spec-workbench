@@ -727,6 +727,10 @@ impl Generator for Reporting {
             .unwrap_or_default()
     }
 
+    fn time_allowed(&self) -> Option<std::time::Duration> {
+        self.0.reporting().and_then(|r| r.client().time_allowed())
+    }
+
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
         match self.0.reporting() {
             Some(reporter) => reporter.client().generate(job, cancel),

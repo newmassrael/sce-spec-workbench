@@ -66,6 +66,9 @@ const CAUSES: Partial<Record<FailureKind, Readonly<Record<string, Key>>>> = {
     "certificate-refused": "causeCertificateRefused",
     "connection-broken": "causeConnectionBroken",
   },
+  time: {
+    "clock-ran-out": "causeClockRanOut",
+  },
   size: {
     "context-full": "causeContextFull",
     "answer-too-large": "causeAnswerTooLarge",

@@ -62,6 +62,7 @@ fn job() -> Job {
         refusal: None,
         fresh_ids: false,
         progress: Default::default(),
+        deadline: None,
     }
 }
 
@@ -1610,6 +1611,64 @@ fn a_model_server_that_does_not_answer_ends_the_run_at_its_time() {
         began.elapsed() < Duration::from_secs(10),
         "{:?}",
         began.elapsed()
+    );
+}
+
+#[test]
+fn a_run_is_stopped_by_the_deadline_of_its_request_and_not_by_a_time_of_its_own() {
+    // The connection allows half an hour, and the request has a quarter of a second left of it:
+    // the second is what the run is held to.
+    let rig = Rig::new("local-clock", vec![Script::Hang]);
+    let config = LocalConfig {
+        timeout: Duration::from_secs(30 * 60),
+        ..LocalConfig::for_model("m")
+    };
+    let mut job = job();
+    job.deadline = Some(Instant::now() + Duration::from_millis(1500));
+
+    let began = Instant::now();
+    let refused = rig
+        .local(config)
+        .generate(&job, &Cancel::new())
+        .unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure, Failure::of(FailureKind::Time));
+    assert!(
+        began.elapsed() < Duration::from_secs(20),
+        "the run went on past the request's deadline: {:?}",
+        began.elapsed()
+    );
+}
+
+#[test]
+fn a_request_with_no_time_left_is_not_asked_of_the_model() {
+    let rig = Rig::new("local-clock-gone", vec![says(&draft("<scxml/>"))]);
+    let mut job = job();
+    job.deadline = Some(Instant::now());
+
+    let refused = rig.run_job(&job).unwrap_err();
+
+    let GenerateError::Failed(Trouble { failure, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert_eq!(failure, Failure::of(FailureKind::Time));
+    assert!(rig.server.requests().is_empty(), "the model was asked");
+}
+
+#[test]
+fn a_connection_says_it_keeps_a_clock_and_how_long_it_gives_a_request() {
+    let rig = Rig::new("local-allowed", vec![]);
+    let config = LocalConfig {
+        timeout: Duration::from_secs(90),
+        ..LocalConfig::for_model("m")
+    };
+
+    assert_eq!(
+        rig.local(config).time_allowed(),
+        Some(Duration::from_secs(90))
     );
 }
 

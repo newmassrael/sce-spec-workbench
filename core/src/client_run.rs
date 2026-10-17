@@ -179,6 +179,7 @@ pub(crate) fn blank_job() -> Job {
         refusal: None,
         fresh_ids: false,
         progress: Default::default(),
+        deadline: None,
     }
 }
 

@@ -690,7 +690,20 @@ impl Generator for Codex {
         Some(instructions_of(&self.support))
     }
 
+    fn time_allowed(&self) -> Option<Duration> {
+        Some(self.config.timeout)
+    }
+
     fn generate(&self, job: &Job, cancel: &Cancel) -> Result<Draft, GenerateError> {
+        // The request's clock when it has one: what is left of the time the request was given. A
+        // client is not started when none is left.
+        let allowed = job.time_left().unwrap_or(self.config.timeout);
+        if allowed.is_zero() {
+            return Err(GenerateError::time(format!(
+                "the request had used all of its {} before the client was started",
+                span_words(self.config.timeout)
+            )));
+        }
         // Nothing is started before it is known to be a Codex this build has verified, with
         // nothing on that nobody looked at, and a credential to give it.
         let Run { kept, home } = self
@@ -727,16 +740,11 @@ impl Generator for Codex {
             ))
             .because(cause::CLIENT_FAULT)
         })?;
-        let ended = supervise(
-            child,
-            Some(prompt(job).into_bytes()),
-            cancel,
-            self.config.timeout,
-        )
-        .map_err(|e| {
-            GenerateError::installation(format!("the client could not be read: {e}"))
-                .because(cause::CLIENT_FAULT)
-        })?;
+        let ended =
+            supervise(child, Some(prompt(job).into_bytes()), cancel, allowed).map_err(|e| {
+                GenerateError::installation(format!("the client could not be read: {e}"))
+                    .because(cause::CLIENT_FAULT)
+            })?;
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
