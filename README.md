@@ -56,7 +56,12 @@ ignored, no word boundary) and its message. The gate is the one in the `sce` sub
 the file, the line and the pattern's number), and a clone without the gate or the list refuses the
 commit rather than passing it. A pattern too blunt for the loose tier is left out of it by number in
 `~/.claude/restricted-terms.txt.loose-exclude`. CI cannot make this check, because the list cannot
-be in the repository, so the hook is the only place it is made. `git commit --no-verify` skips it.
+be in the repository, so the hook is the only place it is made. `git commit --no-verify` skips the
+commit hooks, and two more cover what it leaves: `post-commit` warns at once that the commit would
+be refused, and `pre-push` reads every line each pushed commit adds and every message, and refuses
+the push (`SKIP_PREPUSH` is not a hook here and does not matter). The one bypass,
+`SCE_RESTRICTED_OVERRIDE=1`, says so and writes a row (time, hook, repository, commit; no text) to
+`~/.claude/restricted-override.log`.
 
 Today it does the first two parts: **specs** (a titled piece of specification
 text), **immutable revisions** of each, and a **save that refuses to overwrite**

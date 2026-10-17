@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# pre-push: what the push would publish is held to the restricted-term list.
+#
+# `pre-commit` and `commit-msg` read a commit as it is made, and `--no-verify`, a cherry-pick, a
+# rebase or a clone that never ran the installer reach the remote without meeting them. The push
+# is the last place a local hook stands before the text is public, so it reads every line each
+# pushed commit adds and every message, with the gate of the pinned `sce` (the same words as its
+# own pre-push). The matched text is never printed. A gate this checkout does not have, or one
+# too old to read a range, refuses the push instead of passing it.
+#
+# The only bypass is the gate's own, `SCE_RESTRICTED_OVERRIDE=1`, which says so and writes a row to
+# the override log. Turn the hooks on once per clone: `bash scripts/git-hooks/install.sh`.
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+gate="$repo_root/sce/tools/git-hooks/restricted-term-gate.sh"
+
+if [[ ! -r "$gate" ]]; then
+    printf '\nERROR pre-push: the restricted-term gate is not in this checkout (%s).\n' "$gate" >&2
+    printf '  It comes with the sce submodule: git submodule update --init sce\n' >&2
+    printf '  A gate that is not there is a check that was not made, so this refuses.\n' >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$gate"
+
+if ! declare -F restricted_term_gate_range >/dev/null; then
+    printf '\nERROR pre-push: %s cannot read a range of commits.\n' "$gate" >&2
+    printf '  The pinned sce is older than the push gate: git submodule update --remote sce\n' >&2
+    exit 1
+fi
+
+failed=0
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [[ -z "${local_sha:-}" || "$local_sha" =~ ^0+$ ]] && continue   # a deletion publishes nothing
+    if [[ -z "${remote_sha:-}" || "$remote_sha" =~ ^0+$ ]] \
+        || ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+        # A new ref, or a remote commit this clone does not hold (a force push): what is new is
+        # what no remote-tracking ref reaches.
+        restricted_term_gate_range "pre-push" "$local_sha" --not --remotes || failed=1
+    else
+        restricted_term_gate_range "pre-push" "${remote_sha}..${local_sha}" || failed=1
+    fi
+done
+
+if (( failed )); then
+    printf '\npre-push: take the text out of the commits above (amend or rebase) and push\n' >&2
+    printf 'pre-push: again — the remote is public and a push does not un-publish.\n' >&2
+    exit 1
+fi
+exit 0

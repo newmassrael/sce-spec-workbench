@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# post-commit: say so when the commit just made carries a restricted term.
+#
+# `git commit --no-verify` skips pre-commit and commit-msg and does not skip this one, so a commit
+# made past them is still told that the push will refuse it, while it is local and amending it
+# costs nothing. It only warns, and it never fails: git ignores a post-commit status, and a
+# warning that could break a commit would be a reason to turn it off.
+
+set -uo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+gate="$repo_root/sce/tools/git-hooks/restricted-term-gate.sh"
+
+if [[ ! -r "$gate" ]]; then
+    printf '\npost-commit: the restricted-term gate is not in this checkout, so this commit was not read.\n' >&2
+    exit 0
+fi
+
+# shellcheck source=/dev/null
+source "$gate"
+
+if declare -F restricted_term_gate_warn >/dev/null; then
+    restricted_term_gate_warn
+else
+    printf '\npost-commit: the pinned sce has no warning gate, so this commit was not read.\n' >&2
+fi
+exit 0

@@ -201,6 +201,119 @@ fn install_turns_the_hooks_on_for_the_clone_it_is_run_in() {
     );
 }
 
+impl Sandbox {
+    /// A commit made past the commit hooks, as `--no-verify` makes one (`post-commit` still runs).
+    fn commit_past_the_hooks(&self, message: &str) -> Output {
+        self.command(&["commit", "-q", "--no-verify", "-m", message])
+            .output()
+            .expect("git runs")
+    }
+
+    /// A bare repository to push to, set as `origin`.
+    fn remote(&self) -> PathBuf {
+        let bare = self.dir.parent().unwrap().join("remote.git");
+        let _ = std::fs::remove_dir_all(&bare);
+        let out = Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(&bare)
+            .output()
+            .expect("git runs");
+        assert!(out.status.success());
+        self.git(&["remote", "add", "origin", bare.to_str().unwrap()]);
+        bare
+    }
+
+    fn push(&self) -> Output {
+        self.command(&["push", "-q", "origin", "HEAD:refs/heads/main"])
+            .output()
+            .expect("git runs")
+    }
+}
+
+#[test]
+fn a_commit_made_past_the_hooks_is_warned_about_at_once_and_refused_at_the_push() {
+    let sandbox = Sandbox::new("hooks-past", true);
+    sandbox.remote();
+    sandbox.stage("notes.txt", "nothing restricted\n");
+    let clean = sandbox.commit_past_the_hooks("a plain message");
+    assert!(clean.status.success(), "{}", said(&clean));
+    assert!(!said(&clean).contains("REFUSED"), "{}", said(&clean));
+
+    sandbox.stage(
+        "notes.txt",
+        "nothing restricted\nthe term is PROBE_TERM_9 here\n",
+    );
+    let past = sandbox.commit_past_the_hooks("a plain message");
+    assert!(
+        past.status.success(),
+        "post-commit cannot undo the commit:\n{}",
+        said(&past)
+    );
+    let warned = said(&past);
+    assert!(
+        warned.contains("notes.txt: line(s) 2 — term #0"),
+        "{warned}"
+    );
+    assert!(warned.contains("would be REFUSED at the push"), "{warned}");
+    assert!(!warned.contains("PROBE_TERM_9"), "{warned}");
+
+    let pushed = sandbox.push();
+    assert!(!pushed.status.success(), "the push refuses the commit");
+    let refused = said(&pushed);
+    assert!(
+        refused.contains("notes.txt: line(s) 2 — term #0"),
+        "{refused}"
+    );
+    assert!(!refused.contains("PROBE_TERM_9"), "{refused}");
+    let at_remote = Command::new("git")
+        .args(["--git-dir"])
+        .arg(sandbox.dir.parent().unwrap().join("remote.git"))
+        .args(["rev-parse", "--verify", "-q", "refs/heads/main"])
+        .output()
+        .unwrap();
+    assert!(!at_remote.status.success(), "nothing reached the remote");
+
+    // Taking the text out of the history lets the push through.
+    sandbox.git(&["reset", "-q", "--hard", "HEAD~1"]);
+    let clean_push = sandbox.push();
+    assert!(clean_push.status.success(), "{}", said(&clean_push));
+}
+
+#[test]
+fn a_checkout_without_the_gate_refuses_the_push_and_the_override_leaves_a_row() {
+    let sandbox = Sandbox::new("hooks-push-no-gate", false);
+    sandbox.remote();
+    sandbox.stage("notes.txt", "nothing restricted\n");
+    let made = sandbox.commit_past_the_hooks("a plain message");
+    assert!(made.status.success(), "post-commit never fails a commit");
+
+    let pushed = sandbox.push();
+    assert!(!pushed.status.success(), "no gate is no check");
+    assert!(
+        said(&pushed).contains("restricted-term gate is not in this checkout"),
+        "{}",
+        said(&pushed)
+    );
+
+    // With the gate present, the override passes, says so, and is written down.
+    let with_gate = Sandbox::new("hooks-push-override", true);
+    with_gate.remote();
+    with_gate.stage("notes.txt", "the term is PROBE_TERM_4 here\n");
+    with_gate.commit_past_the_hooks("a plain message");
+    let log = with_gate.dir.parent().unwrap().join("override.log");
+    let out = with_gate
+        .command(&["push", "-q", "origin", "HEAD:refs/heads/main"])
+        .env("SCE_RESTRICTED_OVERRIDE", "1")
+        .env("SCE_RESTRICTED_OVERRIDE_LOG", &log)
+        .output()
+        .expect("git runs");
+    assert!(out.status.success(), "{}", said(&out));
+    assert!(said(&out).contains("DISABLED"), "{}", said(&out));
+    let rows = std::fs::read_to_string(&log).expect("the override was written down");
+    assert!(rows.contains("\tpre-push\t"), "{rows}");
+    assert!(!rows.contains("PROBE_TERM_4"), "{rows}");
+}
+
 #[test]
 fn every_hook_of_the_repository_carries_the_executable_bit() {
     // git passes over a hook that is not executable and says nothing, which is a gate that is
