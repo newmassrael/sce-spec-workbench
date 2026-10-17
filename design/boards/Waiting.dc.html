@@ -35,6 +35,8 @@ body{margin:0}
       <button type="button" class="{{dc11}}" onClick="{{dp11}}">{{dl11}}</button>
       <button type="button" class="{{dc12}}" onClick="{{dp12}}">{{dl12}}</button>
       <button type="button" class="{{dc13}}" onClick="{{dp13}}">{{dl13}}</button>
+      <button type="button" class="{{dc14}}" onClick="{{dp14}}">{{dl14}}</button>
+      <button type="button" class="{{dc15}}" onClick="{{dp15}}">{{dl15}}</button>
     </div>
 
     <div style="display: flex; align-items: center; gap: 14px">
@@ -48,10 +50,17 @@ body{margin:0}
     </div>
 
     <div class="{{liveHide}}" style="display: flex; flex-direction: column; gap: 22px">
-      <div role="status" style="display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-radius: 16px; background: var(--attn-tint); color: var(--attn)">
+      <div class="{{attnHide}}" role="status" style="display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-radius: 16px; background: var(--attn-tint); color: var(--attn)">
         <span class="ic ic-clock" style="width: 22px; height: 22px; margin-top: 1px"></span>
         <span>
           <span style="display: block; font: 600 16px/24px var(--font)">AI를 기다리고 있어요</span>
+          <span style="display: block; margin-top: 2px; font: 500 15px/24px var(--font)">{{head}}</span>
+        </span>
+      </div>
+      <div class="{{queueHide}}" role="status" style="display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-radius: 16px; background: var(--accent-tint); color: var(--accent-ink)">
+        <span class="ic ic-clock" style="width: 22px; height: 22px; margin-top: 1px"></span>
+        <span>
+          <span style="display: block; font: 600 16px/24px var(--font)">차례를 기다리고 있어요</span>
           <span style="display: block; margin-top: 2px; font: 500 15px/24px var(--font)">{{head}}</span>
         </span>
       </div>
@@ -59,7 +68,7 @@ body{margin:0}
       <div style="padding: 20px 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow)">
         <div style="font: 400 15px/24px var(--font); color: var(--ink)">{{body}}</div>
         <div class="{{rawHide}}" style="margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--page); font: 400 13px/20px var(--font); color: var(--ink-2)"><span style="display: block; color: var(--ink-3)">앱이 알려 준 이유 (원문)</span>{{raw}}</div>
-        <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">민이 어제 올림 · 옮겨 쓸 연결: Claude Code</div>
+        <div style="margin-top: 14px; font: 400 13px/20px var(--font); color: var(--ink-3)">민이 어제 올림 · 옮겨 쓸 연결: {{via}}</div>
       </div>
 
       <div class="wrow" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
@@ -80,7 +89,7 @@ body{margin:0}
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px">
           <button class="opt sm {{o1c}}" type="button" onClick="{{o1}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">Claude Code · 기본</span><span class="opt-s">{{o1s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
           <button class="opt sm {{o2c}}" type="button" onClick="{{o2}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">Codex</span><span class="opt-s">찾지 못함</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
-          <button class="opt sm {{o3c}}" type="button" onClick="{{o3}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">사무실 서버</span><span class="opt-s">연결됨</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
+          <button class="opt sm {{o3c}}" type="button" onClick="{{o3}}"><span class="opt-ic"><span class="ic ic-cpu" style="width: 18px; height: 18px"></span></span><span><span class="opt-t">사무실 서버</span><span class="opt-s">{{o3s}}</span></span><span class="opt-mark"><span class="ic ic-check" style="width: 13px; height: 13px"></span></span></button>
         </div>
         <p class="note {{warnHide}}" style="margin-top: 10px"><span class="ic ic-alert" style="margin-top: 2px"></span><span>{{warn}}</span></p>
         <div style="display: flex; align-items: center; gap: 12px; margin-top: 14px">
@@ -118,21 +127,29 @@ class Component extends DCLogic {
       unlisted: { label: '그 밖의 이유', head: '아래 이유로 기다리고 있어요', body: '이 앱이 아직 쉬운 말로 바꾸지 못한 이유예요. 원문을 그대로 보여 드려요.', raw: 'the settings of `c2` could not be read, so this request cannot be run', go: 'link' },
       other: { label: '다른 컴퓨터에서 만든 요청', head: '다른 컴퓨터에서 만든 요청이에요', body: '이 요청을 만든 연결의 설정이 이 컴퓨터에 없어서 여기서는 실행할 수 없어요. 이 컴퓨터에서 다시 요청해 주세요.', go: 'again', againLabel: '이 컴퓨터에서 다시 요청' },
       newer: { label: '더 새로운 앱이 만듦', head: '더 새로운 버전의 앱이 만든 요청이에요', body: '이 앱이 모르는 방식으로 만든 요청이에요. 그 앱으로 실행하거나, 이 앱에서 다시 요청해 주세요.', go: 'again', againLabel: '이 앱에서 다시 요청' },
+      // Not a fault: the connection is working on another request and takes one at a time (its
+      // places, `read_queue`). It frees by itself, so nothing is asked of the person, the banner is
+      // not amber, and the only thing offered is to ask again through another connection.
+      next: { label: '다음 차례', queue: true, via: '사무실 서버', head: '「사무실 서버」가 다른 요청을 처리하고 있어요', body: '이 요청이 다음 차례예요. 앞의 요청이 끝나면 저절로 시작해요. 할 일은 없어요. 기다리고 싶지 않으면 다른 연결로 다시 요청할 수 있어요.', go: 'wait' },
+      queue: { label: '앞에 3개', queue: true, via: '사무실 서버', head: '「사무실 서버」가 다른 요청을 처리하고 있어요. 이 요청 앞에 3개가 더 있어요', body: '이 연결은 한 번에 요청 하나씩 처리해서, 만든 순서대로 기다려요. 앞의 요청이 차례로 끝나면 시작해요. 할 일은 없어요. 기다리고 싶지 않으면 다른 연결로 다시 요청할 수 있어요.', go: 'wait' },
     };
   }
 
   renderVals() {
     const { r, again, pick, asked, confirm, ended } = this.state;
     const R = this.reasons();
-    const order = ['login', 'missing', 'mute', 'unusable', 'unverified', 'key', 'model', 'gone', 'author', 'other', 'newer', 'nobody', 'unlisted'];
+    const order = ['login', 'missing', 'mute', 'unusable', 'unverified', 'key', 'model', 'gone', 'author', 'other', 'newer', 'next', 'queue', 'nobody', 'unlisted'];
     const cur = R[r];
+    const behind = !!cur.queue;
     const warns = [null, 'Codex를 찾지 못했어요. 연결되면 바로 시작하고, 그때까지 기다려요.', null];
     const vals = {
       head: cur.head, body: cur.body,
+      attnHide: behind ? 'hide' : '', queueHide: behind ? '' : 'hide',
+      via: cur.via || 'Claude Code',
       rawHide: cur.raw ? '' : 'hide', raw: cur.raw || '',
       linkHide: cur.go === 'link' ? '' : 'hide',
       againPriHide: cur.go === 'again' ? '' : 'hide',
-      againSecHide: cur.go === 'link' ? '' : 'hide',
+      againSecHide: cur.go === 'link' || cur.go === 'wait' ? '' : 'hide',
       againLabel: cur.againLabel || '',
       liveHide: ended ? 'hide' : '', endedHide: ended ? '' : 'hide',
       openAgain: () => this.setState({ again: true, asked: false, confirm: false }),
@@ -141,8 +158,9 @@ class Component extends DCLogic {
       o1c: pick === 0 ? 'sel' : '', o2c: pick === 1 ? 'sel' : '', o3c: pick === 2 ? 'sel' : '',
       o1: () => this.setState({ pick: 0 }), o2: () => this.setState({ pick: 1 }), o3: () => this.setState({ pick: 2 }),
       o1s: r === 'login' || r === 'missing' || r === 'mute' || r === 'unusable' ? '로그인 필요' : '연결됨',
-      warnHide: pick === 1 || (pick === 0 && (r === 'login' || r === 'missing' || r === 'mute' || r === 'unusable')) ? '' : 'hide',
-      warn: pick === 1 ? warns[1] : 'Claude Code가 아직 준비되지 않았어요. 준비되면 바로 시작하고, 그때까지 기다려요.',
+      o3s: behind ? '다른 요청 처리 중' : '연결됨',
+      warnHide: pick === 1 || (pick === 2 && behind) || (pick === 0 && (r === 'login' || r === 'missing' || r === 'mute' || r === 'unusable')) ? '' : 'hide',
+      warn: pick === 1 ? warns[1] : pick === 2 ? '이 연결은 지금 다른 요청을 처리하고 있어요. 새 요청도 같은 차례로 줄을 서요.' : 'Claude Code가 아직 준비되지 않았어요. 준비되면 바로 시작하고, 그때까지 기다려요.',
       ask: () => this.setState({ again: false, asked: true }),
       askedHide: asked ? '' : 'hide',
       askCancel: () => this.setState({ confirm: true }),

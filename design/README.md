@@ -314,12 +314,27 @@ Read in `core/src/directory.rs`, `runner.rs` and `sce/sce-specs/src` (`store/req
   and no path was found that cancels it.
 - **A reason is an English sentence, not a code.** The executor keeps it as text ("in that executor's
   words"), the UI puts it into a sentence, and `Waiting` maps the ones this application writes to plain
-  Korean: thirteen cases, including a chosen program that is gone, a missing authoring tool, and
-  nobody to take the request. A sentence it does not know is shown in its own words and said to be
-  so (the last case). A real build needs either codes in the application or a table of its sentences
-  in the UI; matching text is fragile, and this is a decision for that work and not the design.
+  Korean: fifteen cases, including a chosen program that is gone, a missing authoring tool, nobody
+  to take the request, and two for waiting behind another request. A sentence it does not know is
+  shown in its own words and said to be so (the last case). A real build needs either codes in the
+  application or a table of its sentences in the UI; matching text is fragile, and this is a decision
+  for that work and not the design.
 - **A reason is known only while a runner is alive.** The UI counts a runner that stopped reporting
-  as absent, so a request can wait with no reason at all (the `받을 AI 없음` case).
+  as absent, so a request can wait with no reason at all (the `받을 AI 없음` case). The exception is
+  waiting behind another request of the same connection (`다음 차례`, `앞에 3개`): that is not a
+  sentence a runner says but a record read from the store (`read_queue`: the connection, how many
+  of its places are running, how many are ahead), so it is known with no runner alive and is put into
+  words by the screen.
+- **Waiting behind another request is not amber.** Amber is what waits for the owner (the five
+  states above), and this frees by itself when the request ahead ends, so the banner is the neutral
+  accent, its title says `차례를 기다리고 있어요` and not `AI를 기다리고 있어요`, and it offers no
+  `연결 확인`: the one thing to do is to ask again through another connection, which replaces the
+  request (nothing is lost, it has not started). Asking again for the same busy connection says
+  the new request waits in the same line. A connection takes one request at a time unless its
+  places say more, so the line is in the order the requests were made.
+- **The list does not draw this state yet.** A row for a request behind another is still the amber
+  `연결을 기다리는 중`; it needs its own neutral state (a sixth, `차례를 기다리는 중`) in `Library`,
+  its sort and its search, which is left to be decided with the rows.
 - A request made in the application for no connection is not run at all (`unchosen`), which is why
   the import choice exists.
 - A review of a conversion that is long enough to need its own navigation.
