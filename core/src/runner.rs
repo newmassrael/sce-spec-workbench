@@ -36,6 +36,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sce_specs::commands::complete_generation;
+use sce_specs::journal::{is_code, Event, CODES_MAX};
 use sce_specs::requests::{Failure, FailureKind, State};
 use sce_specs::{
     AdapterReport, Answers, CandidateWrite, Clock, CommandError, ConnectionId, ConnectionRef,
@@ -88,6 +89,46 @@ pub struct Job {
     /// The owner asked for every requirement of the list to be issued a new id (ADR 0012): the
     /// list is built with `fresh`, and one that carries an id is refused before it is published.
     pub fresh_ids: bool,
+    /// Where the run says what it does. A generator that reports tells it here, and one that does
+    /// not leaves it empty: the screen then says the connection does not report, which is not the
+    /// same as a run that did nothing.
+    pub progress: Progress,
+}
+
+/// Where a run says what it does, as events the store keeps beside the request (`journal`).
+///
+/// It is a way to say something and never a way to fail: an event that cannot be kept (the folder
+/// did not answer, the journal holds the most it keeps) is not the run's trouble, and a run that
+/// stopped for it would be failing for a thing nobody asked it to do. Cloned freely.
+#[derive(Clone, Default)]
+pub struct Progress(Option<Arc<dyn Fn(Event) + Send + Sync>>);
+
+impl Progress {
+    /// A run that says nothing.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// A run that tells `sink` each event.
+    pub fn to(sink: impl Fn(Event) + Send + Sync + 'static) -> Self {
+        Progress(Some(Arc::new(sink)))
+    }
+
+    pub fn say(&self, event: Event) {
+        if let Some(sink) = &self.0 {
+            sink(event);
+        }
+    }
+}
+
+impl std::fmt::Debug for Progress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "Progress(reporting)"
+        } else {
+            "Progress(none)"
+        })
+    }
 }
 
 /// The model and the requirement list a spec had before the request.
@@ -394,7 +435,7 @@ pub struct Runner<C: Clock, G> {
 
 impl<C, G> Runner<C, G>
 where
-    C: Clock + Send + Sync,
+    C: Clock + Send + Sync + 'static,
     G: Generator + 'static,
 {
     pub fn new(
@@ -676,7 +717,8 @@ where
         // What the last draft that was not accepted was not accepted for, as the failure the
         // request ends with if no later one is.
         let mut last_failure = Failure::of(FailureKind::Model);
-        for _ in 0..=self.config.repairs {
+        for tried in 1..=self.config.repairs + 1 {
+            job.progress.say(Event::TryBegun { n: tried });
             let draft = match generator.generate(&job, cancel) {
                 Ok(draft) => draft,
                 Err(GenerateError::Failed(trouble)) => {
@@ -739,6 +781,9 @@ where
                     if refused.kind == "check-refused"
                         || refused.kind == "fresh-ids-not-issued" =>
                 {
+                    job.progress.say(Event::DraftRefused {
+                        codes: codes_in(&refused),
+                    });
                     last_refusal = refusal_text(&refused);
                     last_failure = Failure::of(FailureKind::Model).because(cause::CHECKS_REFUSED);
                     job.refusal = Some(last_refusal.clone());
@@ -830,6 +875,18 @@ where
             previous,
             refusal: None,
             fresh_ids: view.request.fresh_ids,
+            progress: self.progress_for(spec, request, attempt),
+        })
+    }
+
+    /// Where the run of this attempt says what it does: the journal of the request, as the executor
+    /// that holds it. What cannot be kept is let go (see [`Progress`]).
+    fn progress_for(&self, spec: &SpecId, request: &str, attempt: u32) -> Progress {
+        let store = Arc::clone(&self.store);
+        let (spec, request) = (spec.clone(), request.to_string());
+        let holder = self.config.name.clone();
+        Progress::to(move |event| {
+            let _ = store.record_event(&spec, &request, &holder, attempt, event);
         })
     }
 
@@ -902,6 +959,24 @@ fn report_adapter<C: Clock, G: Generator + ?Sized>(
             version: version.as_deref(),
         })
         .map(|_| ())
+}
+
+/// The codes of the records the core refused a draft with, in the order the product wrote them: at
+/// most [`CODES_MAX`], each only if it is the shape of a code, so that a record the journal would
+/// refuse is not what stops the others being kept.
+fn codes_in(refused: &CommandError) -> Vec<String> {
+    refused.detail["records"]
+        .as_array()
+        .map(|records| {
+            records
+                .iter()
+                .filter_map(|record| record["code"].as_str())
+                .filter(|code| is_code(code))
+                .map(str::to_string)
+                .take(CODES_MAX)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// What the core said of a draft it refused, in the words an executor can write again from:

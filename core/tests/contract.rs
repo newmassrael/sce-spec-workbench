@@ -770,6 +770,31 @@ fn replies() -> Value {
             json!({"id": id, "request": failed_id, "holder": "adapter-a", "attempt": 1}),
         ),
     );
+    // What the run of that request did, said by its executor one event at a time and read back
+    // added up: a try, two turns, a check that refused with codes, a message that was not a design.
+    for event in [
+        json!({"kind": "try-begun", "n": 1}),
+        json!({"kind": "turn-asked", "turn": 0}),
+        json!({"kind": "tool-ran", "tool": "validate_scxml_set", "verdict": "refused",
+               "codes": ["validation/invalid-reference", "scxml/unreachable-state"]}),
+        json!({"kind": "turn-asked", "turn": 1}),
+        json!({"kind": "not-the-draft", "cause": "output-limit"}),
+    ] {
+        let said = answer(
+            &store,
+            "record_request_event",
+            json!({"id": id, "request": failed_id, "holder": "adapter-a", "attempt": 1, "event": event}),
+        );
+        answers.insert("record_request_event".into(), said);
+    }
+    answers.insert(
+        "read_request_journal".into(),
+        answer(
+            &store,
+            "read_request_journal",
+            json!({"id": id, "request": failed_id}),
+        ),
+    );
     answers.insert(
         "fail_request".into(),
         answer(

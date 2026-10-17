@@ -233,6 +233,15 @@ const en = {
     "The AI could not write the model, and did not say what kind of problem it was.",
   failureActionsHeading: "What you can do",
   failureWordsHeading: "What was said",
+  progressTurns: "Turns: {turns}",
+  progressChecks: "Checks: {checks} (refused {refused})",
+  progressMinutes: "{minutes} min",
+  progressTries: "Tries: {tries}",
+  progressHandovers: "Conversation begun again: {n}",
+  progressNotDrafts: "Messages that were not a design: {n}",
+  progressSilent:
+    "This run has not said what it does, and may not be able to: not every connection reports its turns and checks.",
+  progressDetails: "What the last refusal named",
   causeCheckerUnavailable:
     "The program that checks a design is missing or crashed, so nothing about the design was judged.",
   causeAuthoringServer:
@@ -698,6 +707,15 @@ const ko: Record<Key, string> = {
   failureUnclassified: "AI가 모델을 작성하지 못했고, 어떤 종류의 문제인지 말하지 않았습니다.",
   failureActionsHeading: "할 수 있는 일",
   failureWordsHeading: "받은 말",
+  progressTurns: "턴: {turns}",
+  progressChecks: "검사: {checks} (거절 {refused})",
+  progressMinutes: "{minutes}분",
+  progressTries: "시도: {tries}",
+  progressHandovers: "대화를 다시 시작한 횟수: {n}",
+  progressNotDrafts: "설계가 아니었던 메시지: {n}",
+  progressSilent:
+    "이 실행은 무엇을 하는지 알려 주지 않았고, 알릴 수 없을 수도 있습니다: 모든 연결이 턴과 검사를 알리는 것은 아닙니다.",
+  progressDetails: "마지막 거절이 가리킨 것",
   causeCheckerUnavailable:
     "설계를 검사하는 프로그램이 없거나 멈췄기 때문에 설계에 대해서는 아무것도 판정하지 못했습니다.",
   causeAuthoringServer: "AI에게 도구를 주는 이 앱의 부분을 시작하지 못했거나 멈췄습니다.",

@@ -25,6 +25,7 @@ import {
   parseReadConnection,
   parseReadRevisionReport,
   parseRegisteredRequest,
+  parseRequestJournal,
   parseRequestList,
   parseRequestReply,
   parseReadAnswers,
@@ -58,6 +59,7 @@ import {
   type Queue,
   type ReadRevisionReport,
   type RegisteredRequest,
+  type RequestJournal,
   type Review,
   type Revision,
   type Saved,
@@ -169,6 +171,8 @@ export interface Api {
   ): Promise<RegisteredRequest>;
   /** One request of the spec, as the clock reads it now. */
   readRequest(id: string, request: string): Promise<GenerationRequest>;
+  /** What the run of the request did, added up by the core, for a request that ended as for one that runs. */
+  readRequestJournal(id: string, request: string): Promise<RequestJournal>;
   /** The spec's requests, the newest first. */
   listRequests(id: string): Promise<GenerationRequest[]>;
   /** Call the request off. Whoever holds it is told at its next word. */
@@ -351,6 +355,9 @@ export function apiOver(transport: Transport): Api {
     },
     async readRequest(id, request) {
       return parseRequestReply(await transport.call("read_request", { id, request }));
+    },
+    async readRequestJournal(id, request) {
+      return parseRequestJournal(await transport.call("read_request_journal", { id, request }));
     },
     async listRequests(id) {
       return parseRequestList(await transport.call("list_requests", { id }));

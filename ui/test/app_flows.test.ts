@@ -28,6 +28,35 @@ interface Revision {
   text: string;
 }
 
+/** What a run did, added up as the core adds it. */
+interface FakeProgress {
+  entries: number;
+  tries: number;
+  turns: number;
+  checks: number;
+  refused: number;
+  drafts_refused: number;
+  not_drafts: number;
+  handovers: number;
+  last_refusal: string[];
+  started_at: string | null;
+  last_at: string | null;
+}
+
+const NO_PROGRESS: FakeProgress = {
+  entries: 0,
+  tries: 0,
+  turns: 0,
+  checks: 0,
+  refused: 0,
+  drafts_refused: 0,
+  not_drafts: 0,
+  handovers: 0,
+  last_refusal: [],
+  started_at: null,
+  last_at: null,
+};
+
 /** A request as the fake core keeps it. */
 interface FakeRequest {
   id: string;
@@ -86,6 +115,7 @@ class FakeCore implements Transport {
   private listSaves = 0;
   private acceptSaves = 0;
   private readonly requestsOf = new Map<string, FakeRequest[]>();
+  private readonly journals = new Map<string, { progress: FakeProgress; now: string }>();
   /** Every model a spec had, newest last, and each by its revision: what `model_history` and a review of an earlier one read. */
   private readonly modelHistoryOf = new Map<string, string[]>();
   private readonly modelsByRevision = new Map<
@@ -202,6 +232,19 @@ class FakeCore implements Transport {
     if (request === undefined) throw new Error(`${id} has no request`);
     request.state = "interrupted";
   }
+
+  /**
+   * What the run of the spec's latest request did, as the core adds it up, and the moment the core
+   * reads its clock at. Anything not said is nothing.
+   */
+  sayRun(id: string, said: Partial<FakeProgress> = {}, now = "2026-10-17T10:30:00Z"): void {
+    const request = this.latestRequest(id);
+    if (request === undefined) throw new Error(`${id} has no request`);
+    this.journals.set(request.id, { progress: { ...NO_PROGRESS, ...said }, now });
+  }
+
+  /** How many times the screen asked what a run did. */
+  journalReads = 0;
 
   /** The executor could not, and says why. */
   failRequest(id: string, note: string, failure: { kind: string; cause: string | null } | null = null): void {
@@ -541,6 +584,19 @@ class FakeCore implements Transport {
         const found = this.requestsOf.get(id)?.find((r) => r.id === args["request"]);
         if (found === undefined) throw new CommandFailure("not-found", "no such request");
         return { request: this.requestJson(id, found) };
+      }
+      case "read_request_journal": {
+        this.journalReads += 1;
+        const id = String(args["id"]);
+        const found = this.requestsOf.get(id)?.find((r) => r.id === args["request"]);
+        if (found === undefined) throw new CommandFailure("not-found", "no such request");
+        const said = this.journals.get(found.id);
+        return {
+          progress: said?.progress ?? NO_PROGRESS,
+          tail: [],
+          full: false,
+          now: said?.now ?? "2026-10-17T10:30:00Z",
+        };
       }
       case "cancel_request": {
         const id = String(args["id"]);
@@ -3648,6 +3704,78 @@ describe("asking for a model", () => {
     expect(root.querySelector("#generation-failure")?.getAttribute("data-kind")).toBe("unclassified");
     expect(root.querySelector("#generation-failure-cause")).toBeNull();
     expect(root.querySelector("#generation-failure-words")?.textContent).toContain("an old failure");
+  });
+
+  it("says what a run has done so far while it runs, from the journal the core keeps", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    core.sayRun("alpha", {
+      entries: 9,
+      tries: 1,
+      turns: 4,
+      checks: 3,
+      refused: 2,
+      last_refusal: ["validation/invalid-reference", "scxml/dead-transition"],
+      started_at: "2026-10-17T10:00:00Z",
+      last_at: "2026-10-17T10:29:00Z",
+    });
+    await ticker.fire();
+
+    expect(root.querySelector("#generation-progress-line")?.textContent).toBe(
+      "Turns: 4 · Checks: 3 (refused 2) · 30 min",
+    );
+    const details = root.querySelector<HTMLDetailsElement>("#generation-progress-details");
+    expect(details?.open).toBe(false);
+    expect(details?.textContent).toContain("validation/invalid-reference");
+    expect(details?.textContent).toContain("scxml/dead-transition");
+  });
+
+  it("reads the journal of a run that is going on again, and of one that ended once more and no more", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    core.sayRun("alpha", { entries: 2, tries: 1, turns: 1, started_at: "2026-10-17T10:00:00Z" });
+    await ticker.fire();
+    const whileRunning = core.journalReads;
+    await ticker.fire();
+    // A run is read on every question: its minutes and its counts move with no state moving.
+    expect(core.journalReads).toBeGreaterThan(whileRunning);
+
+    core.sayRun("alpha", { entries: 6, tries: 1, turns: 3, checks: 2, refused: 1, started_at: "2026-10-17T10:00:00Z", last_at: "2026-10-17T10:20:00Z" });
+    core.failRequest("alpha", "no", { kind: "model", cause: "output-limit" });
+    await ticker.fire();
+    expect(root.querySelector("#generation-progress-line")?.textContent).toContain("Turns: 3");
+    const read = core.journalReads;
+    await ticker.fire();
+    await ticker.fire();
+
+    // What a run that ended did does not change: it is not asked about again.
+    expect(core.journalReads).toBe(read);
+  });
+
+  it("says a run that has said nothing may be on a connection that does not report, and says nothing before that", async () => {
+    await click("Alpha");
+    await press("generate");
+    core.takeRequest("alpha");
+    core.sayRun("alpha", { entries: 1, tries: 1, started_at: "2026-10-17T10:29:40Z", last_at: "2026-10-17T10:29:40Z" });
+    await ticker.fire();
+    expect(root.querySelector("#generation-progress")).toBeNull();
+
+    core.sayRun("alpha", { entries: 1, tries: 1, started_at: "2026-10-17T10:00:00Z", last_at: "2026-10-17T10:00:00Z" });
+    await ticker.fire();
+
+    expect(root.querySelector("#generation-progress")?.textContent).toContain("not every connection reports");
+    expect(root.querySelector("#generation-progress-line")).toBeNull();
+  });
+
+  it("does not read the journal of a request nobody has taken", async () => {
+    await click("Alpha");
+    await press("generate");
+    await ticker.fire();
+
+    expect(core.journalReads).toBe(0);
+    expect(root.querySelector("#generation-progress")).toBeNull();
   });
 
   it("offers to replace a request that was let go of, and asks for the replacement as one", async () => {

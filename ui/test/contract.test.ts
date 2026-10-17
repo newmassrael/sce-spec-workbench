@@ -34,6 +34,8 @@ import {
   parseQueue,
   parseRequestCandidateTexts,
   parseRegisteredRequest,
+  parseRecordedEvent,
+  parseRequestJournal,
   parseRequestList,
   parseRequestReply,
   parseFigures,
@@ -110,6 +112,8 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   complete_request: parseCompletedRequest,
   fail_request: parseRequestReply,
   cancel_request: parseRequestReply,
+  record_request_event: parseRecordedEvent,
+  read_request_journal: parseRequestJournal,
   report_adapter: parseAdapterReport,
   read_adapter_status: parseAdapterListing,
   read_host_status: parseHostListing,
@@ -419,7 +423,11 @@ describe("the replies the core gives", () => {
     expect(parseRequestReply(replies.answers["fail_request"])).toMatchObject({
       state: "failed",
       note: "SCE refused the model",
+      failure: { kind: "model", cause: "checks-refused" },
     });
+    // A request that did not fail says no failure, and one that failed says which kind.
+    expect(parseRequestReply(replies.answers["cancel_request"]).failure).toBeNull();
+    expect(parseRequestReply(replies.answers["claim_request"]).failure).toBeNull();
     expect(parseRequestReply(replies.answers["cancel_request"]).state).toBe("cancelled");
     // What an executor looks at to find spec: the requests that can still produce a result.
     const open = parseRequestList(replies.answers["list_open_requests"]);
@@ -428,6 +436,51 @@ describe("the replies the core gives", () => {
     const listed = parseRequestList(replies.answers["list_requests"]);
     expect(listed.map((r) => r.seq)).toEqual([...listed.map((r) => r.seq)].sort((a, b) => b - a));
     expect(listed.filter((r) => isOpenRequest(r.state))).toHaveLength(0);
+  });
+
+  it("add up what the run of a request did, and keep its latest events as they were said", () => {
+    expect(replies.answers["record_request_event"]).toEqual({ entries: 5 });
+    const journal = parseRequestJournal(replies.answers["read_request_journal"]);
+
+    expect(journal.progress).toMatchObject({
+      entries: 5,
+      tries: 1,
+      turns: 2,
+      checks: 1,
+      refused: 1,
+      drafts_refused: 0,
+      not_drafts: 1,
+      handovers: 0,
+      last_refusal: ["validation/invalid-reference", "scxml/unreachable-state"],
+    });
+    expect(journal.full).toBe(false);
+    expect(journal.now).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(journal.tail.map((entry) => entry.event.kind)).toEqual([
+      "try-begun",
+      "turn-asked",
+      "tool-ran",
+      "turn-asked",
+      "not-the-draft",
+    ]);
+    expect(journal.tail[4]?.event["cause"]).toBe("output-limit");
+  });
+
+  it("refuse a journal that is not what the core says, and keep an event of a kind it does not know", () => {
+    const said = replies.answers["read_request_journal"] as Record<string, unknown>;
+    const progress = said["progress"] as Record<string, unknown>;
+
+    expect(() => parseRequestJournal({ ...said, progress: { ...progress, turns: -1 } })).toThrow(ContractError);
+    expect(() => parseRequestJournal({ ...said, progress: { ...progress, last_refusal: "a/b" } })).toThrow(
+      ContractError,
+    );
+    expect(() => parseRequestJournal({ ...said, tail: "none" })).toThrow(ContractError);
+    expect(() => parseRequestJournal({ ...said, now: 3 })).toThrow(ContractError);
+    // A kind a later core adds is read as it is said, and not refused: this screen shows counts.
+    const later = parseRequestJournal({
+      ...said,
+      tail: [{ at: "2026-10-17T10:00:00Z", event: { kind: "something-new", n: 1 } }],
+    });
+    expect(later.tail[0]?.event).toEqual({ kind: "something-new", n: 1 });
   });
 
   it("say whether a shell hosts an executor and, when it does not, why", () => {

@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 27;
+export const SUPPORTED_COMMAND_SET_VERSION = 28;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -1495,6 +1495,92 @@ function parseRequestCandidate(value: unknown, where: string): RequestCandidate 
     requirements: nullableRevision(r["requirements"], `${where}.requirements`),
     instructions: nullableText(r, "instructions", where),
   };
+}
+
+/**
+ * What a run did, added up by the core (`read_request_journal`). The counts are the core's and are
+ * not recomputed here: every screen that reads a run reads the same ones.
+ */
+export interface RunProgress {
+  readonly entries: number;
+  /** Times the generator was called for this attempt. */
+  readonly tries: number;
+  /** Times the model was asked, over every try. */
+  readonly turns: number;
+  /** Times a tool that judges a design said accepted or refused, and of those, how many refused. */
+  readonly checks: number;
+  readonly refused: number;
+  readonly drafts_refused: number;
+  readonly not_drafts: number;
+  readonly handovers: number;
+  /** The codes of the latest refusal, by a check or by the core; none before any. */
+  readonly last_refusal: readonly string[];
+  /** When the first and the latest event were written (RFC 3339), `null` for a run that said nothing. */
+  readonly started_at: string | null;
+  readonly last_at: string | null;
+}
+
+/** One event of a run, as the core keeps it: its moment, and the shape it has (`kind`, and what that kind carries). */
+export interface JournalEntry {
+  readonly at: string;
+  readonly event: { readonly kind: string } & Readonly<Record<string, unknown>>;
+}
+
+/** A request's journal as it is read: what it adds up to, its latest events, and the moment the core read the clock at. */
+export interface RequestJournal {
+  readonly progress: RunProgress;
+  readonly tail: readonly JournalEntry[];
+  /** The journal holds the most events it keeps and keeps no more. */
+  readonly full: boolean;
+  /** The core's moment, so that a run that is going on is measured by the clock that wrote its events. */
+  readonly now: string;
+}
+
+function parseRunProgress(value: unknown, where: string): RunProgress {
+  const r = record(value, where);
+  return {
+    entries: count(r, "entries", where),
+    tries: count(r, "tries", where),
+    turns: count(r, "turns", where),
+    checks: count(r, "checks", where),
+    refused: count(r, "refused", where),
+    drafts_refused: count(r, "drafts_refused", where),
+    not_drafts: count(r, "not_drafts", where),
+    handovers: count(r, "handovers", where),
+    last_refusal: stringList(r, "last_refusal", where),
+    started_at: nullableText(r, "started_at", where),
+    last_at: nullableText(r, "last_at", where),
+  };
+}
+
+/** `read_request_journal`. An event of a kind a later core adds is kept as it is said, not refused. */
+export function parseRequestJournal(value: unknown): RequestJournal {
+  const where = "read_request_journal";
+  const r = record(value, where);
+  const tail = r["tail"];
+  if (!Array.isArray(tail)) throw new ContractError(`${where}.tail`, "a list");
+  return {
+    progress: parseRunProgress(r["progress"], `${where}.progress`),
+    tail: tail.map((entry, at) => {
+      const e = record(entry, `${where}.tail[${at}]`);
+      const event = record(e["event"], `${where}.tail[${at}].event`);
+      return {
+        at: text(e, "at", `${where}.tail[${at}]`),
+        event: { ...event, kind: text(event, "kind", `${where}.tail[${at}].event`) },
+      };
+    }),
+    full: optionalFlag(r, "full", where),
+    now: text(r, "now", where),
+  };
+}
+
+/**
+ * `record_request_event`: how many events the journal holds. An executor says it and the screen
+ * never does, but the answer is guarded like every other, so that an executor of another shell
+ * reads the same shape.
+ */
+export function parseRecordedEvent(value: unknown): { readonly entries: number } {
+  return { entries: count(record(value, "record_request_event"), "entries", "record_request_event") };
 }
 
 /** `read_request`, `claim_request`, `heartbeat_request`, `save_request_candidate`, `fail_request`, `cancel_request`: the request. */

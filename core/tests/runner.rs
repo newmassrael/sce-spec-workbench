@@ -491,6 +491,36 @@ fn a_model_the_core_keeps_refusing_fails_the_request_after_the_repairs_with_what
         Some(expected)
     );
     assert!(f.store.read_model(&f.id, None).unwrap().is_none());
+    // The runner says what it did, and the journal is still there after the request failed: two
+    // tries of the generator, and the core refused the draft of each.
+    let journal = f.store.read_journal(&f.id, &request).unwrap();
+    assert_eq!(journal.progress.tries, 2);
+    assert_eq!(journal.progress.drafts_refused, 2);
+    assert!(
+        journal
+            .progress
+            .last_refusal
+            .contains(&"validation/invalid-reference".to_string()),
+        "{:?}",
+        journal.progress.last_refusal
+    );
+}
+
+#[test]
+fn a_run_that_does_not_say_what_it_does_leaves_a_journal_of_the_tries_alone() {
+    let f = fixture("runner-journal-tries");
+    let request = f.ask("press-1");
+    let generator = Scripted::new(|_, _, _| Ok(draft("one")));
+    let runner = f.runner(&generator, f.config());
+
+    let outcome = runner.run_once().unwrap();
+
+    assert!(matches!(outcome, Outcome::Completed { .. }), "{outcome:?}");
+    // The generator said nothing, and the runner said the one thing it knows: a try began.
+    let journal = f.store.read_journal(&f.id, &request).unwrap();
+    assert_eq!(journal.progress.tries, 1);
+    assert_eq!(journal.progress.turns, 0);
+    assert_eq!(journal.progress.checks, 0);
 }
 
 #[test]

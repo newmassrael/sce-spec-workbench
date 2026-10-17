@@ -68,6 +68,7 @@ import {
   type Queue,
   type Refusal,
   type RequestHead,
+  type RequestJournal,
   type RequirementOutcome,
   type RequirementsReport,
   type SourceText,
@@ -92,6 +93,7 @@ import {
   type EditorModel,
 } from "./editor_model";
 import { adviceFor } from "./failure_view";
+import { journalKey, runWords } from "./progress_view";
 import { findQuote, groundOf, linesNaming, quotesOf, statesOf } from "./grounding_model";
 import {
   connectedNames,
@@ -266,6 +268,13 @@ export class App {
   /** Where the spec's latest request stands, as the core last said, and what was read of it. */
   private requestHead: RequestHead | null = null;
   private requestDetail: GenerationRequest | null = null;
+  /** What the run of the latest request did, as the core last said, and which request that was of. */
+  private journal: {
+    readonly request: string;
+    readonly read: RequestJournal;
+    /** Read after the request stopped running: what its run did does not change any more. */
+    readonly final: boolean;
+  } | null = null;
   /** Which AI adapters are there, and whether the shells host one and why not, as last read. */
   private adapters: AdapterListing | null = null;
   private hosts: HostListing | null = null;
@@ -412,6 +421,7 @@ export class App {
       this.revision = null;
       this.requestHead = null;
       this.requestDetail = null;
+      this.journal = null;
       this.requestBusy = null;
       this.requestNotice = null;
       this.offerReplace = false;
@@ -472,6 +482,8 @@ export class App {
         }
       }
     }
+    if (await this.noteJournal(id, session, head)) changed = true;
+    if (session !== this.session) return;
     try {
       const listing = await this.api.readAdapterStatus();
       if (session !== this.session) return;
@@ -502,6 +514,45 @@ export class App {
     if (await this.noteBundle(id, session, heads.bundle)) changed = true;
     if (session !== this.session) return;
     if (changed) this.render();
+  }
+
+  /**
+   * What the run of the latest request did. A run that is going on is read on every question, as
+   * its counts and its minutes move without the request's state moving (an event is not a change
+   * of state, and the core does not move the heads for one); a request that ended is read once,
+   * because what its run did does not change any more. Answers whether what is drawn changed.
+   */
+  private async noteJournal(id: string, session: number, head: RequestHead | null): Promise<boolean> {
+    if (head === null) {
+      const had = this.journal !== null;
+      this.journal = null;
+      return had;
+    }
+    const running = head.state === "running";
+    const held = this.journal;
+    if (!running && held !== null && held.request === head.id && held.final) return false;
+    // A request that never ran has nothing to read; the journal of one that is only waiting is empty.
+    if (head.state === "queued") {
+      const had = this.journal !== null;
+      this.journal = null;
+      return had;
+    }
+    try {
+      const read = await this.api.readRequestJournal(id, head.id);
+      if (session !== this.session) return false;
+      const before = held === null ? "none" : `${held.request}:${journalKey(held.read, this.statusNow())}`;
+      this.journal = { request: head.id, read, final: !running };
+      return before !== `${head.id}:${journalKey(read, this.statusNow())}`;
+    } catch (error) {
+      if (session !== this.session) return false;
+      this.askForToken(error);
+      return false;
+    }
+  }
+
+  /** Where the latest request stands, as the screen reads it now. */
+  private statusNow(): Status {
+    return statusOf(this.requestHead, this.requestDetail, this.adapters, this.hosts, this.queue);
   }
 
   /**
@@ -2047,6 +2098,7 @@ export class App {
         { id: "generation-status", class: "status", role: "status", "aria-live": "polite" },
         busyWords ?? this.generationWords(status, modelHere),
       ),
+      this.progressBlock(status),
       status.kind === "failed" ? this.failureBlock(status) : null,
       this.ai === null ? null : h("p", { id: "generation-target", class: "muted" }, this.ai.targetLine()),
       controls.canGenerate ? this.freshIdsOption() : null,
@@ -2098,6 +2150,36 @@ export class App {
       case "completed":
         return this.t("generationCompleted");
     }
+  }
+
+  /**
+   * What the run did, from the journal the core keeps of it: counts of what happened and the
+   * minutes the core measured, and what the latest refusal named behind a control. A run that
+   * has said nothing is told apart from one that did nothing: not every connection reports.
+   */
+  private progressBlock(status: Status): HTMLElement | null {
+    const held = this.journal;
+    const words =
+      held !== null && held.request === this.requestHead?.id ? runWords(held.read, status) : null;
+    if (words === null) return null;
+    if (words.silent) return h("p", { id: "generation-progress", class: "muted" }, this.t("progressSilent"));
+    return h(
+      "div",
+      { id: "generation-progress", class: "muted" },
+      h(
+        "p",
+        { id: "generation-progress-line" },
+        words.parts.map((part) => this.t(part.key, part.values)).join(" · "),
+      ),
+      words.codes.length === 0
+        ? null
+        : h(
+            "details",
+            { id: "generation-progress-details" },
+            h("summary", {}, this.t("progressDetails")),
+            h("ul", {}, ...words.codes.map((code) => h("li", {}, code))),
+          ),
+    );
   }
 
   /**

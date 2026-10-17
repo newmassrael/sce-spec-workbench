@@ -26,7 +26,10 @@ use sce_spec_workbench_core::claude_code::AuthorServer;
 use sce_spec_workbench_core::codex::AUTHOR_TOOLS;
 use sce_spec_workbench_core::http_client::Endpoint;
 use sce_spec_workbench_core::local::{list_models, Local, LocalConfig, ModelsError, Step};
-use sce_spec_workbench_core::runner::{cause, Cancel, GenerateError, Generator, Job, Trouble};
+use sce_spec_workbench_core::runner::{
+    cause, Cancel, GenerateError, Generator, Job, Progress, Trouble,
+};
+use sce_specs::journal::{Event, ToolVerdict};
 use sce_specs::requests::{Failure, FailureKind};
 use sce_specs::{Revision, SpecId};
 use serde_json::{json, Value};
@@ -58,6 +61,7 @@ fn job() -> Job {
         previous: None,
         refusal: None,
         fresh_ids: false,
+        progress: Default::default(),
     }
 }
 
@@ -87,8 +91,12 @@ impl Rig {
     }
 
     fn run(&self) -> Result<sce_spec_workbench_core::runner::Draft, GenerateError> {
+        self.run_job(&job())
+    }
+
+    fn run_job(&self, job: &Job) -> Result<sce_spec_workbench_core::runner::Draft, GenerateError> {
         self.local(LocalConfig::for_model("qwen-test"))
-            .generate(&job(), &Cancel::new())
+            .generate(job, &Cancel::new())
     }
 }
 
@@ -668,6 +676,147 @@ fn validating(text: &str) -> Script {
         "validate_scxml_set",
         &json!({"documents_text": [{"name": "m.scxml", "text": text}]}).to_string(),
     )])
+}
+
+/// A job whose run says what it does to the list that is returned.
+fn job_that_says_what_it_does() -> (Job, Arc<Mutex<Vec<Event>>>) {
+    let said = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&said);
+    let mut job = job();
+    job.progress = Progress::to(move |event| sink.lock().unwrap().push(event));
+    (job, said)
+}
+
+#[test]
+fn a_run_says_each_turn_each_tool_and_each_message_that_was_not_the_draft() {
+    let rig = Rig::new(
+        "local-says",
+        vec![
+            validating("<scxml><!-- one --></scxml>"),
+            ended_as("", "", "length", 100),
+            says(&draft("<scxml><!-- two --></scxml>")),
+        ],
+    );
+    // What the checking tool refused: the codes it names are said, in its order, and a word that
+    // is not the shape of a code does not stop the others.
+    tool_gives(
+        &rig.folder,
+        "validate_scxml_set",
+        &json!({"verdict": "refused", "diagnostics": [
+            {"code": "validation/invalid-reference", "message": "nowhere"},
+            {"code": "Not A Code"},
+            {"code": "scxml/dead-transition"},
+            {"unparsed": "a line that is no record"},
+        ]}),
+    );
+    let (job, said) = job_that_says_what_it_does();
+
+    rig.run_job(&job).unwrap();
+
+    assert_eq!(
+        *said.lock().unwrap(),
+        vec![
+            Event::TurnAsked { turn: 0 },
+            Event::ToolRan {
+                tool: "validate_scxml_set".to_string(),
+                verdict: ToolVerdict::Refused,
+                codes: vec![
+                    "validation/invalid-reference".to_string(),
+                    "scxml/dead-transition".to_string()
+                ],
+            },
+            Event::TurnAsked { turn: 1 },
+            Event::NotTheDraft {
+                cause: Some("output-limit".to_string())
+            },
+            Event::TurnAsked { turn: 2 },
+        ]
+    );
+}
+
+#[test]
+fn a_tool_that_does_not_judge_ran_and_one_that_failed_failed_and_neither_is_a_check() {
+    let rig = Rig::new(
+        "local-says-tools",
+        vec![
+            calls(&[
+                (Some("c1"), "specs_read", "{\"spec\":\"door-lock\"}"),
+                (
+                    Some("c2"),
+                    "validate_scxml",
+                    "{\"document_text\":\"<scxml/>\"}",
+                ),
+            ]),
+            says(&draft("<scxml/>")),
+        ],
+    );
+    let (job, said) = job_that_says_what_it_does();
+
+    rig.run_job(&job).unwrap();
+
+    let said = said.lock().unwrap();
+    let tools: Vec<(&str, ToolVerdict)> = said
+        .iter()
+        .filter_map(|event| match event {
+            Event::ToolRan { tool, verdict, .. } => Some((tool.as_str(), *verdict)),
+            _ => None,
+        })
+        .collect();
+    // `specs_read` judges nothing. The stand-in's `validate_scxml` answers that it failed.
+    assert_eq!(
+        tools,
+        vec![
+            ("specs_read", ToolVerdict::Ran),
+            ("validate_scxml", ToolVerdict::Failed)
+        ]
+    );
+}
+
+#[test]
+fn a_tool_that_could_not_judge_is_said_so_before_the_run_ends() {
+    let rig = Rig::new("local-says-cannot", vec![validating("<scxml/>")]);
+    tool_cannot_judge(&rig.folder, "validate_scxml_set", "the generator crashed");
+    let (job, said) = job_that_says_what_it_does();
+
+    let ended = rig.run_job(&job).unwrap_err();
+
+    assert!(matches!(ended, GenerateError::Failed(_)), "{ended:?}");
+    let said = said.lock().unwrap();
+    assert_eq!(
+        said.last(),
+        Some(&Event::ToolRan {
+            tool: "validate_scxml_set".to_string(),
+            verdict: ToolVerdict::CannotJudge,
+            codes: Vec::new(),
+        })
+    );
+}
+
+#[test]
+fn a_conversation_begun_again_is_said_and_a_run_with_no_one_to_say_it_to_is_the_same_run() {
+    let rig = Rig::new(
+        "local-says-handover",
+        vec![
+            reporting(validating("<scxml><!-- one --></scxml>"), 900),
+            says(&draft("<scxml><!-- two --></scxml>")),
+        ],
+    );
+    let config = LocalConfig {
+        context_tokens: Some(1_000),
+        handoff_percent: 80,
+        ..LocalConfig::for_model("qwen-test")
+    };
+    let (job, said) = job_that_says_what_it_does();
+
+    rig.local(config).generate(&job, &Cancel::new()).unwrap();
+
+    assert!(
+        said.lock()
+            .unwrap()
+            .contains(&Event::HandedOver { proactive: true }),
+        "{:?}",
+        said.lock().unwrap()
+    );
 }
 
 #[test]

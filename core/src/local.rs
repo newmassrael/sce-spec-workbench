@@ -42,7 +42,8 @@ use crate::client_run::{
 };
 use crate::http_client::{self, Endpoint, HttpError, Request};
 use crate::mcp_client::{McpClient, McpError, Tool};
-use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job, Trouble};
+use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job, Progress, Trouble};
+use sce_specs::journal::{is_code, Event, ToolVerdict, CODES_MAX};
 use sce_specs::requests::FailureKind;
 
 /// The most of one answer of the server that is read.
@@ -594,6 +595,7 @@ impl Local {
     ) {
         let (standing, carried_design) = standing_of(messages, listed);
         let handoff = handoff_words(&standing);
+        job.progress.say(Event::HandedOver { proactive });
         self.trace.say(|| Step::HandedOver {
             handoff_chars: handoff.chars().count(),
             carried_design,
@@ -724,6 +726,7 @@ impl Local {
         call: &Call,
         deadline: Instant,
         cancel: &Cancel,
+        progress: &Progress,
     ) -> Result<ToolWords, GenerateError> {
         let Some(tool) = tools.iter().find(|tool| tool.name == call.name) else {
             let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_str()).collect();
@@ -756,6 +759,11 @@ impl Local {
         // run lasts (eighty minutes, on 2026-10-17, against a generator that had lost its
         // templates). The run ends, and the owner is told what to put right.
         if called.cannot_judge {
+            progress.say(Event::ToolRan {
+                tool: tool.name.clone(),
+                verdict: ToolVerdict::CannotJudge,
+                codes: Vec::new(),
+            });
             return Err(GenerateError::installation(format!(
                 "the checking tool `{}` could not judge anything, so the run was stopped: this \
                  is a fault of the installation and no change to the design puts it right. {}",
@@ -834,6 +842,7 @@ impl Generator for Local {
                 self.begin_again(job, &system, &mut messages, listed.as_ref(), true);
                 (repairs, unread, prompt_tokens) = (0, 0, None);
             }
+            job.progress.say(Event::TurnAsked { turn });
             self.trace.say(|| Step::Asked {
                 turn,
                 messages: messages.len(),
@@ -885,7 +894,13 @@ impl Generator for Local {
             if !calls.is_empty() {
                 messages.push(echo_of(&message, &calls));
                 for call in &calls {
-                    let done = self.run_tool(&mut mcp, &tools, call, deadline, cancel)?;
+                    let done =
+                        self.run_tool(&mut mcp, &tools, call, deadline, cancel, &job.progress)?;
+                    job.progress.say(Event::ToolRan {
+                        tool: call.name.clone(),
+                        verdict: verdict_of(&call.name, &done),
+                        codes: codes_of(&done.words),
+                    });
                     self.trace.say(|| Step::Tool {
                         name: call.name.clone(),
                         failed: done.failed,
@@ -913,6 +928,9 @@ impl Generator for Local {
                 Ok(draft) => return Ok(draft),
                 Err(wrong) if repairs < REPAIRS => {
                     let trouble = trouble_of(wrong, &ended, &said);
+                    job.progress.say(Event::NotTheDraft {
+                        cause: trouble.failure.cause.clone(),
+                    });
                     self.trace.say(|| Step::NotTheDraft {
                         why: trouble.words.clone(),
                     });
@@ -922,6 +940,9 @@ impl Generator for Local {
                 }
                 Err(wrong) => {
                     let trouble = trouble_of(wrong, &ended, &said);
+                    job.progress.say(Event::NotTheDraft {
+                        cause: trouble.failure.cause.clone(),
+                    });
                     self.trace.say(|| Step::NotTheDraft {
                         why: trouble.words.clone(),
                     });
@@ -958,6 +979,55 @@ struct Call {
     /// What the arguments were as the model wrote them, and the JSON they are when they are.
     raw: String,
     arguments: Result<Value, String>,
+}
+
+/// What a tool the model called came to, as the journal says it. Only a tool that judges a design
+/// (`DESIGN_TOOLS`) is said to have accepted or refused one, and that is read from the verdict in
+/// what the tool answered; any other tool ran, or failed.
+fn verdict_of(tool: &str, done: &ToolWords) -> ToolVerdict {
+    if done.failed {
+        return ToolVerdict::Failed;
+    }
+    if !DESIGN_TOOLS.contains(&tool) {
+        return ToolVerdict::Ran;
+    }
+    match first_value(&done.words)
+        .as_ref()
+        .and_then(|answer| answer["verdict"].as_str())
+    {
+        Some("accepted") => ToolVerdict::Accepted,
+        Some("refused") => ToolVerdict::Refused,
+        // A checking tool that said something else judged nothing the journal can count.
+        _ => ToolVerdict::Ran,
+    }
+}
+
+/// The codes a checking tool named as what it refused, in the order it wrote them: at most
+/// [`CODES_MAX`], and only those that are the shape of a code, so that one that is not does not
+/// stop the rest being kept.
+fn codes_of(words: &str) -> Vec<String> {
+    first_value(words)
+        .as_ref()
+        .and_then(|answer| answer["diagnostics"].as_array())
+        .map(|records| {
+            records
+                .iter()
+                .filter_map(|record| record["code"].as_str())
+                .filter(|code| is_code(code))
+                .map(str::to_string)
+                .take(CODES_MAX)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The first JSON value of what a tool said: a checking tool's answer is one object, and for an
+/// accepted set the pages of its documents follow it as text of their own.
+fn first_value(words: &str) -> Option<Value> {
+    serde_json::Deserializer::from_str(words)
+        .into_iter::<Value>()
+        .next()
+        .and_then(Result::ok)
 }
 
 /// The tool calls in a message of the model, in order.

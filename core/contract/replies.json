@@ -117,7 +117,7 @@
     },
     "describe": {
       "application_command_set_version": 2,
-      "command_set_version": 27,
+      "command_set_version": 28,
       "commands": [
         "describe",
         "list_specs",
@@ -159,6 +159,8 @@
         "read_adapter_status",
         "read_host_status",
         "read_queue",
+        "record_request_event",
+        "read_request_journal",
         "read_bundle",
         "bundle_history",
         "list_connections",
@@ -180,7 +182,7 @@
     },
     "describe_desktop": {
       "application_command_set_version": 2,
-      "command_set_version": 27,
+      "command_set_version": 28,
       "commands": [
         "describe",
         "list_specs",
@@ -222,6 +224,8 @@
         "read_adapter_status",
         "read_host_status",
         "read_queue",
+        "record_request_event",
+        "read_request_journal",
         "read_bundle",
         "bundle_history",
         "list_connections",
@@ -1792,6 +1796,68 @@
         "text": "{\n  \"format\": \"sce-requirements\",\n  \"v\": 1,\n  \"manifest\": \"{\\\"doc_id\\\":\\\"door\\\",\\\"rev\\\":\\\"2\\\",\\\"requirements\\\":[{\\\"id\\\":\\\"R1\\\"}]}\\n\",\n  \"sidecar\": null\n}\n"
       }
     },
+    "read_request_journal": {
+      "full": false,
+      "now": "2026-10-03T09:00:00Z",
+      "progress": {
+        "checks": 1,
+        "drafts_refused": 0,
+        "entries": 5,
+        "handovers": 0,
+        "last_at": "2026-10-03T09:00:00Z",
+        "last_refusal": [
+          "validation/invalid-reference",
+          "scxml/unreachable-state"
+        ],
+        "not_drafts": 1,
+        "refused": 1,
+        "started_at": "2026-10-03T09:00:00Z",
+        "tries": 1,
+        "turns": 2
+      },
+      "tail": [
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "event": {
+            "kind": "try-begun",
+            "n": 1
+          }
+        },
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "event": {
+            "kind": "turn-asked",
+            "turn": 0
+          }
+        },
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "event": {
+            "codes": [
+              "validation/invalid-reference",
+              "scxml/unreachable-state"
+            ],
+            "kind": "tool-ran",
+            "tool": "validate_scxml_set",
+            "verdict": "refused"
+          }
+        },
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "event": {
+            "kind": "turn-asked",
+            "turn": 1
+          }
+        },
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "event": {
+            "cause": "output-limit",
+            "kind": "not-the-draft"
+          }
+        }
+      ]
+    },
     "read_requirements": {
       "requirements": {
         "manifest": "{\"doc_id\":\"door\",\"rev\":\"1\",\"requirements\":[{\"id\":\"R1\"},{\"id\":\"R2\"}]}\n",
@@ -2160,6 +2226,9 @@
         "id": "<spec-id>",
         "title": "Door lock"
       }
+    },
+    "record_request_event": {
+      "entries": 5
     },
     "remove_spec": {
       "removed": {
@@ -2546,7 +2615,7 @@
     }
   },
   "application_command_set_version": 2,
-  "command_set_version": 27,
+  "command_set_version": 28,
   "refusals": {
     "active-request": {
       "detail": {
@@ -2848,7 +2917,7 @@
     },
     "unknown-command": {
       "kind": "unknown-command",
-      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, read_bundle, bundle_history, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
+      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
     },
     "wrong-connection": {
       "detail": {
