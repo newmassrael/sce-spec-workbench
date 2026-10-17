@@ -111,7 +111,8 @@ fn a_call_names_the_tool_and_gives_the_arguments_and_the_words_it_answers_are_pu
         called,
         Called {
             text: "the spec\nmore".to_string(),
-            is_error: false
+            is_error: false,
+            cannot_judge: false
         }
     );
     let sent = fs::read_to_string(folder.join("calls")).unwrap();
@@ -137,7 +138,29 @@ fn a_tool_that_says_it_failed_is_an_answer_and_not_an_error_of_the_server() {
         called,
         Called {
             text: "no such spec".to_string(),
-            is_error: true
+            is_error: true,
+            cannot_judge: false
+        }
+    );
+}
+
+#[test]
+fn a_tool_that_says_it_could_not_judge_is_told_apart_from_one_that_refused_what_it_was_sent() {
+    let (mut client, _) = started(
+        "mcp-cannot-judge",
+        "printf '{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"the generator failed\"}],\"isError\":true,\"_meta\":{\"sce.dev/cannot-judge\":true}}}\\n' \"$id\"",
+    );
+
+    let called = client
+        .call("specs_read", &json!({}), within(10), &Cancel::new())
+        .unwrap();
+
+    assert_eq!(
+        called,
+        Called {
+            text: "the generator failed".to_string(),
+            is_error: true,
+            cannot_judge: true
         }
     );
 }

@@ -236,7 +236,7 @@ pub fn authoring_server(folder: &Path, tools: &[&str]) -> AuthorServer {
                  validate_scxml) printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"content\":[{{\"type\":\"text\",\"text\":\"line 3: bad\"}}],\"isError\":true}}}}\\n' \"$id\" ;;\n\
                  scxml_unresolved) printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"content\":[]}}}}\\n' \"$id\" ;;\n\
                  scxml_requirement_set) requirement_set ;;\n\
-                 *) printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"content\":[{{\"type\":\"text\",\"text\":%s}}]}}}}\\n' \"$id\" \"$(tool_text \"$name\")\" ;;\n\
+                 *) meta=''; [ -f '{folder}'/cannot_judge.$name ] && meta=',\"isError\":true,\"_meta\":{{\"sce.dev/cannot-judge\":true}}'; printf '{{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{{\"content\":[{{\"type\":\"text\",\"text\":%s}}]%s}}}}\\n' \"$id\" \"$(tool_text \"$name\")\" \"$meta\" ;;\n\
                esac ;;\n\
            esac\n\
          done\n",
@@ -271,6 +271,13 @@ pub fn requirement_set_gives_at(folder: &Path, n: u32, answer: &Value, fails: bo
 /// `answer`, in place of `ok:` and its name.
 pub fn tool_gives(folder: &Path, name: &str, answer: &Value) {
     put_answer(folder, &format!("answer.{name}.json"), answer);
+}
+
+/// From now on the stand-in's tool `name` says `words` and that it could not judge, as the
+/// authoring server does when its generator is missing or failed.
+pub fn tool_cannot_judge(folder: &Path, name: &str, words: &str) {
+    tool_gives(folder, name, &Value::String(words.to_string()));
+    std::fs::write(folder.join(format!("cannot_judge.{name}")), "").unwrap();
 }
 
 /// The file holds the answer as a JSON string literal, which is how a tool's text is put in the

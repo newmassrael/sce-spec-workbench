@@ -235,15 +235,79 @@ impl Setup {
     }
 }
 
+/// A specification of a building of `zones` rooms, each with its own thresholds, and one rule over
+/// all of them. It is long on purpose (a model that is handed a document of a few paragraphs says
+/// nothing of one that is handed a floor plan), and no two rooms are told the same, so a model
+/// that writes one room and copies it is wrong about the others.
+fn long_specification(zones: u32) -> String {
+    let mut text = String::from(
+        "A building controller for a building of rooms, written as rules for each room and one rule \
+         over all of them.\n\n",
+    );
+    for room in 1..=zones {
+        let off = 2 + room % 7;
+        let held = 20 + room % 25;
+        let cards = 1 + room % 4;
+        text.push_str(&format!(
+            "Room {room}. The light of room {room} is off until motion is seen in it, and it goes \
+             off again {off} minutes after the last motion. The door of room {room} opens for a \
+             card that is on the list of room {room}; after {cards} cards in a row that are not on \
+             the list it ignores every card for {held} seconds. A door of room {room} that is held \
+             open for more than {held} seconds raises a warning for that room, and the warning \
+             ends when the door closes.\n\n"
+        ));
+    }
+    text.push_str(
+        "Fire. When the fire alarm of the building is raised, every light is on, every door is \
+         open, and no card is read until the alarm is cleared by the key switch in the hall.\n",
+    );
+    text
+}
+
 #[test]
 #[ignore = "runs a model on a real server: minutes of its time"]
 fn a_model_on_a_real_server_writes_a_model_the_core_accepts_and_publishes() {
+    let _ = write_and_publish("local-live", "Storage room door", SPECIFICATION);
+}
+
+/// What `SCE_LOCAL_ZONES` rooms (default 60) make of the model's context and of a run's time: the
+/// request is the same as the one above, and the document is the long one. What this holds is that
+/// the run ends in an outcome the application can say (a draft the core accepts, or a refusal with
+/// its reason) and not in a hang, and what it prints is how long the document made the run.
+#[test]
+#[ignore = "runs a model on a real server over a long document: many minutes of its time"]
+fn a_model_on_a_real_server_is_given_a_long_document_and_ends_in_an_outcome() {
+    let zones = std::env::var("SCE_LOCAL_ZONES")
+        .ok()
+        .and_then(|text| text.trim().parse::<u32>().ok())
+        .filter(|zones| *zones > 0)
+        .unwrap_or(60);
+    let text = long_specification(zones);
+    println!(
+        "the document: {zones} rooms, {} characters, {} words",
+        text.len(),
+        text.split_whitespace().count()
+    );
+    let model = write_and_publish("local-live-long", "A building of rooms", &text);
+
+    // The core accepting a draft says it is well formed, and says nothing of a draft that wrote
+    // fifty rooms of sixty. Every room the document tells of is named in the design.
+    let named = numbers_named(&model);
+    let missing: Vec<u32> = (1..=zones).filter(|room| !named.contains(room)).collect();
+    println!("rooms the design does not name: {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "the design leaves out rooms of the document: {missing:?}"
+    );
+}
+
+fn write_and_publish(label: &str, title: &str, text: &str) -> String {
     let setup = Setup::from_environment();
 
-    let specs = common::scratch("local-live").join("specs");
+    let specs = common::scratch(label).join("specs");
     let store = Arc::new(SpecStore::with_clock(&specs, SystemClock));
-    let spec = store.create_spec("Storage room door").unwrap().id;
-    let source = store.save_source(&spec, SPECIFICATION, None).unwrap();
+    let spec = store.create_spec(title).unwrap().id;
+    let source = store.save_source(&spec, text, None).unwrap();
     let head = match source {
         sce_specs::Saved::Saved { revision, .. } | sce_specs::Saved::Unchanged { revision } => {
             revision
@@ -289,6 +353,30 @@ fn a_model_on_a_real_server_writes_a_model_the_core_accepts_and_publishes() {
     println!("--- requirements ---\n{}\n--- end ---", list.text);
     assert!(model.text.contains("<scxml") || model.text.contains("documents"));
     assert_eq!(published.bundle.checks[0].verdict, "accepted");
+    model.text
+}
+
+/// The numbers the model's names carry (`light_12`, `door_7`): a name is a word, an underscore and
+/// the number of its room, and a run of digits after an underscore is one of those numbers.
+fn numbers_named(text: &str) -> std::collections::BTreeSet<u32> {
+    let bytes = text.as_bytes();
+    let mut found = std::collections::BTreeSet::new();
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] == b'_' && bytes.get(at + 1).is_some_and(u8::is_ascii_digit) {
+            let end = bytes[at + 1..]
+                .iter()
+                .position(|b| !b.is_ascii_digit())
+                .map_or(bytes.len(), |n| at + 1 + n);
+            if let Ok(number) = text[at + 1..end].parse::<u32>() {
+                found.insert(number);
+            }
+            at = end;
+        } else {
+            at += 1;
+        }
+    }
+    found
 }
 
 /// What the screen does, by the commands it sends, and then what the application's own host does

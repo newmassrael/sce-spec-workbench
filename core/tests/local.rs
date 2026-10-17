@@ -32,7 +32,7 @@ use serde_json::{json, Value};
 
 use common::model_server::{
     authoring_server, called, calls, chat_server, draft, requirement_set_gives,
-    requirement_set_gives_at, says, scope_of, tool_gives, ChatServer, Script,
+    requirement_set_gives_at, says, scope_of, tool_cannot_judge, tool_gives, ChatServer, Script,
 };
 use common::scratch;
 
@@ -226,6 +226,36 @@ fn a_tool_that_was_not_offered_is_not_called_and_the_model_is_told_which_there_a
         "{told}"
     );
     assert!(told.contains("specs_read"), "{told}");
+}
+
+#[test]
+fn a_checking_tool_that_could_not_judge_ends_the_run_and_the_model_is_not_sent_to_rewrite() {
+    // Three answers are scripted. A run that handed the first failure back as a correction would
+    // ask the model again, and the count of requests is what this holds against.
+    let rig = Rig::new(
+        "local-cannot-judge",
+        vec![
+            validating("<scxml><!-- one --></scxml>"),
+            validating("<scxml><!-- two --></scxml>"),
+            says(&draft("<scxml><!-- three --></scxml>")),
+        ],
+    );
+    tool_cannot_judge(
+        &rig.folder,
+        "validate_scxml_set",
+        "the code generator failed with status 101: Cannot find Jinja2 templates",
+    );
+
+    let ended = rig.run().unwrap_err();
+
+    let GenerateError::Failed(said) = ended else {
+        panic!("a run that could not be checked ends as a failure: {ended:?}");
+    };
+    assert!(said.contains("validate_scxml_set"), "{said}");
+    assert!(said.contains("no change to the design"), "{said}");
+    // What the tool said is what the owner reads, so that what to put right is named.
+    assert!(said.contains("Cannot find Jinja2 templates"), "{said}");
+    assert_eq!(rig.server.requests().len(), 1, "the model was asked again");
 }
 
 #[test]

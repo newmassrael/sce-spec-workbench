@@ -637,6 +637,17 @@ impl Local {
         let called = mcp
             .call(&tool.name, &arguments, deadline, cancel)
             .map_err(|e| self.mcp_failure(e))?;
+        // A tool that could not judge says nothing of what the model sent, so handing its words
+        // back as a correction sends the model to rewrite what was not wrong, for as long as the
+        // run lasts (eighty minutes, on 2026-10-17, against a generator that had lost its
+        // templates). The run ends, and the owner is told what to put right.
+        if called.cannot_judge {
+            return Err(GenerateError::Failed(format!(
+                "the checking tool `{}` could not judge anything, so the run was stopped: this \
+                 is a fault of the installation and no change to the design puts it right. {}",
+                tool.name, called.text
+            )));
+        }
         Ok(match (called.is_error, called.text.is_empty()) {
             (true, _) => ToolWords::failed(called.text),
             (false, true) => ToolWords::gave("(the tool gave no output)".to_string()),

@@ -59,11 +59,19 @@ pub struct Tool {
     pub schema: Value,
 }
 
+/// The key of a result's `_meta` by which the authoring server says its tool could not judge at
+/// all: the generator it checks with is missing or failed, which is a fault of the installation
+/// that no change to a design puts right (`sce_author.mcp.CANNOT_JUDGE`).
+const CANNOT_JUDGE: &str = "sce.dev/cannot-judge";
+
 /// What a call answered: the words it gave, and whether it says it failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Called {
     pub text: String,
     pub is_error: bool,
+    /// It failed, and not because of what it was sent: asking again, or a model rewriting what it
+    /// sent, gets the same answer.
+    pub cannot_judge: bool,
 }
 
 /// Why the server did not do what was asked.
@@ -225,6 +233,7 @@ impl McpClient {
         Ok(Called {
             text,
             is_error: said["isError"].as_bool().unwrap_or(false),
+            cannot_judge: said["_meta"][CANNOT_JUDGE].as_bool().unwrap_or(false),
         })
     }
 
