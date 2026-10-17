@@ -28,11 +28,17 @@ import {
   type ClientKind,
   type Readiness,
 } from "./ai_settings_model";
-import { BILLING_WORDS, NOT_USED_WORDS, SIGN_IN_WORDS, programChoice } from "./ai_settings_view";
+import {
+  BILLING_WORDS,
+  NOT_USED_WORDS,
+  SIGN_IN_WORDS,
+  effortChoice,
+  programChoice,
+} from "./ai_settings_view";
 import type { Api, ConnectionRef } from "./api";
 import { CodexSection } from "./codex_settings";
 import { ServerSection } from "./server_settings";
-import { NO_LIMITS } from "./contract";
+import { EFFORTS, NO_LIMITS } from "./contract";
 import type {
   Candidate,
   CodexStatus,
@@ -85,6 +91,8 @@ export class AiSettings {
   private draftModel: string | null | undefined = undefined;
   /** What was typed in the field for another model id. */
   private typedModel = "";
+  /** The effort chosen in the list and not yet saved; `undefined` is the one that is kept. */
+  private draftEffort: string | null | undefined = undefined;
   /** The programs the application found, as of the last time it looked. */
   private candidates: readonly Candidate[] = [];
   /** The program chosen in the list and not yet saved; `undefined` is the one that is kept. */
@@ -335,6 +343,7 @@ export class AiSettings {
       } else {
         this.draftModel = undefined;
         this.typedModel = "";
+        this.draftEffort = undefined;
         this.draftProgram = undefined;
       }
       this.notice = { tone: "ok", text: this.host.t(makeDefault ? "aiSaved" : "aiSavedNotDefault") };
@@ -368,6 +377,7 @@ export class AiSettings {
       // word about the program.
       executable: this.chosenProgram(),
       model: this.chosenModel(),
+      effort: this.chosenEffort(),
       auth: "official-login",
       server_url: null,
       // What a person set outside this screen is theirs: saving a model does not drop it.
@@ -391,6 +401,12 @@ export class AiSettings {
   private chosenProgram(): string | null {
     if (this.draftProgram !== undefined) return this.draftProgram;
     return claudeConnection(this.listing)?.connection.executable ?? null;
+  }
+
+  /** The effort that would be saved: the one chosen in the list, else the one kept; `null` is the client's own. */
+  private chosenEffort(): string | null {
+    if (this.draftEffort !== undefined) return this.draftEffort;
+    return claudeConnection(this.listing)?.connection.effort ?? null;
   }
 
   /** The model that would be saved: a typed id wins over the list, and `null` is the client's own. */
@@ -657,6 +673,20 @@ export class AiSettings {
         ),
         h("dt", {}, t("aiModel")),
         h("dd", {}, select),
+        h("dt", {}, t("aiEffort")),
+        h(
+          "dd",
+          {},
+          effortChoice({
+            id: "ai-effort",
+            t,
+            offered: EFFORTS["claude-code"],
+            current: this.chosenEffort(),
+            choose: (effort) => {
+              this.draftEffort = effort;
+            },
+          }),
+        ),
       ),
       h(
         "details",

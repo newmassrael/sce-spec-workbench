@@ -892,6 +892,7 @@ fn replies() -> Value {
     let pinned = sce_spec_workbench_core::PinnedRun {
         adapter: sce_spec_workbench_core::AdapterKind::Local,
         model: Some("qwen".to_string()),
+        effort: None,
         limits: sce_spec_workbench_core::Limits::default(),
     }
     .pin(

@@ -590,6 +590,7 @@ fn pin_of(rig: &Rig, executable: Option<&Path>) -> Pin {
     PinnedRun {
         adapter: sce_spec_workbench_core::AdapterKind::ClaudeCode,
         model: Some("opus".to_string()),
+        effort: None,
         limits: sce_spec_workbench_core::Limits::default(),
     }
     .pin(ConnectionId::parse("claude").unwrap(), revision)

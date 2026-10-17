@@ -202,6 +202,7 @@ fn claude() -> Connection {
         display_name: None,
         executable: None,
         model: Some("opus".to_string()),
+        effort: None,
         auth: AuthSource::OfficialLogin,
         server_url: None,
         limits: Limits {
@@ -253,6 +254,47 @@ fn what_the_environment_may_spend_bounds_a_run_made_for_a_connection_too() {
     // are the connection's.
     assert_eq!(bounded.config().model.as_deref(), Some("opus"));
     assert_eq!(bounded.config().max_turns, 40);
+}
+
+#[test]
+fn the_effort_a_connection_pinned_is_the_effort_the_client_is_run_with() {
+    let rig = Rig::new("dir-effort", SUBSCRIPTION);
+    let mut thoughtful = claude();
+    thoughtful.effort = Some("xhigh".to_string());
+    let pin = rig.pin(&thoughtful);
+
+    let client = rig.directory(Policy::shipped()).claude_for(&pin).unwrap();
+
+    assert_eq!(client.config().effort.as_deref(), Some("xhigh"));
+    // A connection that names none leaves it to the client. A rig of its own: the same connection
+    // saved again over what is kept would have to name the revision it replaces.
+    let other = Rig::new("dir-effort-none", SUBSCRIPTION);
+    let plain = other.pin(&claude());
+    let left = other
+        .directory(Policy::shipped())
+        .claude_for(&plain)
+        .unwrap();
+    assert_eq!(left.config().effort, None);
+}
+
+#[test]
+fn the_effort_a_model_server_connection_pinned_is_the_effort_it_is_asked_for() {
+    let rig = Rig::new("dir-local-effort", SUBSCRIPTION);
+    let mut thoughtful = local();
+    thoughtful.effort = Some("low".to_string());
+    let pin = rig.pin(&thoughtful);
+
+    let server = rig.directory(Policy::shipped()).local_for(&pin).unwrap();
+
+    assert_eq!(server.config().effort.as_deref(), Some("low"));
+    // A rig of its own: the same connection saved again over what is kept would have to name the
+    // revision it replaces.
+    let other = Rig::new("dir-local-effort-none", SUBSCRIPTION);
+    let left = other
+        .directory(Policy::shipped())
+        .local_for(&other.pin(&local()))
+        .unwrap();
+    assert_eq!(left.config().effort, None);
 }
 
 #[test]
@@ -365,6 +407,7 @@ fn local() -> Connection {
         display_name: Some("pc2 (tunnel)".to_string()),
         executable: None,
         model: Some("qwen3-coder:30b".to_string()),
+        effort: None,
         auth: AuthSource::NoAuth,
         server_url: Some("http://127.0.0.1:11434/v1".to_string()),
         limits: Limits {

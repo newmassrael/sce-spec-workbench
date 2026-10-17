@@ -256,6 +256,11 @@ fn unreadable_words(why: &str) -> String {
 pub struct LocalConfig {
     /// The model the server is asked for, as it names it.
     pub model: String,
+    /// How hard the server is asked to make the model think (`reasoning_effort` of the request), in
+    /// the word the server names; what it does when not told is its own default. A server that does
+    /// not know the field leaves it unread, and one that knows it and not the word refuses the
+    /// request in its own words, which the run says.
+    pub effort: Option<String>,
     /// How many times the model is asked, tool calls included.
     pub max_turns: u32,
     /// How long a run may take before it is stopped.
@@ -282,6 +287,7 @@ impl LocalConfig {
     pub fn for_model(model: impl Into<String>) -> Self {
         LocalConfig {
             model: model.into(),
+            effort: None,
             max_turns: 60,
             timeout: Duration::from_secs(30 * 60),
             handoffs: 2,
@@ -653,13 +659,17 @@ impl Local {
         deadline: Instant,
         cancel: &Cancel,
     ) -> Result<Turn, GenerateError> {
-        let body = json!({
+        let mut body = json!({
             "model": self.config.model,
             "messages": messages,
             "tools": tools,
             "stream": false,
-        })
-        .to_string();
+        });
+        // Said only when the connection names one: a server told nothing uses its own default.
+        if let Some(effort) = &self.config.effort {
+            body["reasoning_effort"] = json!(effort);
+        }
+        let body = body.to_string();
         let response = http_client::send(
             &self.endpoint,
             Request {

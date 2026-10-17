@@ -81,6 +81,7 @@ const connection = (model: string | null): Connection => ({
   display_name: null,
   executable: null,
   model,
+  effort: null,
   auth: "official-login",
   server_url: null,
   limits: { ...NO_LIMITS, turns: 40 },
@@ -124,6 +125,7 @@ const codexConnection = (over: Partial<Connection> = {}): Connection => ({
   display_name: null,
   executable: null,
   model: null,
+  effort: null,
   auth: "official-login",
   server_url: null,
   limits: { ...NO_LIMITS, seconds: 900 },
@@ -548,6 +550,73 @@ describe("saving the connection", () => {
     expect((r.core.asked("save_connection")[0] as { connection: Connection }).connection.model).toBe("claude-opus-4-1");
     const models = [...r.root.querySelectorAll<HTMLOptionElement>("#ai-model option")].map((o) => o.value);
     expect(models).toContain("claude-opus-4-1");
+  });
+
+  it("offers the efforts Claude Code takes, and the client's own first", async () => {
+    const r = await ready();
+
+    const offered = [...r.root.querySelectorAll<HTMLOptionElement>("#ai-effort option")].map((o) => o.value);
+
+    expect(offered).toEqual(["", "low", "medium", "high", "xhigh", "max"]);
+    expect(r.root.querySelector<HTMLSelectElement>("#ai-effort")!.value).toBe("");
+  });
+
+  it("saves the effort the person chose, and sends none when they chose the client's own", async () => {
+    const r = await ready();
+    const effort = r.root.querySelector<HTMLSelectElement>("#ai-effort")!;
+    effort.value = "high";
+    effort.dispatchEvent(new Event("change"));
+
+    click(r.root, "#ai-save");
+    await settle();
+
+    const saved = (r.core.asked("save_connection")[0] as { connection: Connection }).connection;
+    expect(saved.effort).toBe("high");
+    expect(saved.model).toBeNull();
+  });
+
+  /** A rig whose kept connection to Claude Code names `effort`. */
+  const keptWithEffort = async (effort: string): Promise<Rig> => {
+    const r = rig();
+    r.core.listing = {
+      connections: [{ connection: { ...connection("opus"), effort }, revision: REVISION_1 }],
+      unreadable: [],
+      default: CLAUDE_CONNECTION_ID,
+    };
+    await r.settings.load();
+    r.settings.openPanel();
+    r.draw();
+    return r;
+  };
+
+  it("keeps the effort it was given when only the model is changed, and drops it only when asked to", async () => {
+    const r = await keptWithEffort("xhigh");
+    expect(r.root.querySelector<HTMLSelectElement>("#ai-effort")!.value).toBe("xhigh");
+    const model = r.root.querySelector<HTMLSelectElement>("#ai-model")!;
+    model.value = "sonnet";
+    model.dispatchEvent(new Event("change"));
+
+    click(r.root, "#ai-save");
+    await settle();
+
+    expect((r.core.asked("save_connection")[0] as { connection: Connection }).connection.effort).toBe("xhigh");
+
+    const effort = r.root.querySelector<HTMLSelectElement>("#ai-effort")!;
+    effort.value = "";
+    effort.dispatchEvent(new Event("change"));
+    click(r.root, "#ai-save");
+    await settle();
+
+    expect((r.core.asked("save_connection")[1] as { connection: Connection }).connection.effort).toBeNull();
+  });
+
+  it("says an effort the connection names and this build does not offer, and does not drop it unseen", async () => {
+    const r = await keptWithEffort("ultra");
+
+    const select = r.root.querySelector<HTMLSelectElement>("#ai-effort")!;
+
+    expect(select.value).toBe("ultra");
+    expect(select.textContent).toContain("not offered by this build");
   });
 
   it("reads again and says so when another window changed the connection, and sends nothing more", async () => {
@@ -1035,6 +1104,7 @@ describe("saving a connection to Codex", () => {
           display_name: null,
           executable: null,
           model: null,
+          effort: null,
           auth: "official-login",
           server_url: null,
           limits: NO_LIMITS,
@@ -1048,6 +1118,35 @@ describe("saving a connection to Codex", () => {
     expect(r.settings.targetLine()).toBe("Will ask: Codex (client default)");
     // What is shown is of what is kept now: Codex is asked again.
     expect(r.core.asked("read_codex_status")).toHaveLength(2);
+  });
+
+  it("offers the efforts Codex takes, saves the one chosen, and keeps it when something else is saved", async () => {
+    const key = codexSignedIn({ route: "codex-cli-api-key", billing: "usage", environment: "CODEX_API_KEY" });
+    const r = await readyToSave({
+      listing: {
+        connections: [
+          { connection: codexConnection({ model: "gpt-kept", auth: "env-api-key", effort: "high" }), revision: REVISION_1 },
+        ],
+        unreadable: [],
+        default: CODEX_CONNECTION_ID,
+      },
+      codex: codexStatusOf({}, [{ state: "signed-out" }, { state: "signed-out" }, key]),
+    });
+    const select = r.root.querySelector<HTMLSelectElement>("#ai-codex-effort")!;
+    expect([...select.options].map((o) => o.value)).toEqual(["", "low", "medium", "high", "xhigh"]);
+    expect(select.value).toBe("high");
+
+    // A save of the model alone does not lose it.
+    typeInto(r.root, "#ai-codex-model", "gpt-new");
+    click(r.root, "#ai-save");
+    await settle();
+    expect((r.core.asked("save_connection")[0] as { connection: Connection }).connection.effort).toBe("high");
+
+    // And a chosen one is what is saved.
+    choose(r.root, "#ai-codex-effort", "xhigh");
+    click(r.root, "#ai-save");
+    await settle();
+    expect((r.core.asked("save_connection")[1] as { connection: Connection }).connection.effort).toBe("xhigh");
   });
 
   it("saves the model that was typed, the source and the program that were chosen", async () => {
@@ -1427,6 +1526,7 @@ const serverConnection = (over: Partial<Connection> = {}): Connection => ({
   display_name: "office GPU box",
   executable: null,
   model: "qwen3-coder:30b",
+  effort: null,
   auth: "none",
   server_url: OLLAMA,
   limits: { ...NO_LIMITS, turns: 30 },
@@ -1532,6 +1632,36 @@ describe("a model server of the person's", () => {
     expect(r.core.asked("read_server_status")).toHaveLength(1);
   });
 
+  it("is saved with the effort as the server names it, and none when the field is empty", async () => {
+    const r = await chooseServer({ servers: [[OLLAMA, listed(OLLAMA, ["qwen3-coder:30b"])]] });
+    typeInto(r.root, "#ai-server-name", "office GPU box");
+    click(r.root, `[data-address="${OLLAMA}"]`);
+    await settle();
+    typeInto(r.root, "#ai-server-model", "qwen3-coder:30b");
+    typeInto(r.root, "#ai-server-effort", "  low  ");
+
+    click(r.root, "#ai-save");
+    await settle();
+
+    expect((r.core.asked("save_connection")[0] as { connection: Connection }).connection.effort).toBe("low");
+
+    typeInto(r.root, "#ai-server-effort", "   ");
+    click(r.root, "#ai-save");
+    await settle();
+
+    expect((r.core.asked("save_connection")[1] as { connection: Connection }).connection.effort).toBeNull();
+  });
+
+  it("offers words a server is known to take as suggestions and holds the person to none of them", async () => {
+    const r = await chooseServer({ servers: [[OLLAMA, listed(OLLAMA, ["qwen3-coder:30b"])]] });
+
+    const suggested = [...r.root.querySelectorAll<HTMLOptionElement>("#ai-server-efforts option")].map((o) => o.value);
+
+    expect(suggested).toEqual(["low", "medium", "high", "xhigh"]);
+    // The field is a text field: a word nobody listed can be typed, and the core decides.
+    expect(r.root.querySelector<HTMLInputElement>("#ai-server-effort")!.type).toBe("text");
+  });
+
   it("is saved with the name, the address and the model, takes no key, and becomes the default", async () => {
     const r = await chooseServer({ servers: [[OLLAMA, listed(OLLAMA, ["qwen3-coder:30b"])]] });
     typeInto(r.root, "#ai-server-name", "  office GPU box  ");
@@ -1550,6 +1680,7 @@ describe("a model server of the person's", () => {
           display_name: "office GPU box",
           executable: null,
           model: "qwen3-coder:30b",
+          effort: null,
           auth: "none",
           server_url: OLLAMA,
           limits: NO_LIMITS,

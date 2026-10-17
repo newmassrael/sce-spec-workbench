@@ -70,6 +70,8 @@ pub struct AuthorServer {
 pub struct ClaudeCodeConfig {
     /// A model name or alias; the client's own default when absent.
     pub model: Option<String>,
+    /// How hard the client is asked to think (`--effort`); its own default when absent.
+    pub effort: Option<String>,
     /// How many turns the client may take before it is stopped.
     pub max_turns: u32,
     /// What a run may cost before it is stopped; unbounded when absent.
@@ -84,6 +86,7 @@ impl Default for ClaudeCodeConfig {
     fn default() -> Self {
         ClaudeCodeConfig {
             model: None,
+            effort: None,
             max_turns: 60,
             max_budget_usd: None,
             timeout: Duration::from_secs(30 * 60),
@@ -162,6 +165,9 @@ impl ClaudeCode {
             .args(["--append-system-prompt", SYSTEM_PROMPT]);
         if let Some(model) = &self.config.model {
             command.args(["--model", model]);
+        }
+        if let Some(effort) = &self.config.effort {
+            command.args(["--effort", effort]);
         }
         if let Some(budget) = self.config.max_budget_usd {
             command.args(["--max-budget-usd", &budget.to_string()]);

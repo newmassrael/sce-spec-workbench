@@ -155,6 +155,7 @@ fn pin(connection: &str) -> Pin {
     PinnedRun {
         adapter: AdapterKind::ClaudeCode,
         model: None,
+        effort: None,
         limits: Limits::default(),
     }
     .pin(

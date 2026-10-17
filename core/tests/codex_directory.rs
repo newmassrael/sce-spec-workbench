@@ -143,6 +143,7 @@ fn codex_connection(auth: AuthSource) -> Connection {
         display_name: None,
         executable: None,
         model: Some("gpt-test".to_string()),
+        effort: None,
         auth,
         server_url: None,
         limits: Limits {

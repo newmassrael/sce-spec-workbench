@@ -102,6 +102,7 @@ fn pinned_to_codex(label: &str) -> (ConnectionStore, Pin) {
         display_name: None,
         executable: None,
         model: Some("gpt-test".to_string()),
+        effort: None,
         auth: AuthSource::OfficialLogin,
         server_url: None,
         limits: Limits::default(),

@@ -31,6 +31,7 @@ fn claude(name: &str) -> Connection {
         display_name: None,
         executable: None,
         model: Some("opus".to_string()),
+        effort: None,
         auth: AuthSource::OfficialLogin,
         server_url: None,
         limits: Limits::default(),
@@ -44,6 +45,7 @@ fn local(name: &str) -> Connection {
         display_name: Some("pc2 (tunnel)".to_string()),
         executable: None,
         model: Some("qwen3-coder:30b".to_string()),
+        effort: None,
         auth: AuthSource::NoAuth,
         server_url: Some("http://127.0.0.1:11434/v1".to_string()),
         limits: Limits::default(),
@@ -381,6 +383,115 @@ fn a_connection_id_is_lowercase_letters_digits_and_hyphens() {
     for good in ["a", "0", "claude-1", "pc2-tunnel", &"x".repeat(40)] {
         assert_eq!(ConnectionId::parse(good).unwrap().as_str(), good);
     }
+}
+
+/// `connection` of `adapter` with `effort` named.
+fn with_effort(adapter: AdapterKind, effort: &str) -> Connection {
+    let mut connection = shaped(
+        adapter,
+        match adapter {
+            AdapterKind::Local => AuthSource::NoAuth,
+            _ => AuthSource::OfficialLogin,
+        },
+    );
+    connection.effort = Some(effort.to_string());
+    connection
+}
+
+#[test]
+fn a_client_is_held_to_the_efforts_it_takes_and_each_of_them_is_kept() {
+    for adapter in [AdapterKind::ClaudeCode, AdapterKind::Codex] {
+        for word in adapter.efforts().expect("a client has a list") {
+            accepted(&with_effort(adapter, word));
+        }
+    }
+    // What one client takes the other does not: `max` is Claude Code's alone.
+    accepted(&with_effort(AdapterKind::ClaudeCode, "max"));
+    let said = refusal(&with_effort(AdapterKind::Codex, "max"));
+    assert!(said.contains("`low`") && said.contains("`xhigh`"), "{said}");
+    assert!(said.contains("`max` is not"), "{said}");
+    // A word nobody lists, spelled in capitals, with spaces, or empty is refused, and so is a
+    // sentence.
+    for bad in ["High", "extra high", "", "bogus", "think harder please"] {
+        let said = refusal(&with_effort(AdapterKind::ClaudeCode, bad));
+        assert!(
+            said.contains("an effort for a claude-code connection"),
+            "{bad}: {said}"
+        );
+    }
+}
+
+#[test]
+fn a_model_server_is_held_only_to_the_effort_being_a_word_as_the_server_names_it() {
+    for ok in [
+        "low",
+        "medium",
+        "xhigh",
+        "off",
+        "a",
+        "reasoning-3",
+        "x".repeat(24).as_str(),
+    ] {
+        accepted(&with_effort(AdapterKind::Local, ok));
+    }
+    for bad in [
+        "",
+        "High",
+        "two words",
+        "-lead",
+        "trail-",
+        "dot.ted",
+        &"x".repeat(25),
+    ] {
+        let said = refusal(&with_effort(AdapterKind::Local, bad));
+        assert!(
+            said.contains("an effort for a model server"),
+            "{bad:?}: {said}"
+        );
+    }
+}
+
+#[test]
+fn no_effort_is_the_clients_or_the_servers_own_and_reads_and_writes_as_it_did() {
+    // A connection written before efforts existed has no field, and is read as having none.
+    let old = serde_json::to_value(claude("main")).unwrap();
+    assert!(old.get("effort").is_none(), "{old}");
+    let read: Connection = serde_json::from_value(old).unwrap();
+    assert_eq!(read.effort, None);
+    // One that names an effort keeps it through a save and a read.
+    let store = store("connections-effort-roundtrip");
+    store
+        .save(&with_effort(AdapterKind::ClaudeCode, "high"), None)
+        .unwrap();
+    let kept = store
+        .read(&id("shaped"), None)
+        .unwrap()
+        .expect("it is there");
+    assert_eq!(kept.connection.effort.as_deref(), Some("high"));
+}
+
+#[test]
+fn the_effort_is_part_of_what_a_request_pins_and_what_a_later_save_changes_is_not() {
+    use sce_spec_workbench_core::PinnedRun;
+    let mut connection = claude("main");
+    connection.effort = Some("high".to_string());
+    let pin = connection.pin(Revision::of(b"first"));
+
+    let run = PinnedRun::read(&pin).unwrap();
+    assert_eq!(run.effort.as_deref(), Some("high"));
+    // Saving another effort afterwards does not reach a request that was already made.
+    connection.effort = Some("low".to_string());
+    assert_eq!(
+        PinnedRun::read(&pin).unwrap().effort.as_deref(),
+        Some("high")
+    );
+    // A request made for a connection with none pins none, and a pin from before efforts reads as none.
+    assert_eq!(
+        PinnedRun::read(&claude("main").pin(Revision::of(b"x")))
+            .unwrap()
+            .effort,
+        None
+    );
 }
 
 #[test]

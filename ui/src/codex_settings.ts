@@ -24,8 +24,8 @@ import {
   type Because,
   type Outlook,
 } from "./ai_settings_model";
-import { BILLING_WORDS, NOT_USED_WORDS, programChoice } from "./ai_settings_view";
-import { NO_LIMITS } from "./contract";
+import { BILLING_WORDS, NOT_USED_WORDS, effortChoice, programChoice } from "./ai_settings_view";
+import { EFFORTS, NO_LIMITS } from "./contract";
 import type {
   Candidate,
   ClaudeClient,
@@ -84,6 +84,8 @@ export class CodexSection {
   private candidates: readonly Candidate[] = [];
   /** The model typed and not yet saved; `undefined` is the one that is kept. */
   private draftModel: string | undefined = undefined;
+  /** The effort chosen in the list and not yet saved; `undefined` is the one that is kept. */
+  private draftEffort: string | null | undefined = undefined;
   /** The source chosen in the list and not yet saved; `undefined` is the one that is kept. */
   private draftSource: CodexSource | undefined = undefined;
   /** The program chosen in the list and not yet saved; `undefined` is the one that is kept. */
@@ -118,6 +120,7 @@ export class CodexSection {
       display_name: null,
       executable: this.chosenProgram(),
       model: this.chosenModel(),
+      effort: this.chosenEffort(),
       auth: chosenSource(this.status(), kept, this.draftSource),
       server_url: null,
       // What a person set outside this screen is theirs: saving a model does not drop it.
@@ -128,6 +131,7 @@ export class CodexSection {
   /** What was saved is what is kept now: nothing is left of what was chosen. */
   reset(): void {
     this.draftModel = undefined;
+    this.draftEffort = undefined;
     this.draftSource = undefined;
     this.draftProgram = undefined;
   }
@@ -148,6 +152,12 @@ export class CodexSection {
   private chosenProgram(): string | null {
     if (this.draftProgram !== undefined) return this.draftProgram;
     return codexConnection(this.env.listing())?.connection.executable ?? null;
+  }
+
+  /** The effort that would be saved: the one chosen in the list, else the one kept; `null` is the client's own. */
+  private chosenEffort(): string | null {
+    if (this.draftEffort !== undefined) return this.draftEffort;
+    return codexConnection(this.env.listing())?.connection.effort ?? null;
   }
 
   /** The model that would be saved: what was typed, else the one kept; empty is the client's own. */
@@ -228,7 +238,25 @@ export class CodexSection {
         ),
       );
     }
-    if (runs) rows.push(h("dt", {}, t("aiModel")), h("dd", {}, this.modelField()));
+    if (runs) {
+      rows.push(h("dt", {}, t("aiModel")), h("dd", {}, this.modelField()));
+      rows.push(
+        h("dt", {}, t("aiEffort")),
+        h(
+          "dd",
+          {},
+          effortChoice({
+            id: "ai-codex-effort",
+            t,
+            offered: EFFORTS.codex,
+            current: this.chosenEffort(),
+            choose: (effort) => {
+              this.draftEffort = effort;
+            },
+          }),
+        ),
+      );
+    }
     return h("dl", { class: "ai-facts" }, ...rows);
   }
 

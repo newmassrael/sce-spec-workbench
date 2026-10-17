@@ -63,6 +63,7 @@ fn server(address: &str) -> Connection {
         display_name: Some("pc2 (tunnel)".to_string()),
         executable: None,
         model: Some("qwen-test".to_string()),
+        effort: None,
         auth: AuthSource::NoAuth,
         server_url: Some(address.to_string()),
         limits: Limits::default(),

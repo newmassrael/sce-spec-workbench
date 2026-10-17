@@ -233,6 +233,13 @@ const en = {
     "The AI could not write the model, and did not say what kind of problem it was.",
   failureActionsHeading: "What you can do",
   failureWordsHeading: "What was said",
+  aiEffort: "Effort",
+  aiEffortDefault: "The client's or the server's own",
+  aiEffortUnoffered: "not offered by this build",
+  aiEffortNote:
+    "How hard the model thinks before it answers. More takes longer and may leave no room to answer; less answers sooner.",
+  aiServerEffortNote:
+    "As the server names it (for example low, medium, xhigh); empty leaves it to the server. A server that does not know the word refuses the request and says so.",
   heldHeading: "The last design the run held",
   heldNote:
     "This is the last design the run sent to be checked, kept so that you can read how near it came. It is not accepted, and it is not this spec's model: only a new request can make a model.",
@@ -715,6 +722,13 @@ const ko: Record<Key, string> = {
   failureUnclassified: "AI가 모델을 작성하지 못했고, 어떤 종류의 문제인지 말하지 않았습니다.",
   failureActionsHeading: "할 수 있는 일",
   failureWordsHeading: "받은 말",
+  aiEffort: "강도",
+  aiEffortDefault: "클라이언트나 서버의 기본값",
+  aiEffortUnoffered: "이 빌드가 제공하지 않음",
+  aiEffortNote:
+    "모델이 답하기 전에 얼마나 깊이 생각하는지입니다. 높을수록 오래 걸리고 답할 여유가 남지 않을 수 있으며, 낮을수록 빨리 답합니다.",
+  aiServerEffortNote:
+    "서버가 부르는 이름 그대로입니다(예: low, medium, xhigh). 비워 두면 서버에 맡깁니다. 서버가 모르는 단어면 요청을 거절하고 그렇게 말합니다.",
   heldHeading: "실행이 마지막으로 가지고 있던 설계",
   heldNote:
     "이 실행이 검사하려고 마지막으로 보낸 설계이며, 얼마나 가까이 갔는지 읽을 수 있도록 남겨 둔 것입니다. 받아들여진 것이 아니고 이 명세의 모델도 아닙니다: 모델은 새 요청만 만들 수 있습니다.",

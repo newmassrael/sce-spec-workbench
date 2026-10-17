@@ -62,6 +62,7 @@ import {
   parseSpecSnapshot,
   SUPPORTED_APPLICATION_COMMAND_SET_VERSION,
   SUPPORTED_COMMAND_SET_VERSION,
+  EFFORTS,
 } from "../src/contract";
 
 interface Replies {
@@ -1121,5 +1122,28 @@ describe("a reply that is not the promised shape", () => {
     expect(asCommandError("conflict")).toBeNull();
     expect(asCommandError(null)).toBeNull();
     expect(asCommandError({ kind: "busy", message: "wait" })).toEqual({ kind: "busy", message: "wait" });
+  });
+});
+
+describe("the efforts a person may choose", () => {
+  /** The list the core holds a connection to, read where it is written and not restated here. */
+  function coreEfforts(adapter: "ClaudeCode" | "Codex"): string[] {
+    const source = readFileSync(new URL("../../core/src/connection.rs", import.meta.url), "utf8");
+    const at = source.indexOf(`AdapterKind::${adapter} => Some(&[`);
+    expect(at, `the core lists efforts for ${adapter}`).toBeGreaterThan(-1);
+    const list = source.slice(at, source.indexOf("]", at));
+    return [...list.matchAll(/"([a-z]+)"/g)].map((m) => m[1] as string);
+  }
+
+  it("are the ones the core holds a connection to, for each client", () => {
+    expect([...EFFORTS["claude-code"]]).toEqual(coreEfforts("ClaudeCode"));
+    expect([...EFFORTS.codex]).toEqual(coreEfforts("Codex"));
+  });
+
+  it("are said in a connection the core lists, and are none for one that names none", () => {
+    const listing = parseConnectionListing(replies.answers["list_connections"]);
+    for (const { connection } of listing.connections) {
+      expect(connection.effort === null || typeof connection.effort === "string").toBe(true);
+    }
   });
 });

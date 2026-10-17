@@ -66,6 +66,9 @@ pub const HOME_DIR: &str = "codex-home";
 pub struct CodexConfig {
     /// A model name; the client's own default when absent.
     pub model: Option<String>,
+    /// How hard the client is asked to think (`model_reasoning_effort`); its own default when
+    /// absent.
+    pub effort: Option<String>,
     /// How long a run may take before it is killed.
     pub timeout: Duration,
     /// How many requests of the connection run at once.
@@ -76,6 +79,7 @@ impl Default for CodexConfig {
     fn default() -> Self {
         CodexConfig {
             model: None,
+            effort: None,
             timeout: Duration::from_secs(30 * 60),
             places: 1,
         }
@@ -151,6 +155,7 @@ impl Codex {
             &scoped_to(&self.author, spec),
             self.support.disabled_features(),
             self.config.model.as_deref(),
+            self.config.effort.as_deref(),
             scratch,
             schema_file,
             last,
@@ -192,6 +197,7 @@ fn exec_arguments(
     author: &AuthorServer,
     disabled: &[String],
     model: Option<&str>,
+    effort: Option<&str>,
     scratch: &Path,
     schema_file: &Path,
     last: &Path,
@@ -210,6 +216,14 @@ fn exec_arguments(
     ]);
     if let Some(model) = model {
         args.extend(["-m".into(), model.to_string()]);
+    }
+    if let Some(effort) = effort {
+        // A TOML string, as every value given with `-c` is: the word is one of a closed list the
+        // connection was held to when it was saved, so it carries nothing that needs quoting.
+        args.extend([
+            "-c".into(),
+            format!("model_reasoning_effort={}", toml_string(effort)),
+        ]);
     }
     for feature in disabled {
         args.extend(["--disable".into(), feature.clone()]);
@@ -513,6 +527,7 @@ fn instruction_material(support: &Support) -> String {
     let arguments = exec_arguments(
         &scoped_to(&author, "<spec>"),
         support.disabled_features(),
+        None,
         None,
         Path::new("<scratch>"),
         Path::new("<schema>"),

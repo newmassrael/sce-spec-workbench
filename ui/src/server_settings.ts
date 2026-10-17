@@ -51,6 +51,14 @@ const PRESETS: readonly { readonly name: string; readonly address: string }[] = 
   { name: "vLLM", address: "http://127.0.0.1:8000/v1" },
 ];
 
+/**
+ * Efforts offered as suggestions for a model server: the words of the OpenAI-compatible
+ * `reasoning_effort`, and `xhigh`, which a server this was measured against names for its highest.
+ * They are suggestions and nothing more: a server takes the words it defines, and the core holds
+ * the effort only to being a word.
+ */
+const SERVER_EFFORT_SUGGESTIONS = ["low", "medium", "high", "xhigh"] as const;
+
 /** The id of what the server said, which a screen can bring into view. */
 const STATUS_ID = "ai-server-status";
 
@@ -84,6 +92,8 @@ export class ServerSection {
   private draftAddress: string | undefined = undefined;
   /** The model typed or chosen and not yet saved; `undefined` is the one that is kept. */
   private draftModel: string | undefined = undefined;
+  /** The effort typed and not yet saved; `undefined` is the one that is kept. */
+  private draftEffort: string | undefined = undefined;
   /** What was typed in the limit fields and not yet saved; a key that is absent is the one that is kept. */
   private draftLimits: Partial<Record<ServerLimit, string>> = {};
   /** The buttons as drawn, so that typing can enable them without drawing the fields again. */
@@ -137,6 +147,7 @@ export class ServerSection {
       display_name: this.name(),
       executable: null,
       model: this.model() === "" ? null : this.model(),
+      effort: this.effort(),
       // A server that wants a key cannot be used by this build, so none is asked for.
       auth: "none",
       server_url: this.address(),
@@ -151,6 +162,7 @@ export class ServerSection {
     this.draftName = undefined;
     this.draftAddress = undefined;
     this.draftModel = undefined;
+    this.draftEffort = undefined;
     this.draftLimits = {};
   }
 
@@ -184,6 +196,12 @@ export class ServerSection {
 
   private model(): string {
     return (this.draftModel ?? localConnection(this.env.listing())?.connection.model ?? "").trim();
+  }
+
+  /** The effort that would be saved: what was typed, else the one kept; empty is the server's own. */
+  private effort(): string | null {
+    const typed = (this.draftEffort ?? localConnection(this.env.listing())?.connection.effort ?? "").trim();
+    return typed === "" ? null : typed;
   }
 
   /** What the server said, when it was asked at the address that is shown now and not another. */
@@ -221,6 +239,8 @@ export class ServerSection {
         h("dd", { id: STATUS_ID }, this.checkButton(), this.drawnStatus()),
         h("dt", {}, t("aiModel")),
         h("dd", {}, this.modelField()),
+        h("dt", {}, t("aiEffort")),
+        h("dd", {}, this.effortField()),
         ...SERVER_LIMITS.flatMap((limit) => [
           h("dt", {}, t(limit.label)),
           h("dd", {}, this.limitField(limit.key, limit.label, limit.note)),
@@ -418,6 +438,40 @@ export class ServerSection {
       ...listed.map((model) => h("option", { value: model })),
     );
     return h("div", {}, field, options);
+  }
+
+  /**
+   * How hard the server is asked to make the model think: a word as the server names it, or nothing
+   * for the server's own. The words offered are those the servers this build was written against
+   * take; the server decides which it takes, and says so when it refuses one.
+   */
+  private effortField(): HTMLElement {
+    const t = this.env.t;
+    const field = h("input", {
+      id: "ai-server-effort",
+      type: "text",
+      maxlength: "24",
+      spellcheck: "false",
+      autocomplete: "off",
+      list: "ai-server-efforts",
+      "aria-label": t("aiEffort"),
+      placeholder: t("aiEffortDefault"),
+      oninput: (event) => {
+        this.draftEffort = (event.target as HTMLInputElement).value;
+      },
+    });
+    field.value = this.draftEffort ?? localConnection(this.env.listing())?.connection.effort ?? "";
+    return h(
+      "div",
+      {},
+      field,
+      h(
+        "datalist",
+        { id: "ai-server-efforts" },
+        ...SERVER_EFFORT_SUGGESTIONS.map((word) => h("option", { value: word })),
+      ),
+      h("p", { class: "muted" }, t("aiServerEffortNote")),
+    );
   }
 
   /** A limit of the model: a count, or nothing for the application's own. */

@@ -96,6 +96,7 @@ fn run() -> Result<(), String> {
             model: std::env::var("SCE_CLAUDE_MODEL")
                 .ok()
                 .filter(|model| !model.trim().is_empty()),
+            effort: None,
             auth: AuthSource::OfficialLogin,
             server_url: None,
             limits: RunLimits::default(),

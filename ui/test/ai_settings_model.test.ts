@@ -85,6 +85,7 @@ const connection = (over: Partial<Connection> = {}): Connection => ({
   display_name: null,
   executable: null,
   model: "opus",
+  effort: null,
   auth: "official-login",
   server_url: null,
   limits: NO_LIMITS,

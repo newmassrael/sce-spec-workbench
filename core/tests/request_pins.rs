@@ -484,6 +484,7 @@ fn a_request_written_before_its_run_was_the_applications_reads_as_it_was_made() 
         PinnedRun {
             adapter: AdapterKind::Local,
             model: Some("qwen3-coder:30b".to_string()),
+            effort: None,
             limits: Limits {
                 turns: Some(40),
                 handoffs: Some(2),

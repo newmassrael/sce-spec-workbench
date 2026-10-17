@@ -72,3 +72,49 @@ export function programChoice(options: ProgramChoice): HTMLElement {
   );
   return h("label", { class: "ai-program" }, h("span", {}, `${t("aiProgram")} `), select);
 }
+
+/** What the choice of an effort needs. */
+export interface EffortChoice {
+  /** The id of the list, which a test and a label find it by. */
+  readonly id: string;
+  readonly t: (key: Key, values?: Record<string, string>) => string;
+  /** The efforts the client takes, as the core holds a connection to them. */
+  readonly offered: readonly string[];
+  /** What would be saved: the one chosen in the list, else the one kept; `null` is the client's own. */
+  readonly current: string | null;
+  /** The person chose one in the list; `null` is the client's own. */
+  readonly choose: (effort: string | null) => void;
+}
+
+/**
+ * How hard the model is asked to think: the client's own default, or one of the words the client
+ * takes. An effort a connection already names that is not in the list stays in it, said to be one
+ * this build does not offer, so that a save does not drop it unseen (it is refused by the core,
+ * which says why, when the person saves).
+ */
+export function effortChoice(options: EffortChoice): HTMLElement {
+  const { t, current, offered } = options;
+  const select = h(
+    "select",
+    {
+      id: options.id,
+      "aria-label": t("aiEffort"),
+      onchange: (event) => {
+        const value = (event.target as HTMLSelectElement).value;
+        options.choose(value === "" ? null : value);
+      },
+    },
+    h("option", { value: "", selected: current === null }, t("aiEffortDefault")),
+    ...offered.map((word) => h("option", { value: word, selected: current === word }, word)),
+    current !== null && !offered.includes(current)
+      ? h("option", { value: current, selected: true }, `${current} (${t("aiEffortUnoffered")})`)
+      : null,
+  );
+  return h(
+    "label",
+    { class: "ai-effort" },
+    h("span", {}, `${t("aiEffort")} `),
+    select,
+    h("span", { class: "muted" }, ` ${t("aiEffortNote")}`),
+  );
+}

@@ -325,6 +325,34 @@ fn a_draft_the_core_refused_is_put_to_the_client_in_the_products_words() {
 }
 
 #[test]
+fn the_effort_a_connection_names_reaches_the_command_line_and_none_is_asked_when_it_names_none() {
+    let fake = Fake::answering("claude-effort", &answered(single("<scxml/>")));
+    let config = ClaudeCodeConfig {
+        effort: Some("xhigh".to_string()),
+        ..ClaudeCodeConfig::default()
+    };
+
+    generate(
+        &ClaudeCode::new(fake.binary.clone(), author(), config),
+        &job(),
+    )
+    .unwrap();
+
+    assert_eq!(fake.value_of("--effort").as_deref(), Some("xhigh"));
+
+    let plain = Fake::answering("claude-no-effort", &answered(single("<scxml/>")));
+    generate(
+        &ClaudeCode::new(plain.binary.clone(), author(), ClaudeCodeConfig::default()),
+        &job(),
+    )
+    .unwrap();
+    assert!(
+        plain.value_of("--effort").is_none(),
+        "the client's own effort"
+    );
+}
+
+#[test]
 fn a_request_with_no_time_left_does_not_start_the_client_and_says_it_ran_out() {
     let fake = Fake::new("claude-clock-gone", "echo should-not-run");
     let gone = Job {

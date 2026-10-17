@@ -123,6 +123,7 @@ fn pinned(label: &str, adapter: AdapterKind) -> (ConnectionStore, Pin) {
         display_name: None,
         executable: None,
         model: Some("opus".to_string()),
+        effort: None,
         auth: AuthSource::OfficialLogin,
         server_url: None,
         limits: Limits::default(),

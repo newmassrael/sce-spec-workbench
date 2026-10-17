@@ -620,6 +620,40 @@ fn a_model_that_says_the_schema_back_is_told_that_it_did() {
 }
 
 #[test]
+fn the_effort_a_connection_names_is_asked_of_the_server_in_every_request_and_none_when_it_names_none(
+) {
+    let rig = Rig::new(
+        "local-effort",
+        vec![
+            calls(&[(Some("c1"), "specs_read", "{\"spec\":\"door-lock\"}")]),
+            says(&draft("<scxml/>")),
+        ],
+    );
+    let config = LocalConfig {
+        effort: Some("low".to_string()),
+        ..LocalConfig::for_model("qwen-test")
+    };
+
+    rig.local(config).generate(&job(), &Cancel::new()).unwrap();
+
+    let requests = rig.server.requests();
+    assert_eq!(requests.len(), 2);
+    for sent in &requests {
+        assert_eq!(sent.body["reasoning_effort"], json!("low"));
+    }
+
+    let plain = Rig::new("local-no-effort", vec![says(&draft("<scxml/>"))]);
+    plain.run().unwrap();
+    assert!(
+        plain.server.requests()[0]
+            .body
+            .get("reasoning_effort")
+            .is_none(),
+        "a server told nothing uses its own default"
+    );
+}
+
+#[test]
 fn a_model_that_only_calls_tools_runs_out_of_turns() {
     let script = (0..10)
         .map(|_| calls(&[(Some("c"), "specs_read", "{}")]))

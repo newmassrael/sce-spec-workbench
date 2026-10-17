@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 29;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 2;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 3;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -324,10 +324,25 @@ export interface Connection {
   readonly display_name: string | null;
   readonly executable: string | null;
   readonly model: string | null;
+  /**
+   * How hard the model is asked to think, in the client's or the server's word for it; `null` leaves
+   * it to them. Which words a client takes is `EFFORTS`; a model server names its own.
+   */
+  readonly effort: string | null;
   readonly auth: AuthSource;
   readonly server_url: string | null;
   readonly limits: Limits;
 }
+
+/**
+ * The efforts a person may choose for a client, as the core holds a connection to them
+ * (`AdapterKind::efforts`). A test reads the core's list and holds this one to it. A model server has
+ * no list here: the words it takes are its own.
+ */
+export const EFFORTS: Readonly<Record<"claude-code" | "codex", readonly string[]>> = {
+  "claude-code": ["low", "medium", "high", "xhigh", "max"],
+  codex: ["low", "medium", "high", "xhigh"],
+};
 
 /**
  * What one generation may spend, as a connection says it; `null` is the application's default. The
@@ -1936,6 +1951,7 @@ function parseConnection(value: unknown, where: string): Connection {
     display_name: nullableText(r, "display_name", where),
     executable: nullableText(r, "executable", where),
     model: nullableText(r, "model", where),
+    effort: nullableText(r, "effort", where),
     auth: oneOf(r, "auth", where, ["official-login", "app-store", "env-api-key", "server-key", "none"] as const),
     server_url: nullableText(r, "server_url", where),
     limits: parseLimits(limits, `${where}.limits`),

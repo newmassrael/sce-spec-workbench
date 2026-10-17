@@ -76,6 +76,37 @@ impl AdapterKind {
             AdapterKind::Local => &[AuthSource::NoAuth, AuthSource::ServerKey],
         }
     }
+
+    /// The efforts a person may choose for this kind of connection, when the kind has a list.
+    ///
+    /// How hard a model thinks is the client's or the server's own knob, and each names its values.
+    /// A client's list is the one it states and a person verified against it: Claude Code's from
+    /// its own help (`--effort`), Codex's from the key it reads (`model_reasoning_effort`). A value
+    /// that is not here is refused when the connection is saved, where it can be put right, and not
+    /// when a run of two hours has begun with it. A model that does not take one of these says so
+    /// when it is run, in the client's own words. A model server has no list of ours: which values
+    /// it takes is the server's to say (`None`), and it is held only to being a word.
+    pub fn efforts(self) -> Option<&'static [&'static str]> {
+        match self {
+            AdapterKind::ClaudeCode => Some(&["low", "medium", "high", "xhigh", "max"]),
+            AdapterKind::Codex => Some(&["low", "medium", "high", "xhigh"]),
+            AdapterKind::Local => None,
+        }
+    }
+}
+
+/// The longest an effort of a model server may be: a word the server defines.
+const EFFORT_MAX: usize = 24;
+
+/// Whether `word` is the shape of an effort a model server may be asked for: 1 to `EFFORT_MAX`
+/// lowercase letters, digits and hyphens, none at either end.
+fn is_effort_word(word: &str) -> bool {
+    (1..=EFFORT_MAX).contains(&word.len())
+        && !word.starts_with('-')
+        && !word.ends_with('-')
+        && word
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 /// Where a connection's credential comes from. The credential itself is never in a connection.
@@ -200,6 +231,11 @@ pub struct Connection {
     /// The model asked for, as the client or server names it. None leaves the choice to it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// How hard the model is asked to think, in the client's or the server's word for it (see
+    /// [`AdapterKind::efforts`]). None leaves it to the client or the server: what they do when
+    /// not told is their own default, and it is not said here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
     pub auth: AuthSource,
     /// A local connection's server: `http(s)://host[:port][/path]`, nothing more.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -258,6 +294,28 @@ impl Connection {
                 )));
             }
         }
+        if let Some(effort) = self.effort.as_deref() {
+            match self.adapter.efforts() {
+                Some(allowed) if !allowed.contains(&effort) => {
+                    return Err(bad(format!(
+                        "an effort for a {} connection is one of {}, and `{effort}` is not",
+                        self.adapter.word(),
+                        allowed
+                            .iter()
+                            .map(|word| format!("`{word}`"))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    )));
+                }
+                None if !is_effort_word(effort) => {
+                    return Err(bad(format!(
+                        "an effort for a model server is a word of 1 to {EFFORT_MAX} lowercase \
+                         letters, digits and hyphens, as the server names it"
+                    )));
+                }
+                _ => {}
+            }
+        }
         if let Some(executable) = self.executable.as_deref() {
             if !valid_executable(executable) {
                 return Err(bad(format!(
@@ -294,6 +352,10 @@ pub struct PinnedRun {
     pub adapter: AdapterKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// How hard the model was asked to think when the request was made. A run is the one its
+    /// request asked for: an effort changed afterwards is not the effort of a request already made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
     #[serde(default, skip_serializing_if = "Limits::is_empty")]
     pub limits: Limits,
 }
@@ -304,6 +366,7 @@ impl PinnedRun {
         PinnedRun {
             adapter: connection.adapter,
             model: connection.model.clone(),
+            effort: connection.effort.clone(),
             limits: connection.limits.clone(),
         }
     }

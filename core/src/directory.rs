@@ -263,6 +263,7 @@ impl Connections {
         let defaults = ClaudeCodeConfig::default();
         let config = ClaudeCodeConfig {
             model: run.model.clone(),
+            effort: run.effort.clone(),
             max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
             max_budget_usd: launch.max_budget_usd,
             timeout: run
@@ -299,6 +300,7 @@ impl Connections {
         let defaults = CodexConfig::default();
         Ok(ready.with_config(CodexConfig {
             model: run.model.clone(),
+            effort: run.effort.clone(),
             timeout: run
                 .limits
                 .seconds
@@ -371,6 +373,7 @@ impl Connections {
             })?;
         let defaults = LocalConfig::for_model(model);
         let config = LocalConfig {
+            effort: run.effort.clone(),
             max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
             timeout: run
                 .limits

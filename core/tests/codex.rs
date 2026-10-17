@@ -471,6 +471,63 @@ fn no_model_is_asked_for_when_the_connection_names_none() {
     assert!(!fake.argv().iter().any(|a| a == "-m"), "{:?}", fake.argv());
 }
 
+/// A Codex that runs as the connection says, with `effort` named or not.
+fn codex_with_effort(fake: &Fake, effort: Option<&str>) -> Codex {
+    Codex::new(
+        fake.binary.clone(),
+        author(),
+        CodexConfig {
+            effort: effort.map(str::to_string),
+            timeout: Duration::from_secs(20),
+            ..CodexConfig::default()
+        },
+        AuthSource::AppStore,
+        fake.home(),
+        verified_for(fake, AuthSource::AppStore, &["shell_tool", "unified_exec"]),
+    )
+    .with_environment(vec![(
+        "PATH".to_string(),
+        std::env::var("PATH").unwrap_or_default(),
+    )])
+}
+
+#[test]
+fn the_effort_a_connection_names_is_given_as_the_setting_codex_reads_and_none_when_it_names_none() {
+    let fake = Fake::answering("codex-effort", &answer("<scxml/>"));
+    generate(&codex_with_effort(&fake, Some("high"))).unwrap();
+
+    let args = fake.argv();
+    assert!(
+        args.windows(2)
+            .any(|w| w[0] == "-c" && w[1] == "model_reasoning_effort=\"high\""),
+        "{args:?}"
+    );
+
+    let plain = Fake::answering("codex-no-effort", &answer("<scxml/>"));
+    generate(&codex_with_effort(&plain, None)).unwrap();
+    assert!(
+        !plain
+            .argv()
+            .iter()
+            .any(|a| a.starts_with("model_reasoning_effort")),
+        "{:?}",
+        plain.argv()
+    );
+}
+
+#[test]
+fn an_effort_is_a_choice_of_the_run_and_is_not_part_of_what_a_person_verified() {
+    // What a person verified is the sandbox, the settings and the flags, which are the same for
+    // every run; how hard the model thinks is chosen per connection, as the model is, and a
+    // connection that changes it does not make the instructions another version.
+    let fake = Fake::answering("codex-effort-instructions", &answer("<scxml/>"));
+
+    let with = codex_with_effort(&fake, Some("xhigh")).instructions();
+    let without = codex_with_effort(&fake, None).instructions();
+
+    assert_eq!(with, without);
+}
+
 #[test]
 fn what_it_is_told_goes_in_on_standard_input_and_not_on_the_command_line() {
     let fake = Fake::answering("codex-stdin", &answer("<scxml/>"));

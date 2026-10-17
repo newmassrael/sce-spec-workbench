@@ -62,7 +62,12 @@ pub const COMMANDS: &[&str] = &[
 /// 2: a connection's `limits` has `places`, how many requests of it run at once. A core of the
 /// last version refuses a connection that says it (an argument it does not know), so a screen
 /// that sends it is held to this one.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 2;
+///
+/// 3: a connection has an `effort`, how hard the model is asked to think, in the client's or the
+/// server's word for it (`save_connection` takes it and every reply that is a connection says it,
+/// `null` when none is chosen). A core of the last version refuses a connection that says it (a
+/// field it does not know), so a screen that sends it is held to this one.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 3;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {

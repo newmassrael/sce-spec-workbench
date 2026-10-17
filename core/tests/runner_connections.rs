@@ -124,6 +124,7 @@ fn pin(connection: &str, revision: &str) -> Pin {
     PinnedRun {
         adapter: AdapterKind::ClaudeCode,
         model: Some("opus".to_string()),
+        effort: None,
         limits: Limits {
             turns: Some(7),
             seconds: None,
