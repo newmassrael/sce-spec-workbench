@@ -43,6 +43,21 @@ git submodule update --init sce
 `scripts/check.sh` is everything CI judges short of the installer, and
 `scripts/check_installer.sh` builds the Linux installer and starts what it installs.
 
+Before the first commit of a clone, turn the hooks on:
+
+```sh
+bash scripts/git-hooks/install.sh
+```
+
+This repository is public and a push does not un-publish, so a commit is held to a list of
+restricted terms at the commit: its files (strictly, and loosely over the lines it adds: case
+ignored, no word boundary) and its message. The gate is the one in the `sce` submodule, the list is
+`~/.claude/restricted-terms.txt` and is in no repository, nothing it matched is ever printed (only
+the file, the line and the pattern's number), and a clone without the gate or the list refuses the
+commit rather than passing it. A pattern too blunt for the loose tier is left out of it by number in
+`~/.claude/restricted-terms.txt.loose-exclude`. CI cannot make this check, because the list cannot
+be in the repository, so the hook is the only place it is made. `git commit --no-verify` skips it.
+
 Today it does the first two parts: **specs** (a titled piece of specification
 text), **immutable revisions** of each, and a **save that refuses to overwrite**
 text the caller has not seen; and the **model** of a spec, kept beside the text

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# pre-commit: what is staged is held to the restricted-term list before it can be committed.
+#
+# The gate is SCE's own (`sce/tools/git-hooks/restricted-term-gate.sh`), so this repository and
+# the one it is built on refuse the same things in the same words. Its list lives outside every
+# repository (`~/.claude/restricted-terms.txt`), it never prints what it matched, and it fails
+# closed: a list it cannot read, or a gate this checkout does not have, refuses the commit
+# instead of passing it. This repository is public, and a push does not un-publish.
+#
+# There is no bypass here. `SCE_RESTRICTED_OVERRIDE=1` is the gate's own, and it says so loudly.
+# Turn the hooks on once per clone: `bash scripts/git-hooks/install.sh`.
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+gate="$repo_root/sce/tools/git-hooks/restricted-term-gate.sh"
+
+if [[ ! -r "$gate" ]]; then
+    printf '\nERROR pre-commit: the restricted-term gate is not in this checkout (%s).\n' "$gate" >&2
+    printf '  It comes with the sce submodule: git submodule update --init sce\n' >&2
+    printf '  A gate that is not there is a check that was not made, so this refuses.\n' >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$gate"
+
+if ! declare -F restricted_term_gate_staged >/dev/null; then
+    printf '\nERROR pre-commit: %s does not define restricted_term_gate_staged.\n' "$gate" >&2
+    exit 1
+fi
+
+restricted_term_gate_staged

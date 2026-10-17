@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+# SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+#
+# commit-msg: the message is held to the restricted-term list too.
+#
+# `pre-commit` reads the files a commit carries and cannot see the message, which is published
+# with the commit all the same. Same gate, same list, same rules as `pre-commit`: it prints no
+# matched text, and it refuses when the gate or the list is missing.
+
+set -euo pipefail
+
+message="${1:?commit-msg hook requires the message file path}"
+repo_root="$(git rev-parse --show-toplevel)"
+gate="$repo_root/sce/tools/git-hooks/restricted-term-gate.sh"
+
+if [[ ! -r "$gate" ]]; then
+    printf '\nERROR commit-msg: the restricted-term gate is not in this checkout (%s).\n' "$gate" >&2
+    printf '  It comes with the sce submodule: git submodule update --init sce\n' >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$gate"
+
+if ! declare -F restricted_term_gate_message >/dev/null; then
+    printf '\nERROR commit-msg: %s does not read a message (restricted_term_gate_message).\n' "$gate" >&2
+    printf '  The sce submodule is older than the gate this hook needs: update it.\n' >&2
+    exit 1
+fi
+
+restricted_term_gate_message "$message"
