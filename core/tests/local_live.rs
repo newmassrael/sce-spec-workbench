@@ -298,20 +298,82 @@ fn a_model_on_a_real_server_is_given_a_long_document_and_ends_in_an_outcome() {
         text.len(),
         text.split_whitespace().count()
     );
-    let model = write_and_publish("local-live-long", "A building of rooms", &text);
+    let (_, measured) = write_and_publish("local-live-long", "A building of rooms", &text);
 
     // The core accepting a draft says it is well formed, and says nothing of a draft that wrote
-    // fifty rooms of sixty. Every room the document tells of is named in the design.
-    let named = numbers_named(&model);
-    let missing: Vec<u32> = (1..=zones).filter(|room| !named.contains(room)).collect();
-    println!("rooms the design does not name: {missing:?}");
+    // fifty rooms of sixty. What does say is SCE's measure of the design against the requirement
+    // list: a requirement nothing in the design carries is `missing`. The design is not searched
+    // for room names (a model names them as it likes: `light_12`, `room12`, `r12`, and a search
+    // that knew one spelling called two complete designs empty on 2026-10-18).
     assert!(
-        missing.is_empty(),
-        "the design leaves out rooms of the document: {missing:?}"
+        measured.said,
+        "SCE did not measure the design, so nothing says what it leaves out: {:?}",
+        measured.refusal
+    );
+    assert!(
+        measured.missing.is_empty(),
+        "the design leaves out requirements of the document, which SCE found nothing carries: {:?}",
+        &measured.missing[..measured.missing.len().min(40)]
     );
 }
 
-fn write_and_publish(label: &str, title: &str, text: &str) -> String {
+/// What SCE said of a design measured against its requirement list.
+struct Measured {
+    /// SCE answered the measure; when it did not, `refusal` says why.
+    said: bool,
+    refusal: Option<Value>,
+    /// How many requirements fall under each of SCE's words, in alphabetical order.
+    tally: std::collections::BTreeMap<String, usize>,
+    /// The requirements SCE found nothing in the design carries.
+    missing: Vec<String>,
+}
+
+/// SCE's measure of the model and the requirement list the spec keeps, for the revisions it keeps:
+/// asked of the product the run was checked by, as the screen asks it (`read_judgment`).
+fn measure(store: &SpecStore<SystemClock>, codegen: &Path, spec: &SpecId) -> Measured {
+    let head = store.head(spec).unwrap().expect("a text");
+    let model = store.read_model(spec, None).unwrap().expect("a model");
+    let list = store
+        .read_requirements(spec, None)
+        .unwrap()
+        .expect("a requirement list");
+    let answered = sce_specs::call(
+        store,
+        &SceCodegen::at(codegen),
+        "read_judgment",
+        json!({
+            "id": spec.as_str(),
+            "basis": {
+                "source": head,
+                "model": model.revision,
+                "requirements": list.revision,
+            },
+        }),
+    )
+    .expect("the command is answered");
+    let report = &answered["report"];
+    let mut measured = Measured {
+        said: report.get("said").is_some(),
+        refusal: report.get("refused").cloned(),
+        tally: Default::default(),
+        missing: Vec::new(),
+    };
+    for outcome in report["said"]["outcomes"].as_array().into_iter().flatten() {
+        let word = outcome["outcome"]
+            .as_str()
+            .unwrap_or("unspoken")
+            .to_string();
+        if word == "missing" {
+            measured
+                .missing
+                .push(outcome["id"].as_str().unwrap_or("?").to_string());
+        }
+        *measured.tally.entry(word).or_default() += 1;
+    }
+    measured
+}
+
+fn write_and_publish(label: &str, title: &str, text: &str) -> (String, Measured) {
     let setup = Setup::from_environment();
 
     let specs = common::scratch(label).join("specs");
@@ -363,70 +425,12 @@ fn write_and_publish(label: &str, title: &str, text: &str) -> String {
     println!("--- requirements ---\n{}\n--- end ---", list.text);
     assert!(model.text.contains("<scxml") || model.text.contains("documents"));
     assert_eq!(published.bundle.checks[0].verdict, "accepted");
-    model.text
-}
-
-/// The numbers of the rooms a model's names carry. A model names a room's parts as it likes
-/// (`light_12`, `room12_ignoring`, `Room 12`, `room-12`), and a check that knew one way of
-/// spelling it called a design that names every room of forty a design that names none (measured
-/// on 2026-10-18). A number is a room's when it follows the word `room` with at most one separator
-/// (a space, `_` or `-`), or follows an underscore in a name (`light_12`).
-fn numbers_named(text: &str) -> std::collections::BTreeSet<u32> {
-    let lower = text.to_ascii_lowercase();
-    let bytes = lower.as_bytes();
-    let mut found = std::collections::BTreeSet::new();
-    let digits_at = |from: usize| -> Option<(u32, usize)> {
-        let end = bytes[from..]
-            .iter()
-            .position(|b| !b.is_ascii_digit())
-            .map_or(bytes.len(), |n| from + n);
-        (end > from)
-            .then(|| {
-                lower[from..end]
-                    .parse::<u32>()
-                    .ok()
-                    .map(|number| (number, end))
-            })
-            .flatten()
-    };
-    let mut at = 0;
-    while at < bytes.len() {
-        let after = if bytes[at..].starts_with(b"room") {
-            let mut from = at + 4;
-            if matches!(bytes.get(from), Some(b' ' | b'_' | b'-')) {
-                from += 1;
-            }
-            Some(from)
-        } else if bytes[at] == b'_' {
-            Some(at + 1)
-        } else {
-            None
-        };
-        match after.and_then(digits_at) {
-            Some((number, end)) => {
-                found.insert(number);
-                at = end;
-            }
-            None => at += 1,
-        }
-    }
-    found
-}
-
-#[test]
-fn a_room_is_found_however_the_model_spells_its_name() {
-    let said = |text: &str| numbers_named(text).into_iter().collect::<Vec<_>>();
-
-    assert_eq!(said("room7_ignoring room12_unlisted"), vec![7, 12]);
-    assert_eq!(said("Room 3 and ROOM-4 and room_5"), vec![3, 4, 5]);
-    assert_eq!(said("light_12 door_7"), vec![7, 12]);
-    // A number of a threshold or a duration is not a room's, and a word with no number is nothing.
-    assert_eq!(
-        said("after 300 seconds, 3 times; rooms; room"),
-        Vec::<u32>::new()
+    let measured = measure(&store, &setup.codegen, &spec);
+    println!(
+        "what SCE measured of the design: said={} {:?}, missing {:?}",
+        measured.said, measured.tally, measured.missing
     );
-    assert_eq!(said("room007_x"), vec![7]);
-    assert_eq!(said(""), Vec::<u32>::new());
+    (model.text, measured)
 }
 
 /// What the screen does, by the commands it sends, and then what the application's own host does
