@@ -128,13 +128,15 @@ The screen follows what the application does (`core/src/auth_policy.rs`, `claude
 
 ## What the design says
 
-**Five states, in words.** A row in the list is one of: needs a look (`확인할 부분`), changed while
+**Six states, in words.** A row in the list is one of: needs a look (`확인할 부분`), changed while
 you looked (`보던 사이에 바뀜`), the AI is writing it (`AI가 옮겨 쓰는 중`), waiting for its connection
 (`연결을 기다리는 중`), accepted (`수락함`). Every state has a word and a shape; colour is never the
 only cue. The fifth was added because the application can hold a request that no AI is working on
 and that only the person can free (nobody is signed in, the client is not found): showing it as "the AI
 is writing it" would be false, and it needs amber, the colour of what waits for the owner. Its row says
-the reason in a line, and the screen it opens says what to do.
+the reason in a line, and the screen it opens says what to do. A sixth, waiting for its turn behind
+another request of the same connection (`차례를 기다리는 중`), is not amber because the owner has
+nothing to do: it starts by itself when the request ahead ends.
 
 **Every piece of text says who wrote it.** The original is set in a serif, in a white page. What the
 AI wrote is labelled with the AI's name and carries the teal. What the product checked is said in a
@@ -325,16 +327,18 @@ Read in `core/src/directory.rs`, `runner.rs` and `sce/sce-specs/src` (`store/req
   sentence a runner says but a record read from the store (`read_queue`: the connection, how many
   of its places are running, how many are ahead), so it is known with no runner alive and is put into
   words by the screen.
-- **Waiting behind another request is not amber.** Amber is what waits for the owner (the five
-  states above), and this frees by itself when the request ahead ends, so the banner is the neutral
+- **Waiting behind another request is not amber.** Amber is what waits for the owner (the states
+  above but the sixth), and this frees by itself when the request ahead ends, so the banner is the neutral
   accent, its title says `차례를 기다리고 있어요` and not `AI를 기다리고 있어요`, and it offers no
   `연결 확인`: the one thing to do is to ask again through another connection, which replaces the
   request (nothing is lost, it has not started). Asking again for the same busy connection says
   the new request waits in the same line. A connection takes one request at a time unless its
   places say more, so the line is in the order the requests were made.
-- **The list does not draw this state yet.** A row for a request behind another is still the amber
-  `연결을 기다리는 중`; it needs its own neutral state (a sixth, `차례를 기다리는 중`) in `Library`,
-  its sort and its search, which is left to be decided with the rows.
+- **The list draws it as a sixth state, `차례를 기다리는 중`.** A row for a request behind another
+  has the neutral badge with a clock (the shape of the accepted row's tint, told apart by the clock
+  and by the word), says which connection is busy and how many are ahead, and sorts with the rows that
+  need nothing from the owner, after the ones that do. In the prototype the row opens `Waiting` in
+  its default reason: a link between boards cannot say which reason to open.
 - A request made in the application for no connection is not run at all (`unchosen`), which is why
   the import choice exists.
 - A review of a conversion that is long enough to need its own navigation.
