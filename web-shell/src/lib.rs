@@ -122,7 +122,14 @@ fn status_of(kind: &str) -> u16 {
         | "bundled-spec"
         | "lineage-dropped"
         | "lineage-not-continued"
-        | "lineage-numbers-reused" => 409,
+        | "lineage-numbers-reused"
+        // A proposal the spec cannot take now: another is open, a question has no decision, a text
+        // assembled before the last decision, a proposal that ended, a text that has not moved.
+        | "active-proposal"
+        | "undecided"
+        | "decisions-moved"
+        | "proposal-ended"
+        | "nothing-to-carry" => 409,
         "too-large" => 413,
         // The request was understood and what it carries is refused on its content: a model, a
         // list, answers or a candidate that are not one, a reference to a text there is not, a
@@ -135,6 +142,9 @@ fn status_of(kind: &str) -> u16 {
         // A bundle that is not an original: a path that could leave it, two that differ only in case,
         // a rendition with no source. The call was understood and what it carries is refused.
         | "bad-original"
+        // A proposal whose parts do not name each other, a decision on a block nobody has, words
+        // where a decision carries none.
+        | "bad-proposal"
         | "check-refused"
         | "fresh-ids-not-issued"
         | "model-for-an-unknown-text"
@@ -291,6 +301,7 @@ mod tests {
     /// contract file (`core/contract/replies.json`, written by running the commands) and the
     /// few the commands give that no reply of it shows.
     const CHOSEN: &[(&str, u16)] = &[
+        ("active-proposal", 409),
         ("active-request", 409),
         ("bad-adapter", 400),
         ("bad-candidate", 422),
@@ -299,6 +310,7 @@ mod tests {
         ("bad-instructions", 400),
         ("bad-lease", 400),
         ("bad-original", 422),
+        ("bad-proposal", 422),
         ("bad-request", 400),
         ("bad-server-address", 400),
         ("busy", 503),
@@ -311,6 +323,7 @@ mod tests {
         ("connection-moved", 409),
         // The server's own faults: a store that is damaged or cannot be written.
         ("corrupt", 500),
+        ("decisions-moved", 409),
         ("invalid-answers", 422),
         ("invalid-id", 400),
         ("invalid-model", 422),
@@ -329,6 +342,7 @@ mod tests {
         ("no-candidate", 409),
         ("no-core-check", 409),
         ("no-settings", 404),
+        ("nothing-to-carry", 409),
         ("not-allowed-here", 403),
         ("not-allowed-to-find-clients", 403),
         ("not-allowed-to-read-server-status", 403),
@@ -337,6 +351,7 @@ mod tests {
         ("not-found", 404),
         ("not-holder", 409),
         ("not-resuming", 409),
+        ("proposal-ended", 409),
         ("removed-spec", 404),
         ("request-connection-moved", 409),
         ("request-ended", 409),
@@ -348,6 +363,7 @@ mod tests {
         ("sce-timeout", 504),
         ("sce-unavailable", 503),
         ("too-large", 413),
+        ("undecided", 409),
         ("unknown-command", 404),
         ("wrong-connection", 409),
     ];

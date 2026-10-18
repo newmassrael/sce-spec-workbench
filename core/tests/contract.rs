@@ -1697,6 +1697,191 @@ fn replies() -> Value {
         ),
     );
 
+    // A document brought in, converted and checked, waiting for the owner (ADR 0025, 0037): the
+    // proposal is kept in the spec, the owner's decisions are a log, and accepting is one locked step
+    // that writes the spec's text. The conversion and the report are what the authoring tools write;
+    // the store reads their revisions and the questions the report asks, and keeps the rest unread.
+    let proposal_spec = answer(
+        &store,
+        "create_spec",
+        json!({"title": "Door lock, brought in"}),
+    );
+    let proposal_spec_id = proposal_spec["id"].as_str().unwrap().to_string();
+    let proposal_original = answer(
+        &store,
+        "add_original",
+        json!({
+            "id": proposal_spec_id,
+            "members": [{"path": "spec.md", "role": "document", "data": "IyBEb29yIGxvY2sK"}],
+        }),
+    )["digest"]
+        .clone();
+    let proposal_extraction_text = json!({
+        "v": 1, "extractor": "plain", "extractor_version": "1", "member": "spec.md",
+        "blocks": [{"id": "b1"}, {"id": "b2"}], "not_carried": [],
+    })
+    .to_string();
+    let proposal_extraction = answer(
+        &store,
+        "save_extraction",
+        json!({"id": proposal_spec_id, "original": proposal_original,
+               "member": "spec.md", "text": proposal_extraction_text}),
+    )["digest"]
+        .clone();
+    let conversion_text = json!({
+        "v": 1,
+        "converter": {"kind": "rules", "name": "blocks-to-markdown", "version": "1"},
+        "extraction": proposal_extraction,
+        "blocks": [
+            {"id": "m1", "markdown": "# Door lock", "cites": ["b1"]},
+            {"id": "m2", "markdown": "It locks.", "cites": ["b2"]},
+        ],
+    })
+    .to_string();
+    let report_text = json!({
+        "extraction": proposal_extraction,
+        "conversion": sce_specs::Revision::of(conversion_text.as_bytes()),
+        "complete": false,
+        "queue": [{"why": "check", "id": "m2"}],
+    })
+    .to_string();
+    let proposed = answer(
+        &store,
+        "propose_import",
+        json!({"id": proposal_spec_id, "key": "press-1", "origin": "gui",
+               "original": proposal_original, "extraction": proposal_extraction,
+               "conversion": conversion_text, "report": report_text}),
+    );
+    let proposal_id = proposed["proposal"]["id"].as_str().unwrap().to_string();
+    answers.insert("propose_import".into(), proposed);
+    answers.insert(
+        "read_proposal".into(),
+        answer(
+            &store,
+            "read_proposal",
+            json!({"id": proposal_spec_id, "proposal": proposal_id}),
+        ),
+    );
+    answers.insert(
+        "list_proposals".into(),
+        answer(&store, "list_proposals", json!({"id": proposal_spec_id})),
+    );
+    answers.insert(
+        "read_proposal_documents".into(),
+        answer(
+            &store,
+            "read_proposal_documents",
+            json!({"id": proposal_spec_id, "proposal": proposal_id}),
+        ),
+    );
+    refusals.insert(
+        "active-proposal".into(),
+        refusal(
+            &store,
+            "propose_import",
+            json!({"id": proposal_spec_id, "key": "press-2", "origin": "gui",
+                   "original": proposal_original, "extraction": proposal_extraction,
+                   "conversion": conversion_text, "report": report_text}),
+        ),
+    );
+    refusals.insert(
+        "undecided".into(),
+        refusal(
+            &store,
+            "accept_proposal",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "text": "# Door lock\n", "decisions": 0}),
+        ),
+    );
+    refusals.insert(
+        "bad-proposal".into(),
+        refusal(
+            &store,
+            "decide_block",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "block": "m2", "what": "correct"}),
+        ),
+    );
+    answers.insert(
+        "decide_block".into(),
+        answer(
+            &store,
+            "decide_block",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "block": "m2", "what": "keep"}),
+        ),
+    );
+    refusals.insert(
+        "decisions-moved".into(),
+        refusal(
+            &store,
+            "accept_proposal",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "text": "# Door lock\n", "decisions": 0}),
+        ),
+    );
+    answers.insert(
+        "accept_proposal".into(),
+        answer(
+            &store,
+            "accept_proposal",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "text": "# Door lock\n", "decisions": 1}),
+        ),
+    );
+    refusals.insert(
+        "proposal-ended".into(),
+        refusal(
+            &store,
+            "decide_block",
+            json!({"id": proposal_spec_id, "proposal": proposal_id,
+                   "block": "m1", "what": "keep"}),
+        ),
+    );
+    // A text typed after a proposal was made: it cannot be accepted, and is carried to the new head.
+    let heads = answer(&store, "read_spec_heads", json!({"id": proposal_spec_id}));
+    let moved_proposal = answer(
+        &store,
+        "propose_import",
+        json!({"id": proposal_spec_id, "key": "press-3", "origin": "gui",
+               "original": proposal_original, "extraction": proposal_extraction,
+               "conversion": conversion_text, "report": report_text,
+               "expect": heads["source"]}),
+    );
+    let moved_proposal_id = moved_proposal["proposal"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    refusals.insert(
+        "nothing-to-carry".into(),
+        refusal(
+            &store,
+            "rebase_proposal",
+            json!({"id": proposal_spec_id, "proposal": moved_proposal_id}),
+        ),
+    );
+    answer(
+        &store,
+        "save_source",
+        json!({"id": proposal_spec_id, "text": "# Door lock, typed meanwhile\n",
+               "base": heads["source"]}),
+    );
+    let carried = answer(
+        &store,
+        "rebase_proposal",
+        json!({"id": proposal_spec_id, "proposal": moved_proposal_id}),
+    );
+    let carried_id = carried["proposal"]["id"].as_str().unwrap().to_string();
+    answers.insert("rebase_proposal".into(), carried);
+    answers.insert(
+        "reject_proposal".into(),
+        answer(
+            &store,
+            "reject_proposal",
+            json!({"id": proposal_spec_id, "proposal": carried_id, "note": "not what we meant"}),
+        ),
+    );
+
     // A command without a written-down reply is a command the screen's test
     // cannot hold to account.
     for command in all_commands() {
@@ -1730,6 +1915,10 @@ fn replies() -> Value {
     name_the_unstable(&mut document, &fresh_spec_id, "<fresh-spec-id>");
     name_the_unstable(&mut document, &waiting_spec, "<waiting-spec-id>");
     name_the_unstable(&mut document, &waiting_request, "<waiting-request-id>");
+    name_the_unstable(&mut document, &proposal_spec_id, "<proposal-spec-id>");
+    name_the_unstable(&mut document, &proposal_id, "<proposal-id>");
+    name_the_unstable(&mut document, &moved_proposal_id, "<moved-proposal-id>");
+    name_the_unstable(&mut document, &carried_id, "<carried-proposal-id>");
     // A revision stays the shape of one, so that the screen's guard reads the file as it
     // would read the core.
     name_the_unstable(&mut document, &bundle_revision, &"b".repeat(64));

@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 31;
+export const SUPPORTED_COMMAND_SET_VERSION = 32;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -1901,6 +1901,187 @@ export function parseExtractionList(value: unknown): ExtractionEntry[] {
       extractor_version: text(r, "extractor_version", at),
     };
   });
+}
+
+/** Where an import proposal is (ADR 0037). Only a pending one can be decided and accepted. */
+export const PROPOSAL_STATES = ["pending", "accepted", "rejected", "superseded"] as const;
+export type ProposalState = (typeof PROPOSAL_STATES)[number];
+
+/** What the owner did with a block. */
+export const DECISION_KINDS = ["keep", "correct", "drop", "add"] as const;
+export type DecisionKind = (typeof DECISION_KINDS)[number];
+
+/** One thing a person is asked about: why, and which block (of the conversion or of the original). */
+export interface ProposalAsk {
+  why: string;
+  id: string;
+}
+
+/** One proposal as the spec keeps it. What it was made of is named by hash. */
+export interface Proposal {
+  id: string;
+  seq: number;
+  key: string;
+  origin: string;
+  original: Revision;
+  extraction: Revision;
+  conversion: Revision;
+  report: Revision;
+  converter: { kind: string; name: string; version: string };
+  /** The text head it was made against; `null` for a spec that had no text. */
+  against: Revision | null;
+  asks: ProposalAsk[];
+  created_at: string;
+  state: ProposalState;
+  ended_at: string | null;
+  note: string | null;
+  /** The text revision accepting made. */
+  saved: Revision | null;
+  /** The proposal this one carries forward. */
+  rebased_from: string | null;
+}
+
+/** One decision of the owner's, a numbered line of the proposal's log. */
+export interface ProposalDecision {
+  n: number;
+  at: string;
+  block: string;
+  what: DecisionKind;
+  /** The owner's words, for `correct`. */
+  text: string | null;
+}
+
+/** `propose_import` and `rebase_proposal`: `created` is `false` when the same press was made before. */
+export interface ProposalRegistered {
+  proposal: Proposal;
+  created: boolean;
+}
+
+/** `read_proposal`: the record, its log, what is still asked, and whether the text is where it was. */
+export interface ProposalView {
+  proposal: Proposal;
+  decisions: ProposalDecision[];
+  undecided: ProposalAsk[];
+  /** The text head now. */
+  head: Revision | null;
+  head_matches: boolean;
+}
+
+/** `read_proposal_documents`: the conversion and the check report as they were kept. */
+export interface ProposalDocuments {
+  conversion: string;
+  report: string;
+}
+
+/** `accept_proposal`: `created` is `false` for the same accept said again. */
+export interface ProposalAccepted {
+  proposal: Proposal;
+  saved: Revision;
+  created: boolean;
+}
+
+function parseProposalAsk(value: unknown, where: string): ProposalAsk {
+  const r = record(value, where);
+  return { why: text(r, "why", where), id: text(r, "id", where) };
+}
+
+function parseProposal(value: unknown, where: string): Proposal {
+  const r = record(value, where);
+  const converter = record(r["converter"], `${where}.converter`);
+  // A proposal not yet ended has no end, no note and no saved text: the core leaves an absent field
+  // out and does not write it as null, and the screen reads both the same.
+  const optionalRevision = (name: string): Revision | null =>
+    r[name] === undefined ? null : nullableRevision(r[name], `${where}.${name}`);
+  return {
+    id: text(r, "id", where),
+    seq: count(r, "seq", where),
+    key: text(r, "key", where),
+    origin: text(r, "origin", where),
+    original: revision(r["original"], `${where}.original`),
+    extraction: revision(r["extraction"], `${where}.extraction`),
+    conversion: revision(r["conversion"], `${where}.conversion`),
+    report: revision(r["report"], `${where}.report`),
+    converter: {
+      kind: text(converter, "kind", `${where}.converter`),
+      name: text(converter, "name", `${where}.converter`),
+      version: text(converter, "version", `${where}.converter`),
+    },
+    against: nullableRevision(r["against"], `${where}.against`),
+    asks: list(r, "asks", where).map((a, i) => parseProposalAsk(a, `${where}.asks[${i}]`)),
+    created_at: text(r, "created_at", where),
+    state: oneOf(r, "state", where, PROPOSAL_STATES),
+    ended_at: r["ended_at"] === undefined ? null : nullableText(r, "ended_at", where),
+    note: r["note"] === undefined ? null : nullableText(r, "note", where),
+    saved: optionalRevision("saved"),
+    rebased_from: r["rebased_from"] === undefined ? null : nullableText(r, "rebased_from", where),
+  };
+}
+
+function parseProposalDecision(value: unknown, where: string): ProposalDecision {
+  const r = record(value, where);
+  return {
+    n: count(r, "n", where),
+    at: text(r, "at", where),
+    block: text(r, "block", where),
+    what: oneOf(r, "what", where, DECISION_KINDS),
+    text: r["text"] === undefined ? null : nullableText(r, "text", where),
+  };
+}
+
+/** `propose_import` and `rebase_proposal`. */
+export function parseProposalRegistered(value: unknown, where = "propose_import"): ProposalRegistered {
+  const r = record(value, where);
+  return { proposal: parseProposal(r["proposal"], `${where}.proposal`), created: created(r, where) };
+}
+
+/** `read_proposal`. */
+export function parseProposalView(value: unknown): ProposalView {
+  const where = "read_proposal";
+  const r = record(value, where);
+  if (typeof r["head_matches"] !== "boolean") throw new ContractError(`${where}.head_matches`, "true or false");
+  return {
+    proposal: parseProposal(r["proposal"], `${where}.proposal`),
+    decisions: list(r, "decisions", where).map((d, i) => parseProposalDecision(d, `${where}.decisions[${i}]`)),
+    undecided: list(r, "undecided", where).map((a, i) => parseProposalAsk(a, `${where}.undecided[${i}]`)),
+    head: nullableRevision(r["head"], `${where}.head`),
+    head_matches: r["head_matches"],
+  };
+}
+
+/** `list_proposals`: the spec's proposals, the newest first. */
+export function parseProposalList(value: unknown): Proposal[] {
+  const where = "list_proposals";
+  return list(record(value, where), "proposals", where).map((p, i) => parseProposal(p, `${where}.proposals[${i}]`));
+}
+
+/** `read_proposal_documents`. */
+export function parseProposalDocuments(value: unknown): ProposalDocuments {
+  const where = "read_proposal_documents";
+  const r = record(value, where);
+  return { conversion: text(r, "conversion", where), report: text(r, "report", where) };
+}
+
+/** `decide_block`. */
+export function parseProposalDecided(value: unknown): ProposalDecision {
+  const where = "decide_block";
+  return parseProposalDecision(record(value, where)["decision"], `${where}.decision`);
+}
+
+/** `accept_proposal`. */
+export function parseProposalAccepted(value: unknown): ProposalAccepted {
+  const where = "accept_proposal";
+  const r = record(value, where);
+  return {
+    proposal: parseProposal(r["proposal"], `${where}.proposal`),
+    saved: revision(r["saved"], `${where}.saved`),
+    created: created(r, where),
+  };
+}
+
+/** `reject_proposal`. */
+export function parseProposalRejected(value: unknown): Proposal {
+  const where = "reject_proposal";
+  return parseProposal(record(value, where)["proposal"], `${where}.proposal`);
 }
 
 /** `request_generation`. */

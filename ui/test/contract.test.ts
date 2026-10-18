@@ -38,6 +38,13 @@ import {
   parseOriginalList,
   parseOriginalMemberRead,
   parseOriginalRead,
+  parseProposalAccepted,
+  parseProposalDecided,
+  parseProposalDocuments,
+  parseProposalList,
+  parseProposalRegistered,
+  parseProposalRejected,
+  parseProposalView,
   parseQueue,
   parseRequestCandidateTexts,
   parseRegisteredRequest,
@@ -135,6 +142,14 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   save_extraction: parseExtractionSaved,
   read_extraction: parseExtractionRead,
   list_extractions: parseExtractionList,
+  propose_import: (v) => parseProposalRegistered(v),
+  read_proposal: parseProposalView,
+  list_proposals: parseProposalList,
+  read_proposal_documents: parseProposalDocuments,
+  decide_block: parseProposalDecided,
+  accept_proposal: parseProposalAccepted,
+  reject_proposal: parseProposalRejected,
+  rebase_proposal: (v) => parseProposalRegistered(v, "rebase_proposal"),
   list_connections: parseConnectionListing,
   read_connection: parseReadConnection,
   read_auth_policy: parseAuthPolicy,
@@ -607,6 +622,51 @@ describe("the replies the core gives", () => {
     expect(notCurrent?.detail).toMatchObject({ behind: ["model", "requirements"] });
     expect(asCommandError(replies.refusals["invalid-requirements"])?.message).toContain("not JSON");
     expect(asCommandError(replies.refusals["sce-timeout"])?.detail).toEqual({ seconds: 30 });
+  });
+
+  it("say what a proposal asks, what was decided, and how accepting it ended", () => {
+    const view = parseProposalView(replies.answers["read_proposal"]);
+    expect(view.proposal.state).toBe("pending");
+    expect(view.proposal.against).toBeNull();
+    // A proposal not yet ended has no end, no note and no saved text: the core writes none of them.
+    expect([view.proposal.ended_at, view.proposal.note, view.proposal.saved, view.proposal.rebased_from]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(view.undecided).toEqual([{ why: "check", id: "m2" }]);
+    expect(view.head_matches).toBe(true);
+    const decided = parseProposalDecided(replies.answers["decide_block"]);
+    expect([decided.n, decided.block, decided.what, decided.text]).toEqual([1, "m2", "keep", null]);
+    const accepted = parseProposalAccepted(replies.answers["accept_proposal"]);
+    expect(accepted.proposal.state).toBe("accepted");
+    expect(accepted.proposal.saved).toBe(accepted.saved);
+    expect(accepted.created).toBe(true);
+    const carried = parseProposalRegistered(replies.answers["rebase_proposal"], "rebase_proposal");
+    expect(carried.proposal.rebased_from).toBe("<moved-proposal-id>");
+    expect(carried.proposal.against).not.toBeNull();
+    const rejected = parseProposalRejected(replies.answers["reject_proposal"]);
+    expect([rejected.state, rejected.note]).toEqual(["rejected", "not what we meant"]);
+  });
+
+  it("refuse a proposal by the word the screen branches on, and carry what it needs to say it", () => {
+    expect(asCommandError(replies.refusals["undecided"])?.detail).toMatchObject({ blocks: ["m2"] });
+    expect(asCommandError(replies.refusals["decisions-moved"])?.detail).toEqual({ assembled_from: 0, decisions: 1 });
+    expect(asCommandError(replies.refusals["proposal-ended"])?.detail).toMatchObject({ state: "accepted" });
+    expect(asCommandError(replies.refusals["active-proposal"])?.detail).toEqual({ proposal: "<proposal-id>" });
+    for (const kind of ["bad-proposal", "nothing-to-carry"]) {
+      expect(asCommandError(replies.refusals[kind])?.kind).toBe(kind);
+    }
+  });
+
+  it("are refused when a proposal is in a state or a decision of a kind the screen does not know", () => {
+    const view = structuredClone(replies.answers["read_proposal"]) as { proposal: { state: string } };
+    view.proposal.state = "withdrawn";
+    expect(() => parseProposalView(view)).toThrow(/state/);
+    const decision = structuredClone(replies.answers["decide_block"]) as { decision: { what: string } };
+    decision.decision.what = "shrug";
+    expect(() => parseProposalDecided(decision)).toThrow(/what/);
   });
 
   it("say which spec was removed, and that it is no longer listed or readable", () => {

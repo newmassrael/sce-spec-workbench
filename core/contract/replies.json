@@ -6,6 +6,36 @@
       "parent": null,
       "revision": "93e3f3785b8745e6f7b2f70208f65def3de581686c8e109d6fea653094a7c7a1"
     },
+    "accept_proposal": {
+      "created": true,
+      "proposal": {
+        "against": null,
+        "asks": [
+          {
+            "id": "m2",
+            "why": "check"
+          }
+        ],
+        "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "ended_at": "2026-10-03T09:00:00Z",
+        "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+        "id": "<proposal-id>",
+        "key": "press-1",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+        "saved": "b2d7c7936cdd528b93bfecd1697b0b754f9487d9abfb5539eeee635614606f0e",
+        "seq": 1,
+        "state": "accepted"
+      },
+      "saved": "b2d7c7936cdd528b93bfecd1697b0b754f9487d9abfb5539eeee635614606f0e"
+    },
     "add_original": {
       "bytes": 20,
       "created": true,
@@ -118,12 +148,20 @@
       "id": "<spec-id>",
       "title": "Door lock"
     },
+    "decide_block": {
+      "decision": {
+        "at": "2026-10-03T09:00:00Z",
+        "block": "m2",
+        "n": 1,
+        "what": "keep"
+      }
+    },
     "delete_connection": {
       "deleted": "main"
     },
     "describe": {
       "application_command_set_version": 3,
-      "command_set_version": 31,
+      "command_set_version": 32,
       "commands": [
         "describe",
         "list_specs",
@@ -176,6 +214,14 @@
         "save_extraction",
         "read_extraction",
         "list_extractions",
+        "propose_import",
+        "read_proposal",
+        "list_proposals",
+        "read_proposal_documents",
+        "decide_block",
+        "accept_proposal",
+        "reject_proposal",
+        "rebase_proposal",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -195,7 +241,7 @@
     },
     "describe_desktop": {
       "application_command_set_version": 3,
-      "command_set_version": 31,
+      "command_set_version": 32,
       "commands": [
         "describe",
         "list_specs",
@@ -248,6 +294,14 @@
         "save_extraction",
         "read_extraction",
         "list_extractions",
+        "propose_import",
+        "read_proposal",
+        "list_proposals",
+        "read_proposal_documents",
+        "decide_block",
+        "accept_proposal",
+        "reject_proposal",
+        "rebase_proposal",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -471,6 +525,34 @@
         }
       ]
     },
+    "list_proposals": {
+      "proposals": [
+        {
+          "against": null,
+          "asks": [
+            {
+              "id": "m2",
+              "why": "check"
+            }
+          ],
+          "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+          "converter": {
+            "kind": "rules",
+            "name": "blocks-to-markdown",
+            "version": "1"
+          },
+          "created_at": "2026-10-03T09:00:00Z",
+          "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+          "id": "<proposal-id>",
+          "key": "press-1",
+          "origin": "gui",
+          "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+          "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+          "seq": 1,
+          "state": "pending"
+        }
+      ]
+    },
     "list_requests": {
       "requests": [
         {
@@ -606,6 +688,33 @@
           "written_for": "7dc2f2d866dfb913b74841a0abff1709551fc1f7bc0f302d43251d0f60ce9e97"
         }
       ]
+    },
+    "propose_import": {
+      "created": true,
+      "proposal": {
+        "against": null,
+        "asks": [
+          {
+            "id": "m2",
+            "why": "check"
+          }
+        ],
+        "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+        "id": "<proposal-id>",
+        "key": "press-1",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+        "seq": 1,
+        "state": "pending"
+      }
     },
     "read_acceptance": {
       "acceptance": {
@@ -1819,6 +1928,45 @@
       "path": "spec.md",
       "size": 12
     },
+    "read_proposal": {
+      "decisions": [],
+      "head": null,
+      "head_matches": true,
+      "proposal": {
+        "against": null,
+        "asks": [
+          {
+            "id": "m2",
+            "why": "check"
+          }
+        ],
+        "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+        "id": "<proposal-id>",
+        "key": "press-1",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+        "seq": 1,
+        "state": "pending"
+      },
+      "undecided": [
+        {
+          "id": "m2",
+          "why": "check"
+        }
+      ]
+    },
+    "read_proposal_documents": {
+      "conversion": "{\"blocks\":[{\"cites\":[\"b1\"],\"id\":\"m1\",\"markdown\":\"# Door lock\"},{\"cites\":[\"b2\"],\"id\":\"m2\",\"markdown\":\"It locks.\"}],\"converter\":{\"kind\":\"rules\",\"name\":\"blocks-to-markdown\",\"version\":\"1\"},\"extraction\":\"71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2\",\"v\":1}",
+      "report": "{\"complete\":false,\"conversion\":\"6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973\",\"extraction\":\"71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2\",\"queue\":[{\"id\":\"m2\",\"why\":\"check\"}]}"
+    },
     "read_queue_none": {
       "now": "2026-10-03T09:00:00Z",
       "waiting": []
@@ -2311,8 +2459,65 @@
         "title": "Door lock"
       }
     },
+    "rebase_proposal": {
+      "created": true,
+      "proposal": {
+        "against": "a02e55f8d0bad4e96102d48adf143f399e3bd2befc5cf09346b2fc6288907fa9",
+        "asks": [
+          {
+            "id": "m2",
+            "why": "check"
+          }
+        ],
+        "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+        "id": "<carried-proposal-id>",
+        "key": "rebase:<moved-proposal-id>:a02e55f8d0bad4e96102d48adf143f399e3bd2befc5cf09346b2fc6288907fa9",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "rebased_from": "<moved-proposal-id>",
+        "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+        "seq": 3,
+        "state": "pending"
+      }
+    },
     "record_request_event": {
       "entries": 5
+    },
+    "reject_proposal": {
+      "proposal": {
+        "against": "a02e55f8d0bad4e96102d48adf143f399e3bd2befc5cf09346b2fc6288907fa9",
+        "asks": [
+          {
+            "id": "m2",
+            "why": "check"
+          }
+        ],
+        "conversion": "6cc5ec96d65a11380690f950309d3328d14d18788138fe937417ac3ec278d973",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "ended_at": "2026-10-03T09:00:00Z",
+        "extraction": "71b548d0c408f4b0621bb9104e2e99bb736284b7b3ad6d5203d2bfcc6ea7fdc2",
+        "id": "<carried-proposal-id>",
+        "key": "rebase:<moved-proposal-id>:a02e55f8d0bad4e96102d48adf143f399e3bd2befc5cf09346b2fc6288907fa9",
+        "note": "not what we meant",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "rebased_from": "<moved-proposal-id>",
+        "report": "1d1400c51fb4a5d991b8847cc22a772be089f0b7f3b120be86d0bc3fe2564761",
+        "seq": 3,
+        "state": "rejected"
+      }
     },
     "remove_spec": {
       "removed": {
@@ -2703,8 +2908,15 @@
     }
   },
   "application_command_set_version": 3,
-  "command_set_version": 31,
+  "command_set_version": 32,
   "refusals": {
+    "active-proposal": {
+      "detail": {
+        "proposal": "<proposal-id>"
+      },
+      "kind": "active-proposal",
+      "message": "the spec already has an open proposal (<proposal-id>); ask to replace it, or accept or reject it"
+    },
     "active-request": {
       "detail": {
         "request": "<request-id>",
@@ -2735,6 +2947,13 @@
       },
       "kind": "bad-original",
       "message": "the path `../up.md` names `..`, which could leave the bundle"
+    },
+    "bad-proposal": {
+      "detail": {
+        "what": "correct"
+      },
+      "kind": "bad-proposal",
+      "message": "a correction carries the owner's words"
     },
     "bad-request": {
       "kind": "bad-request",
@@ -2793,6 +3012,14 @@
       },
       "kind": "moved",
       "message": "the default connection was changed after it was read, so nothing was changed; read it again"
+    },
+    "decisions-moved": {
+      "detail": {
+        "assembled_from": 0,
+        "decisions": 1
+      },
+      "kind": "decisions-moved",
+      "message": "decisions were taken after the text was assembled, so nothing was written; assemble it again"
     },
     "invalid-answers": {
       "kind": "invalid-answers",
@@ -2942,6 +3169,21 @@
       "kind": "not-holder",
       "message": "the request <request-id> is held by `adapter-a` as attempt 1, and that is not who spoke"
     },
+    "nothing-to-carry": {
+      "detail": {
+        "proposal": "<moved-proposal-id>"
+      },
+      "kind": "nothing-to-carry",
+      "message": "the text is where the proposal was made against it, so there is nothing to carry forward"
+    },
+    "proposal-ended": {
+      "detail": {
+        "proposal": "<proposal-id>",
+        "state": "accepted"
+      },
+      "kind": "proposal-ended",
+      "message": "the proposal ended (accepted), so it takes no other word"
+    },
     "removed-spec": {
       "kind": "not-found",
       "message": "spec `<removed-spec-id>` (it was removed) does not exist"
@@ -3010,9 +3252,19 @@
       "kind": "sce-unavailable",
       "message": "the SCE generator is not available: no `sce-codegen` was found; set SCE_CODEGEN to its path, or put it beside this program or on PATH"
     },
+    "undecided": {
+      "detail": {
+        "blocks": [
+          "m2"
+        ],
+        "proposal": "<proposal-id>"
+      },
+      "kind": "undecided",
+      "message": "1 question(s) have no decision yet, so nothing was written"
+    },
     "unknown-command": {
       "kind": "unknown-command",
-      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
+      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, propose_import, read_proposal, list_proposals, read_proposal_documents, decide_block, accept_proposal, reject_proposal, rebase_proposal, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
     },
     "wrong-connection": {
       "detail": {
