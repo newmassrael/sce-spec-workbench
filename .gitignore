@@ -4,3 +4,6 @@
 /src-tauri/gen/
 # Notes an assistant keeps while it works on this tree: local, not part of the product.
 /claudedocs/
+# A copy of a third-party skill an assistant installs here, reinstalled by its tool. Only the skills
+# are ignored: a hook or a setting of this repository's own in `.claude/` is still committed.
+/.claude/skills/
