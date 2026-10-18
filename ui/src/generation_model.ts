@@ -19,6 +19,7 @@ import {
   type RequestFailure,
   type RequestHead,
 } from "./contract";
+import { minutesBetween } from "./progress_view";
 
 /** Where the spec's latest request stands, in the terms the person acts on. */
 export type Status =
@@ -40,6 +41,12 @@ export type Status =
        * to offer asking again.
        */
       readonly lane: QueueWait | null;
+      /**
+       * Whole minutes the place the request waits for has been held, by the store's clock; `null`
+       * when it does not wait for a place, or the store did not say since when. Under a minute is
+       * `0` and is not worth saying.
+       */
+      readonly heldMinutes: number | null;
     }
   | { readonly kind: "running"; readonly attempt: number; readonly holder: string | null }
   /** The one that held it stopped answering. Nothing was published. */
@@ -95,7 +102,14 @@ export function hostsKey(hosts: HostListing | null): string {
  */
 export function queueKey(queue: Queue | null): string {
   if (queue === null) return "";
-  return queue.waiting.map((w) => `${w.request}=${w.running}/${w.places}+${w.ahead}`).join("\n");
+  return queue.waiting
+    .map((w) => `${w.request}=${w.running}/${w.places}+${w.ahead}@${heldMinutesOf(queue, w) ?? "-"}`)
+    .join("\n");
+}
+
+/** Whole minutes the place `wait` is for has been held, by the clock of the store that said so. */
+export function heldMinutesOf(queue: Queue, wait: QueueWait): number | null {
+  return wait.running_since === null ? null : minutesBetween(wait.running_since, queue.now);
 }
 
 /** Why the request `request` waits for a place of its connection, as the store says; `null` when it does not. */
@@ -137,7 +151,8 @@ export function statusOf(
   if (head === null) return { kind: "idle" };
   const about = detail !== null && detail.id === head.id ? detail : null;
   switch (head.state) {
-    case "queued":
+    case "queued": {
+      const lane = laneOf(queue, head.id);
       return {
         kind: "queued",
         connected: isConnected(adapters),
@@ -145,8 +160,10 @@ export function statusOf(
         // Made in the application, for no connection: the application does not choose one for it.
         // What was not read of the request is not guessed at.
         unchosen: about !== null && about.pin === null && about.origin === "gui",
-        lane: laneOf(queue, head.id),
+        lane,
+        heldMinutes: queue !== null && lane !== null ? heldMinutesOf(queue, lane) : null,
       };
+    }
     case "running":
       return { kind: "running", attempt: head.attempt, holder: about?.lease?.holder ?? null };
     case "interrupted":

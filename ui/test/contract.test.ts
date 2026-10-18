@@ -503,9 +503,13 @@ describe("the replies the core gives", () => {
         running: 1,
         places: 1,
         ahead: 0,
+        running_since: "2026-10-03T09:00:00Z",
       },
     ]);
+    // The store's moment is said with the queue, the clock `running_since` is measured by.
+    expect(queue.now).toBe("2026-10-03T09:00:00Z");
     expect(() => parseQueue({ waiting: [{ spec: "s", request: "r", connection: "c" }] })).toThrow(ContractError);
+    expect(() => parseQueue({ waiting: [] })).toThrow(ContractError);
   });
 
   it("say what an executor wrote for a request, and that it is not the spec's until it completes", () => {

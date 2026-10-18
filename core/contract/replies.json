@@ -117,7 +117,7 @@
     },
     "describe": {
       "application_command_set_version": 3,
-      "command_set_version": 29,
+      "command_set_version": 30,
       "commands": [
         "describe",
         "list_specs",
@@ -182,7 +182,7 @@
     },
     "describe_desktop": {
       "application_command_set_version": 3,
-      "command_set_version": 29,
+      "command_set_version": 30,
       "commands": [
         "describe",
         "list_specs",
@@ -1746,9 +1746,11 @@
       "standing": "unstated"
     },
     "read_queue_none": {
+      "now": "2026-10-03T09:00:00Z",
       "waiting": []
     },
     "read_queue_waiting": {
+      "now": "2026-10-03T09:00:00Z",
       "waiting": [
         {
           "ahead": 0,
@@ -1756,6 +1758,7 @@
           "places": 1,
           "request": "<waiting-request-id>",
           "running": 1,
+          "running_since": "2026-10-03T09:00:00Z",
           "spec": "<waiting-spec-id>"
         }
       ]
@@ -2622,7 +2625,7 @@
     }
   },
   "application_command_set_version": 3,
-  "command_set_version": 29,
+  "command_set_version": 30,
   "refusals": {
     "active-request": {
       "detail": {

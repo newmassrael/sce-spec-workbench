@@ -312,6 +312,7 @@ const en = {
     "The AI connection `{connection}` is busy with another request. This one is next, and starts when it ends.",
   generationBehind:
     "The AI connection `{connection}` is busy with another request. {ahead} more are ahead of this one.",
+  generationBehindHeld: "The request running has been at it for {minutes} min.",
   generationUnchosen:
     "This request was made without choosing an AI connection, so the application does not run it. An authoring client of your own can still take it; or choose a connection under AI connection and generate again.",
   generateWithConnection: "Generate again with the chosen connection",
@@ -797,6 +798,7 @@ const ko: Record<Key, string> = {
     "AI 연결 `{connection}`이 다른 요청을 처리하고 있습니다. 이 요청이 다음 차례이고, 앞의 요청이 끝나면 시작합니다.",
   generationBehind:
     "AI 연결 `{connection}`이 다른 요청을 처리하고 있습니다. 이 요청 앞에 {ahead}개가 더 있습니다.",
+  generationBehindHeld: "지금 처리 중인 요청은 {minutes}분째 진행 중입니다.",
   generationUnchosen:
     "이 요청은 AI 연결을 고르지 않고 만들어져 앱이 실행하지 않습니다. 직접 쓰는 작성 클라이언트가 가져갈 수는 있고, 아니면 AI 연결에서 연결을 골라 다시 생성하세요.",
   generateWithConnection: "선택한 연결로 다시 생성",

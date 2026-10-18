@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 29;
+export const SUPPORTED_COMMAND_SET_VERSION = 30;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -863,6 +863,8 @@ export interface HostStatus {
  * A queued request that waits for a place of its connection: how many requests of the connection
  * run now, how many it runs at once, and how many queued ones will be taken before this one
  * (0 is the next). Said by the store, which counts, and the same to every shell.
+ * `running_since` is when the attempt that has run longest of the connection's running requests
+ * was taken (RFC 3339), which is how long the place this request waits for has been held.
  */
 export interface QueueWait {
   readonly spec: string;
@@ -871,11 +873,13 @@ export interface QueueWait {
   readonly running: number;
   readonly places: number;
   readonly ahead: number;
+  readonly running_since: string | null;
 }
 
-/** `read_queue`. */
+/** `read_queue`. `now` is the store's moment, the clock that wrote `running_since`. */
 export interface Queue {
   readonly waiting: readonly QueueWait[];
+  readonly now: string;
 }
 
 /** `read_host_status`: every shell that reported, and every record that could not be read. */
@@ -1804,8 +1808,10 @@ export function parseQueue(value: unknown): Queue {
         running: count(wait, "running", at),
         places: count(wait, "places", at),
         ahead: count(wait, "ahead", at),
+        running_since: nullableText(wait, "running_since", at),
       };
     }),
+    now: text(r, "now", where),
   };
 }
 

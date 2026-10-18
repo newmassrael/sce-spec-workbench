@@ -152,6 +152,7 @@ describe("where the latest request stands", () => {
       waiting: null,
       unchosen: false,
       lane: null,
+      heldMinutes: null,
     });
     expect(statusOf(head("queued", 0), null, listing(adapter()))).toEqual(queued(true));
     expect(statusOf(head("queued", 0), null, listing())).toEqual(queued(false));
@@ -159,19 +160,41 @@ describe("where the latest request stands", () => {
   });
 
   describe("a request that waits for a place of its connection", () => {
-    const queue = (...waiting: Queue["waiting"][number][]): Queue => ({ waiting });
-    const wait = (request: string, ahead: number): Queue["waiting"][number] => ({
+    const queue = (...waiting: Queue["waiting"][number][]): Queue => ({ waiting, now: "2026-10-05T09:12:30Z" });
+    const wait = (
+      request: string,
+      ahead: number,
+      running_since: string | null = "2026-10-05T09:00:00Z",
+    ): Queue["waiting"][number] => ({
       spec: "door",
       request,
       connection: "pc2-qwen",
       running: 1,
       places: 1,
       ahead,
+      running_since,
     });
 
     it("says behind which connection it waits and how many are ahead, as the store counted", () => {
       const status = statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-1", 2)));
       expect(status).toMatchObject({ kind: "queued", lane: { connection: "pc2-qwen", ahead: 2 } });
+    });
+
+    it("says how long the place it waits for has been held, by the clock of the store that said so", () => {
+      const status = statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-1", 0)));
+      // Taken at 09:00:00 and read at 09:12:30: twelve whole minutes, and the half is not rounded up.
+      expect(status).toMatchObject({ kind: "queued", heldMinutes: 12 });
+    });
+
+    it("does not guess how long when the store did not say since when", () => {
+      const status = statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-1", 0, null)));
+      expect(status).toMatchObject({ kind: "queued", heldMinutes: null });
+    });
+
+    it("says nothing of a place when the request does not wait for one", () => {
+      expect(statusOf(head("queued", 0), null, listing(adapter()), null, queue(wait("req-9", 0)))).toMatchObject({
+        heldMinutes: null,
+      });
     });
 
     it("does not take the place of another request, and says nothing when nothing is counted", () => {
@@ -190,6 +213,12 @@ describe("where the latest request stands", () => {
       expect(queueKey(queue(wait("req-1", 1)))).toBe(queueKey(queue(wait("req-1", 1))));
       expect(queueKey(queue(wait("req-1", 1)))).not.toBe(queueKey(queue(wait("req-1", 0))));
       expect(queueKey(null)).toBe("");
+    });
+
+    it("is a change of the queue when a minute of the place it waits for has passed, and not before", () => {
+      const at = (now: string): Queue => ({ waiting: [wait("req-1", 0)], now });
+      expect(queueKey(at("2026-10-05T09:12:30Z"))).toBe(queueKey(at("2026-10-05T09:12:59Z")));
+      expect(queueKey(at("2026-10-05T09:12:30Z"))).not.toBe(queueKey(at("2026-10-05T09:13:00Z")));
     });
   });
 

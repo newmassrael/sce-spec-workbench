@@ -2164,9 +2164,15 @@ export class App {
         if (status.waiting !== null) return this.t("generationWaitingFor", { reason: status.waiting });
         if (status.lane !== null) {
           const { connection, ahead } = status.lane;
-          return ahead === 0
-            ? this.t("generationBehindNext", { connection })
-            : this.t("generationBehind", { connection, ahead: String(ahead) });
+          const behind =
+            ahead === 0
+              ? this.t("generationBehindNext", { connection })
+              : this.t("generationBehind", { connection, ahead: String(ahead) });
+          // What the one ahead has run is the store's clock read, and said once it is a minute:
+          // under that a person is told nothing a second would not change.
+          return status.heldMinutes !== null && status.heldMinutes >= 1
+            ? `${behind} ${this.t("generationBehindHeld", { minutes: String(status.heldMinutes) })}`
+            : behind;
         }
         if (status.unchosen) return this.t("generationUnchosen");
         return this.t(status.connected ? "generationQueued" : "generationQueuedNoAi");
