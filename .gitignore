@@ -2,3 +2,5 @@
 /ui/node_modules/
 /ui/dist/
 /src-tauri/gen/
+# Notes an assistant keeps while it works on this tree: local, not part of the product.
+/claudedocs/
