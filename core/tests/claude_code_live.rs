@@ -118,6 +118,24 @@ fn the_real_client_writes_a_model_the_core_accepts_and_publishes() {
     let outcome = runner.run_once().unwrap();
     println!("outcome: {outcome:?}");
 
+    // What the run said it did, from the stream the real client printed while it worked: the screen
+    // shows these counts, so a client whose stream was read as nothing would show a silent run.
+    let journal = store.read_journal(&spec, &request).unwrap();
+    println!("journal: {:?}", journal.progress);
+    println!(
+        "journal tail: {:?}",
+        journal.tail.iter().map(|e| &e.event).collect::<Vec<_>>()
+    );
+    assert!(journal.progress.tries >= 1, "the runner said no try");
+    assert!(
+        journal.progress.turns >= 1,
+        "no turn was read from the client's stream"
+    );
+    assert!(
+        journal.progress.checks >= 1,
+        "no check of the authoring server was read from the client's stream"
+    );
+
     let Outcome::Completed { bundle, .. } = outcome else {
         let seen = store.read_request(&spec, &request).unwrap();
         panic!(

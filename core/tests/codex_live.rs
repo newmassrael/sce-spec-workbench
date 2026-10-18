@@ -546,6 +546,24 @@ fn run(attack: bool) {
     let outcome = runner.run_once().unwrap();
     println!("Outcome: {outcome:?}");
 
+    // What the run said it did, from the events the real client printed while it worked: the screen
+    // shows these counts, so a client whose output was read as nothing would show a silent run.
+    let journal = store.read_journal(&spec, &request).unwrap();
+    println!("Journal: {:?}", journal.progress);
+    println!(
+        "Journal tail: {:?}",
+        journal.tail.iter().map(|e| &e.event).collect::<Vec<_>>()
+    );
+    assert!(journal.progress.tries >= 1, "the runner said no try");
+    assert!(
+        journal.progress.turns >= 1,
+        "no turn was read from the client's events"
+    );
+    assert!(
+        journal.progress.checks >= 1,
+        "no check of the authoring server was read from the client's events"
+    );
+
     let event_text = fs::read_to_string(events).unwrap();
     assert!(
         !event_text.contains(&secret),

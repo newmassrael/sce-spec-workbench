@@ -30,21 +30,29 @@ pub(crate) const DESIGN_TOOLS: [&str; 2] = ["validate_scxml_set", "validate_scxm
 /// What a tool the model called came to, as the journal says it. Only a tool that judges a design
 /// (`DESIGN_TOOLS`) is said to have accepted or refused one, and that is read from the verdict in
 /// what the tool answered; any other tool ran, or failed.
+///
+/// A refusal is an answer and not a failure, though the authoring server sends it as an error
+/// result (the model is told it did wrong, and the client shows it as one): its words are the
+/// verdict `refused` with the codes. So the verdict is read from the words before a result flagged
+/// as an error is taken for a tool that failed, and only a result with no verdict is `Failed`. (A
+/// first version read the flag first and counted none of the refusals the real server made, which
+/// no test against a stand-in could show: the stand-in did not send them as errors.)
 pub(crate) fn verdict_of(tool: &str, failed: bool, words: &str) -> ToolVerdict {
+    if DESIGN_TOOLS.contains(&tool) {
+        match first_value(words)
+            .as_ref()
+            .and_then(|answer| answer["verdict"].as_str())
+        {
+            Some("refused") => return ToolVerdict::Refused,
+            Some("accepted") if !failed => return ToolVerdict::Accepted,
+            _ => {}
+        }
+    }
     if failed {
-        return ToolVerdict::Failed;
-    }
-    if !DESIGN_TOOLS.contains(&tool) {
-        return ToolVerdict::Ran;
-    }
-    match first_value(words)
-        .as_ref()
-        .and_then(|answer| answer["verdict"].as_str())
-    {
-        Some("accepted") => ToolVerdict::Accepted,
-        Some("refused") => ToolVerdict::Refused,
+        ToolVerdict::Failed
+    } else {
         // A checking tool that said something else judged nothing the journal can count.
-        _ => ToolVerdict::Ran,
+        ToolVerdict::Ran
     }
 }
 

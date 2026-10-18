@@ -164,18 +164,116 @@ fn what_is_not_the_models_work_on_the_design_says_nothing() {
 }
 
 #[test]
-fn a_tool_that_errored_is_said_to_have_failed_and_judged_nothing() {
+fn a_refusal_the_server_sends_as_an_error_is_a_refusal_and_not_a_failure() {
     let (progress, events) = said();
     let mut steps = Steps::new(&progress);
     steps.claude_line(&claude_calls("t1", "mcp__sce-author__validate_scxml"));
-    // A refusal's words in an answer that is an error are not a verdict.
+    // The authoring server sends a refused check as an error result whose words are the verdict and
+    // the codes. The first version of this reading called it a failure, and counted no refusal of the
+    // real client (found by a run of the real one).
     steps.claude_line(&claude_answers("t1", &refused(), true));
 
     assert_eq!(
         events_of(&events)[1],
         ran(
             "validate_scxml",
+            ToolVerdict::Refused,
+            &["scxml/unreachable-state", "scxml/dangling-target"]
+        )
+    );
+}
+
+#[test]
+fn a_tool_that_errored_with_no_verdict_is_said_to_have_failed_and_judged_nothing() {
+    let (progress, events) = said();
+    let mut steps = Steps::new(&progress);
+    steps.claude_line(&claude_calls("t1", "mcp__sce-author__validate_scxml"));
+    steps.claude_line(&claude_calls("t2", "mcp__sce-author__specs_read"));
+    steps.claude_line(&claude_answers("t1", "the tool crashed", true));
+    steps.claude_line(&claude_answers("t2", &refused(), true));
+
+    // A check that gave no verdict failed; and a tool that does not judge a design is not said to
+    // have refused one whatever its words say.
+    let said = events_of(&events);
+    assert_eq!(said[1], ran("validate_scxml", ToolVerdict::Failed, &[]));
+    assert_eq!(
+        said[2],
+        ran(
+            "specs_read",
             ToolVerdict::Failed,
+            &["scxml/unreachable-state", "scxml/dangling-target"]
+        )
+    );
+}
+
+#[test]
+fn an_accepted_check_that_the_client_flags_as_an_error_is_not_an_acceptance() {
+    let (progress, events) = said();
+    let mut steps = Steps::new(&progress);
+    steps.claude_line(&claude_calls("t1", "mcp__sce-author__validate_scxml"));
+    steps.claude_line(&claude_answers("t1", &accepted(), true));
+
+    assert_eq!(
+        events_of(&events)[1],
+        ran("validate_scxml", ToolVerdict::Failed, &[])
+    );
+}
+
+#[test]
+fn a_refusal_as_codex_0_163_prints_it_is_a_refusal() {
+    // As printed by the real client (codex-cli 0.163.0, 2026-10-18) for a check the real authoring
+    // server refused: the call ends with status `failed` and no `error`, and what the server said is
+    // in the result's text. Only the codes are shortened.
+    let (progress, events) = said();
+    let mut steps = Steps::new(&progress);
+    steps.codex_line(
+        r#"{"type":"item.started","item":{"id":"item_1","type":"mcp_tool_call","server":"sce-author","tool":"validate_scxml","arguments":{"document_text":"<scxml/>"},"result":null,"error":null,"status":"in_progress"}}"#,
+    );
+    steps.codex_line(
+        r#"{"type":"item.completed","item":{"id":"item_1","type":"mcp_tool_call","server":"sce-author","tool":"validate_scxml","arguments":{"document_text":"<scxml/>"},"result":{"content":[{"type":"text","text":"{\n  \"verdict\": \"refused\",\n  \"manifest\": null,\n  \"diagnostics\": [\n    {\n      \"v\": 1,\n      \"code\": \"validation/invalid-reference\",\n      \"stage\": \"validation\"\n    }\n  ]\n}\n"}],"structured_content":null},"error":null,"status":"failed"}}"#,
+    );
+
+    assert_eq!(
+        events_of(&events),
+        vec![
+            Event::TurnAsked { turn: 0 },
+            ran(
+                "validate_scxml",
+                ToolVerdict::Refused,
+                &["validation/invalid-reference"]
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_refusal_in_a_codex_call_that_failed_is_a_refusal() {
+    let (progress, events) = said();
+    let mut steps = Steps::new(&progress);
+    // The real client prints the call as it starts, and then as it ends.
+    steps.codex_line(&codex_call(
+        true,
+        "validate_scxml_set",
+        "sce-author",
+        None,
+        false,
+    ));
+    steps.codex_line(&codex_item(
+        "mcp_tool_call",
+        false,
+        json!({
+            "id": "item_1", "server": "sce-author", "tool": "validate_scxml_set",
+            "arguments": {}, "status": "completed",
+            "result": {"content": [{"type": "text", "text": refused()}], "structured_content": null},
+            "error": {"message": "the tool reported an error"},
+        }),
+    ));
+
+    assert_eq!(
+        events_of(&events)[1],
+        ran(
+            "validate_scxml_set",
+            ToolVerdict::Refused,
             &["scxml/unreachable-state", "scxml/dangling-target"]
         )
     );
