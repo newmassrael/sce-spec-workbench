@@ -3,39 +3,65 @@
   SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 */
 
+/*
+  Tokens are roles, not colours, and these are the ones of `design/boards/app.css`: a rule names the role
+  it means and never a value. The design is the source of truth for the names and the values; a role the
+  design defines and this stylesheet has no use for yet (the AI's colour, the people hues, the rows of a
+  side-by-side check) is added with the screen that uses it, so that none is defined and left unread.
+
+  - The page is grey and a card is white; a divider is `--line`, and the border of a control is
+    `--line-strong`, because a control has to be found (3:1 against what it sits on, which `--line`
+    is not: 1.4:1).
+  - The accent is the one action and "accepted". Amber (`--attn`) is a decision waiting for the owner.
+  - The design has no colour for "something went wrong": a failed request is amber there, and the only
+    red is the pair of a removed text. An error here uses that pair, so that red stays the colour of
+    what is gone or refused; whether the design should name a role for it is the owner's to say.
+  - Pairs that carry words hold 4.5:1 in both themes; `--ink-3` is not set on a tinted fill.
+*/
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
-  --surface: #f4f5f7;
-  --text: #1b1f24;
-  --muted: #5b6573;
-  --line: #d3d8df;
-  --accent: #1f5fbf;
-  --accent-text: #ffffff;
-  --warn-bg: #fff4d6;
-  --warn-line: #d9a400;
-  --error-bg: #fde8e8;
-  --error-line: #c13b3b;
-  --ok-bg: #e6f4ea;
-  --ok-line: #2f8f4e;
+  --page: #f6f7f9;
+  --card: #ffffff;
+  --line: #e4e7ec;
+  --line-strong: #858fa1;
+  --chip-hover: #e9ecf1;
+  --sel-bg: #fafbff;
+  --ink: #141922;
+  --ink-3: #667085;
+  --accent: #2f5bea;
+  --accent-tint: #edf1fe;
+  --on-accent: #ffffff;
+  --attn: #8a4b00;
+  --attn-tint: #fff3d6;
+  --attn-line: #f1d9a6;
+  --del-bg: #fde3e1;
+  --del-ink: #8c1d18;
+  --ins-bg: #ddebff;
+  --ins-ink: #1d3fb8;
+  --font: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14171c;
-    --surface: #1d2229;
-    --text: #e6e9ee;
-    --muted: #9aa5b3;
-    --line: #333b46;
-    --accent: #6ba6ff;
-    --accent-text: #0b1220;
-    --warn-bg: #3a3012;
-    --warn-line: #b88a00;
-    --error-bg: #3b1d1d;
-    --error-line: #d65a5a;
-    --ok-bg: #16301f;
-    --ok-line: #4cae6c;
+    --page: #0f1218;
+    --card: #171b23;
+    --line: #262c38;
+    --line-strong: #6b7689;
+    --chip-hover: #2a3140;
+    --sel-bg: #1a2030;
+    --ink: #e8ecf3;
+    --ink-3: #8e98a8;
+    --accent: #7c98ff;
+    --accent-tint: #1c2650;
+    --on-accent: #0e1530;
+    --attn: #f0b35a;
+    --attn-tint: #33260f;
+    --attn-line: #5a4318;
+    --del-bg: #4a1d1a;
+    --del-ink: #ffb4ad;
+    --ins-bg: #1d3266;
+    --ins-ink: #b8ccff;
   }
 }
 
@@ -45,9 +71,9 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  background: var(--page);
+  color: var(--ink);
+  font: 15px/1.5 var(--font);
 }
 
 .shell {
@@ -63,7 +89,7 @@ body {
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--card);
 }
 
 .top h1 {
@@ -91,7 +117,7 @@ body {
 .specs {
   padding: 12px 16px;
   border-right: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--card);
   overflow-y: auto;
 }
 
@@ -99,7 +125,7 @@ body {
 .specs h3 {
   margin: 12px 0 6px;
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -122,12 +148,12 @@ body {
 }
 
 .spec-link:hover {
-  background: var(--bg);
+  background: var(--chip-hover);
 }
 
 .spec-link[aria-current="true"] {
   border-color: var(--accent);
-  background: var(--bg);
+  background: var(--sel-bg);
   font-weight: 600;
 }
 
@@ -191,16 +217,17 @@ body {
   min-height: 46vh;
   resize: vertical;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--card);
+  color: var(--ink);
   font: 14px/1.5 var(--mono);
   tab-size: 4;
 }
 
+/* Read-only is the page showing through: a tint would sit under the border at under 3:1. */
 .source:read-only {
-  background: var(--surface);
+  background: var(--page);
 }
 
 .bar {
@@ -222,7 +249,7 @@ body {
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--ink-3);
 }
 
 button,
@@ -230,8 +257,8 @@ select,
 input {
   font: inherit;
   color: inherit;
-  background: var(--bg);
-  border: 1px solid var(--line);
+  background: var(--card);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 5px 10px;
 }
@@ -243,7 +270,7 @@ button {
 button[type="submit"],
 #save {
   background: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -265,22 +292,24 @@ textarea:focus-visible {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--card);
 }
 
+/* Amber is a decision that waits for the owner: the design's note, a tint with its own ink. */
 .banner-warn {
-  background: var(--warn-bg);
-  border-color: var(--warn-line);
+  background: var(--attn-tint);
+  border-color: var(--attn-line);
+  color: var(--attn);
 }
 
 .banner-error {
-  background: var(--error-bg);
-  border-color: var(--error-line);
+  background: var(--del-bg);
+  border-color: var(--del-ink);
 }
 
 .banner-ok {
-  background: var(--ok-bg);
-  border-color: var(--ok-line);
+  background: var(--accent-tint);
+  border-color: var(--accent);
 }
 
 /* The AI panel's choice of how a model is reached: radios in a row, not a boxed group. */
@@ -407,21 +436,21 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 0.85rem;
 }
 
 .zoom button[aria-pressed="true"] {
   background: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
 .sheet figcaption {
   padding: 3px 8px;
   border-top: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
+  background: var(--page);
+  color: var(--ink-3);
   font: 0.75rem/1.4 var(--mono);
 }
 
@@ -475,8 +504,8 @@ textarea:focus-visible {
 
 /* A line of the pseudocode that names a state the marked requirement is carried by. */
 .pseudo .lit {
-  background: var(--warn-bg);
-  box-shadow: -3px 0 0 var(--warn-line);
+  background: var(--attn-tint);
+  box-shadow: -3px 0 0 var(--attn-line);
 }
 
 /* What changed from the model before: the lines that were added and removed, with the lines around them. */
@@ -484,16 +513,19 @@ textarea:focus-visible {
   margin: 8px 0;
 }
 
+/* A text change is the design's pair, with the ink that is held to 4.5:1 on it. */
 .diff .added {
-  background: rgba(46, 160, 67, 0.18);
+  background: var(--ins-bg);
+  color: var(--ins-ink);
 }
 
 .diff .removed {
-  background: rgba(218, 54, 51, 0.18);
+  background: var(--del-bg);
+  color: var(--del-ink);
 }
 
 .diff .gap {
-  color: var(--muted, #6b7380);
+  color: var(--ink-3);
 }
 
 .answer-input {
@@ -501,10 +533,10 @@ textarea:focus-visible {
   width: 100%;
   min-height: 3.4em;
   padding: 6px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--card);
+  color: var(--ink);
   font: inherit;
   resize: vertical;
 }
@@ -579,8 +611,8 @@ textarea:focus-visible {
 
 .acceptance .tally li.unsettled {
   font-weight: 600;
-  border-left-color: var(--warn-line);
-  background: var(--warn-bg);
+  border-left-color: var(--attn-line);
+  background: var(--attn-tint);
 }
 
 .acceptance .tally .count {
@@ -600,7 +632,7 @@ textarea:focus-visible {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--card);
   font: 12px/1.45 var(--mono);
   white-space: pre;
   tab-size: 2;
@@ -648,7 +680,7 @@ textarea:focus-visible {
 
 .unreadable {
   margin-top: 8px;
-  color: var(--error-line);
+  color: var(--del-ink);
 }
 
 /* A phone: the specs fold above the text instead of beside it. */
