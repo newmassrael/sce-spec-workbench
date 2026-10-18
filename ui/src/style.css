@@ -29,6 +29,7 @@
   --ink: #141922;
   --ink-3: #667085;
   --accent: #2f5bea;
+  --accent-ink: #1d3fb8;
   --accent-tint: #edf1fe;
   --on-accent: #ffffff;
   --attn: #8a4b00;
@@ -53,6 +54,7 @@
     --ink: #e8ecf3;
     --ink-3: #8e98a8;
     --accent: #7c98ff;
+    --accent-ink: #a9bdff;
     --accent-tint: #1c2650;
     --on-accent: #0e1530;
     --attn: #f0b35a;
@@ -97,13 +99,13 @@ body {
   font-size: 1.05rem;
 }
 
+/* The folder the specs are in is a thing a person reads, not code: it is set in the face of the rest. */
 .top .root {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--mono);
   font-size: 0.8rem;
 }
 
@@ -126,8 +128,6 @@ body {
   margin: 12px 0 6px;
   font-size: 0.85rem;
   color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .specs ul {
@@ -242,10 +242,12 @@ body {
   min-width: 8em;
 }
 
+/* A revision is an id: it stays small and quiet (`muted`) and in the face of the rest, not in the
+   foreground in monospace. The full one is kept in the history, where it is data. */
 .rev {
   margin-left: auto;
-  font-family: var(--mono);
   font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .muted {
@@ -267,6 +269,13 @@ button {
   cursor: pointer;
 }
 
+/* A control that does not change when the pointer is on it does not say it can be pressed. A disabled
+   one answers nothing, and each filled button below has a hover of its own, which is the more
+   specific of the two, so the light fill is never put under the light text of a filled one. */
+button:hover:not(:disabled) {
+  background: var(--chip-hover);
+}
+
 button[type="submit"],
 #save {
   background: var(--accent);
@@ -274,8 +283,21 @@ button[type="submit"],
   border-color: var(--accent);
 }
 
-button:disabled {
-  opacity: 0.5;
+button[type="submit"]:hover:not(:disabled),
+#save:hover:not(:disabled) {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
+/* Disabled is a flat fill with quiet text, as the design draws it, and not the same control at half
+   strength: a pale blue button still looks like the one action. The text is exempt from the 4.5:1
+   a control that works holds. */
+button:disabled,
+button[type="submit"]:disabled,
+#save:disabled {
+  background: var(--chip-hover);
+  color: var(--ink-3);
+  border-color: var(--line);
   cursor: not-allowed;
 }
 
@@ -446,6 +468,11 @@ textarea:focus-visible {
   border-color: var(--accent);
 }
 
+.zoom button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
 .sheet figcaption {
   padding: 3px 8px;
   border-top: 1px solid var(--line);
@@ -505,7 +532,8 @@ textarea:focus-visible {
 /* A line of the pseudocode that names a state the marked requirement is carried by. */
 .pseudo .lit {
   background: var(--attn-tint);
-  box-shadow: -3px 0 0 var(--attn-line);
+  color: var(--attn);
+  font-weight: 700;
 }
 
 /* What changed from the model before: the lines that were added and removed, with the lines around them. */
@@ -606,12 +634,12 @@ textarea:focus-visible {
 
 .acceptance .tally li {
   padding: 2px 8px;
-  border-left: 3px solid transparent;
 }
 
+/* Marked by its fill, its ink and its weight, and not by a coloured stripe at the edge. */
 .acceptance .tally li.unsettled {
   font-weight: 600;
-  border-left-color: var(--attn-line);
+  color: var(--attn);
   background: var(--attn-tint);
 }
 
