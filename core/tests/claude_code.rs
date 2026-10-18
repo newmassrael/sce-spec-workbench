@@ -125,7 +125,8 @@ fn single(model: &str) -> Value {
     })
 }
 
-/// What `claude -p --output-format json` prints when it succeeded.
+/// What `claude -p --output-format stream-json` prints last when it succeeded (what
+/// `--output-format json` printed alone).
 fn answered(structured: Value) -> Value {
     json!({
         "type": "result", "subtype": "success", "is_error": false,
@@ -145,6 +146,49 @@ fn generate(
 fn server_env(fake: &Fake) -> Value {
     let config: Value = serde_json::from_str(&fake.read("mcp.json")).unwrap();
     config["mcpServers"]["sce-author"]["env"].clone()
+}
+
+#[test]
+fn what_the_client_does_while_it_works_is_said_as_events_and_the_answer_is_its_last_line() {
+    let draft = single("<scxml/>");
+    let stream = [
+        json!({"type": "system", "subtype": "init"}),
+        json!({"type": "assistant", "message": {"id": "m1", "content": [
+            {"type": "tool_use", "id": "t1", "name": "mcp__sce-author__validate_scxml",
+             "input": {"text": "<scxml/>"}}]}}),
+        json!({"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "t1", "is_error": false,
+             "content": [{"type": "text",
+                          "text": "{\"verdict\":\"refused\",\"diagnostics\":[{\"code\":\"scxml/dangling-target\"}]}"}]}]}}),
+        answered(draft.clone()),
+    ]
+    .iter()
+    .map(Value::to_string)
+    .collect::<Vec<_>>()
+    .join("\n");
+    let fake = Fake::new("claude-stream", "cat \"$R/stream.jsonl\"");
+    fs::write(fake.record.join("stream.jsonl"), stream).unwrap();
+    let said = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let kept = Arc::clone(&said);
+    let mut watched = job();
+    watched.progress = sce_spec_workbench_core::runner::Progress::to(move |event| {
+        kept.lock().unwrap().push(event)
+    });
+
+    let drafted = generate(&client(&fake), &watched).unwrap();
+
+    assert_eq!(drafted.model.entry_text(), "<scxml/>");
+    assert_eq!(
+        said.lock().unwrap().clone(),
+        vec![
+            sce_specs::journal::Event::TurnAsked { turn: 0 },
+            sce_specs::journal::Event::ToolRan {
+                tool: "validate_scxml".to_string(),
+                verdict: sce_specs::journal::ToolVerdict::Refused,
+                codes: vec!["scxml/dangling-target".to_string()],
+            },
+        ]
+    );
 }
 
 #[test]
@@ -191,7 +235,12 @@ fn the_client_is_started_with_only_the_tools_the_task_needs() {
     ] {
         assert!(argv.iter().any(|a| a == flag), "{flag} in {argv:?}");
     }
-    assert_eq!(fake.value_of("--output-format").as_deref(), Some("json"));
+    // A stream of events, so that what the run does is said as it does it.
+    assert_eq!(
+        fake.value_of("--output-format").as_deref(),
+        Some("stream-json")
+    );
+    assert!(argv.iter().any(|a| a == "--verbose"), "{argv:?}");
     // No built-in tool at all: no shell, no files, no web. What the client can do is what
     // the author server offers, and of that only what the task needs.
     assert_eq!(fake.value_of("--tools").as_deref(), Some(""));

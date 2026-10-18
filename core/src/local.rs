@@ -42,8 +42,9 @@ use crate::client_run::{
 };
 use crate::http_client::{self, Endpoint, HttpError, Request};
 use crate::mcp_client::{McpClient, McpError, Tool};
+use crate::run_steps::{codes_of, verdict_of, DESIGN_TOOLS};
 use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job, Progress, Trouble};
-use sce_specs::journal::{is_code, Event, ToolVerdict, CODES_MAX};
+use sce_specs::journal::{Event, ToolVerdict};
 use sce_specs::requests::FailureKind;
 
 /// The most of one answer of the server that is read.
@@ -131,9 +132,6 @@ const HANDOFF_RESULT_MAX: usize = 8_000;
 /// too much, which begins a conversation again a little early, where a high one counts too little
 /// and has the server refuse the request.
 const CHARS_PER_TOKEN: u64 = 3;
-
-/// The tools whose arguments are the design the model is putting right.
-const DESIGN_TOOLS: [&str; 2] = ["validate_scxml_set", "validate_scxml"];
 
 /// Whether what a server said of a refused request is that the conversation is longer than the
 /// model's context. Servers word it differently (measured: "prompt (65532 tokens) leaves no room to
@@ -939,7 +937,7 @@ impl Local {
                         self.run_tool(&mut mcp, &tools, call, deadline, cancel, &job.progress)?;
                     job.progress.say(Event::ToolRan {
                         tool: call.name.clone(),
-                        verdict: verdict_of(&call.name, &done),
+                        verdict: verdict_of(&call.name, done.failed, &done.words),
                         codes: codes_of(&done.words),
                     });
                     self.trace.say(|| Step::Tool {
@@ -1020,55 +1018,6 @@ struct Call {
     /// What the arguments were as the model wrote them, and the JSON they are when they are.
     raw: String,
     arguments: Result<Value, String>,
-}
-
-/// What a tool the model called came to, as the journal says it. Only a tool that judges a design
-/// (`DESIGN_TOOLS`) is said to have accepted or refused one, and that is read from the verdict in
-/// what the tool answered; any other tool ran, or failed.
-fn verdict_of(tool: &str, done: &ToolWords) -> ToolVerdict {
-    if done.failed {
-        return ToolVerdict::Failed;
-    }
-    if !DESIGN_TOOLS.contains(&tool) {
-        return ToolVerdict::Ran;
-    }
-    match first_value(&done.words)
-        .as_ref()
-        .and_then(|answer| answer["verdict"].as_str())
-    {
-        Some("accepted") => ToolVerdict::Accepted,
-        Some("refused") => ToolVerdict::Refused,
-        // A checking tool that said something else judged nothing the journal can count.
-        _ => ToolVerdict::Ran,
-    }
-}
-
-/// The codes a checking tool named as what it refused, in the order it wrote them: at most
-/// [`CODES_MAX`], and only those that are the shape of a code, so that one that is not does not
-/// stop the rest being kept.
-fn codes_of(words: &str) -> Vec<String> {
-    first_value(words)
-        .as_ref()
-        .and_then(|answer| answer["diagnostics"].as_array())
-        .map(|records| {
-            records
-                .iter()
-                .filter_map(|record| record["code"].as_str())
-                .filter(|code| is_code(code))
-                .map(str::to_string)
-                .take(CODES_MAX)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// The first JSON value of what a tool said: a checking tool's answer is one object, and for an
-/// accepted set the pages of its documents follow it as text of their own.
-fn first_value(words: &str) -> Option<Value> {
-    serde_json::Deserializer::from_str(words)
-        .into_iter::<Value>()
-        .next()
-        .and_then(Result::ok)
 }
 
 /// The tool calls in a message of the model, in order.

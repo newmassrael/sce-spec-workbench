@@ -35,9 +35,10 @@ use serde_json::{json, Value};
 use crate::auth_policy::Observed;
 use crate::client_find::find_programs;
 use crate::client_run::{
-    blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise, tail, Ended,
-    Scratch, SERVER, SPEC_SCOPE, SYSTEM_PROMPT,
+    blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise,
+    supervise_lines, tail, Ended, Scratch, SERVER, SPEC_SCOPE, SYSTEM_PROMPT,
 };
+use crate::run_steps::Steps;
 use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 /// The tools the client may use, of the authoring server's. Reading a spec and checking a draft;
@@ -148,7 +149,10 @@ impl ClaudeCode {
         command
             .current_dir(scratch)
             .arg("-p")
-            .args(["--output-format", "json"])
+            // A stream of events, one to a line while the client works, so that what it does is
+            // said as it does it; the last of them is the result a single value used to be.
+            .args(["--output-format", "stream-json"])
+            .arg("--verbose")
             .args(["--json-schema", &schema().to_string()])
             .args(["--tools", ""])
             .arg("--strict-mcp-config")
@@ -245,11 +249,18 @@ impl Generator for ClaudeCode {
             ))
             .because(cause::CLIENT_FAULT)
         })?;
-        let ended =
-            supervise(child, Some(prompt(job).into_bytes()), cancel, allowed).map_err(|e| {
-                GenerateError::installation(format!("the client could not be read: {e}"))
-                    .because(cause::CLIENT_FAULT)
-            })?;
+        let mut steps = Steps::new(&job.progress);
+        let ended = supervise_lines(
+            child,
+            Some(prompt(job).into_bytes()),
+            cancel,
+            allowed,
+            &mut |line| steps.claude_line(line),
+        )
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
@@ -261,7 +272,12 @@ impl Generator for ClaudeCode {
                 status,
                 stdout,
                 stderr,
-            } => read_answer(status, &stdout, &stderr),
+            } => {
+                // The result of a stream is its last line; a client that printed its result as
+                // one value is read as it is.
+                let said = steps.result_line().map_or(stdout, str::to_string);
+                read_answer(status, &said, &stderr)
+            }
         }
     }
 }

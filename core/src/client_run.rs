@@ -16,6 +16,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,10 @@ use crate::runner::{Cancel, Draft, Job};
 
 /// The most of what a client writes that is kept to show the owner when it fails.
 const KEPT_BYTES: usize = 16 * 1024 * 1024;
+
+/// The longest line of a client's output that is passed on as it is written. A longer one is read
+/// to its end, so that the client is never held at a write, and is not passed on.
+const LINE_MAX: usize = 16 * 1024 * 1024;
 
 /// What the SCE authoring server is called to a client, and so the prefix of its tools.
 pub(crate) const SERVER: &str = "sce-author";
@@ -303,10 +308,24 @@ pub(crate) enum Ended {
 /// Reading is not left until the client has exited: more than a pipe holds, written to a pipe
 /// nobody reads, holds the client at its write for ever and it never exits.
 pub(crate) fn supervise(
+    child: Child,
+    input: Option<Vec<u8>>,
+    cancel: &Cancel,
+    timeout: Duration,
+) -> io::Result<Ended> {
+    supervise_lines(child, input, cancel, timeout, &mut |_| {})
+}
+
+/// [`supervise`], and each line the client writes to its standard output is handed to `on_line`
+/// as it is written, on the thread that supervises, in order, and every one of them before this
+/// returns. A client that prints what it does while it works (a stream of events) can be read
+/// without waiting for it to end.
+pub(crate) fn supervise_lines(
     mut child: Child,
     input: Option<Vec<u8>>,
     cancel: &Cancel,
     timeout: Duration,
+    on_line: &mut dyn FnMut(&str),
 ) -> io::Result<Ended> {
     let writer = child.stdin.take().map(|mut stdin| {
         thread::spawn(move || {
@@ -317,11 +336,13 @@ pub(crate) fn supervise(
             }
         })
     });
-    let out = child.stdout.take().map(reader);
-    let err = child.stderr.take().map(reader);
+    let (lines_in, lines_out) = mpsc::channel::<String>();
+    let out = child.stdout.take().map(|pipe| reader(pipe, Some(lines_in)));
+    let err = child.stderr.take().map(|pipe| reader(pipe, None));
 
     let started = Instant::now();
     let status = loop {
+        pass_on(&lines_out, on_line);
         if let Some(status) = child.try_wait()? {
             break Some(status);
         }
@@ -332,11 +353,13 @@ pub(crate) fn supervise(
         if started.elapsed() > timeout {
             stop(&mut child);
             let _ = join(writer, out, err);
+            pass_on(&lines_out, on_line);
             return Ok(Ended::TimedOut);
         }
         thread::sleep(Duration::from_millis(20));
     };
     let (stdout, stderr) = join(writer, out, err);
+    pass_on(&lines_out, on_line);
     Ok(match status {
         Some(status) => Ended::Exited {
             status,
@@ -352,10 +375,25 @@ fn stop(child: &mut Child) {
     let _ = child.wait();
 }
 
-/// Read a pipe to its end on a thread of its own; what is kept is the first part of it.
-fn reader<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<String> {
+/// Hand every line that has been read and not yet passed on to `on_line`.
+fn pass_on(lines: &Receiver<String>, on_line: &mut dyn FnMut(&str)) {
+    for line in lines.try_iter() {
+        on_line(&line);
+    }
+}
+
+/// Read a pipe to its end on a thread of its own; what is kept is the first part of it. When
+/// `lines` is given, each complete line is also sent on it as it is read, and the last one even
+/// when nothing ended it.
+fn reader<R: Read + Send + 'static>(
+    mut pipe: R,
+    lines: Option<Sender<String>>,
+) -> thread::JoinHandle<String> {
     thread::spawn(move || {
         let mut kept = Vec::new();
+        let mut line: Vec<u8> = Vec::new();
+        // The line being read has passed `LINE_MAX`: it is read to its end and not passed on.
+        let mut too_long = false;
         let mut chunk = [0u8; 8192];
         loop {
             match pipe.read(&mut chunk) {
@@ -367,7 +405,30 @@ fn reader<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<String> {
                         let room = KEPT_BYTES - kept.len();
                         kept.extend_from_slice(&chunk[..n.min(room)]);
                     }
+                    if let Some(lines) = &lines {
+                        for &byte in &chunk[..n] {
+                            if byte == b'\n' {
+                                if !too_long {
+                                    let _ = lines.send(String::from_utf8_lossy(&line).into_owned());
+                                }
+                                line.clear();
+                                too_long = false;
+                            } else if !too_long {
+                                if line.len() < LINE_MAX {
+                                    line.push(byte);
+                                } else {
+                                    line.clear();
+                                    too_long = true;
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        if let Some(lines) = &lines {
+            if !too_long && !line.is_empty() {
+                let _ = lines.send(String::from_utf8_lossy(&line).into_owned());
             }
         }
         String::from_utf8_lossy(&kept).into_owned()

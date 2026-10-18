@@ -41,6 +41,7 @@ pub mod http_client;
 pub mod installed;
 pub mod local;
 pub mod mcp_client;
+pub mod run_steps;
 pub mod runner;
 pub mod server_status;
 

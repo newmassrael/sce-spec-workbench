@@ -30,10 +30,11 @@ rooms of one specification; see the evidence column).
 | superseded | ended because the text or answers were saved | core |
 | completed | the model, shown without a press | bundle |
 
-What is not shown at all: how long it has run, which turn the model is on, what the checks
-refused, how many times, and what the AI is doing now. The local connection records all of that
-(`Step` in `local.rs`), but only the tests read it. The Claude Code and Codex connections run a
-client of their own and report nothing until it ends.
+What the local connection said of a run (`Step` in `local.rs`) is also kept as the run's journal,
+and the screen shows its counts. The Claude Code and Codex connections run a client of their own
+and say what it does from the events it prints while it works (`run_steps.rs`): its turns and the
+checks of the authoring server, and no more; a hand-over, or how a message of the model ended, is
+not something their output shows.
 
 ## 2. How a request can end
 
@@ -88,13 +89,13 @@ thing said of it was: ...".
 | X3 | The text or answers were saved | ended | the same |
 | X4 | The core refused the draft for a reason that is the specification's, not the draft's (`moved`, a retired id) | failed, one string | kind "specification", pointing to what to change |
 
-### 2.6 Not started
+### 2.6 Waiting to start
 
 | # | Case | Now | Should be |
 |---|---|---|---|
 | Q1 | No AI is connected | said, with the choices | unchanged |
 | Q2 | The connection it was made for cannot run | the executor's reason | unchanged |
-| Q3 | Behind another request of the same connection | the store's word | add how long the one ahead has run |
+| Q3 | Behind another request of the same connection | the store's word, and whole minutes the place has been held by the store's clock (`running_since`, command set 30) | unchanged |
 | Q4 | Made in the application for no connection | said | unchanged |
 
 ## 3. While it runs
@@ -114,9 +115,11 @@ whole time. States a run is in, each of which the person cannot tell apart now:
 
 ## 4. Combinations that change the answer
 
-- **Connection kind.** Local connections have every row above. Claude Code and Codex run a client
-  that reports nothing until it ends, so R1 to R6 do not exist for them and M1 to M4 appear as one
-  string. The screen must say "this connection does not report progress" rather than show nothing.
+- **Connection kind.** Local connections have every row above. Claude Code and Codex have the turns
+  and the checks (R1 to R3) as their client prints them, and the tries (R6) as the runner counts
+  them; R4 and R5 do not exist for them, because their output does not show how a message ended or
+  that a conversation was begun again. A run that has said nothing is said to be silent after a
+  minute, rather than shown as nothing.
 - **Retry after a refusal (T2, R6).** The second try starts from turn 0 and throws the first try
   away, including a design that was one refusal from accepted (M6). That is a design decision
   and not a bug to patch quietly.
@@ -164,24 +167,36 @@ All six steps are built and each landed with tests for the rows it changes.
    executor's own words folded. Every cause the executors name has words in both languages, held
    by a test that reads the executors' list.
 3. **Built.** The journal of a run (R1 to R6): typed events kept beside the request, added up by
-   the core in one place, shown as counts and minutes by the core's clock. Connections that do not
-   report (Claude Code, Codex) are said not to, after a minute of silence. No percentage is shown.
+   the core in one place, shown as counts and minutes by the core's clock. A run that has said
+   nothing is said to be silent after a minute. No percentage is shown.
 4. **Built.** The last design a failed run held is kept as the request's candidate and shown
    folded and said to be neither accepted nor the spec's model (M6). Command set 29.
 5. **Built.** One clock for the request (T2): the deadline is fixed when the request is taken and
    is shared by every try. A try is not begun once the time is gone (`clock-ran-out`).
 6. **Built.** Where a request finished, the screen says how many requirements SCE found the design
    leaves unsettled, in SCE's six words for that and no others (E2).
+7. **Built.** A request that waits behind its connection says how long the place it waits for has
+   been held (Q3): the store gives when the longest-running attempt of the connection was taken and
+   its own moment, and the screen says whole minutes from the two, once it is a minute. Command
+   set 30.
+8. **Built.** Claude Code and Codex say what their run does as it does it: the client is read
+   line by line while it works (`--output-format stream-json --verbose`, `exec --json`), and each
+   turn of the model and each check of the authoring server is a journal event, read by the same
+   code that reads the local connection's checks.
 
 ### What is not covered, and is said so
 
 - **Whether a model that is not accepted could be.** The last design is kept and shown, and
   nothing here says how near it was beyond the counts of the refusals. A near miss is not a
   verdict.
-- **Claude Code and Codex report no turns.** Their runs have a try and a clock and no journal of
-  turns or checks: that is what the client program gives, and the screen says so rather than show
-  nothing.
-- **Q3**, how long the request ahead in a connection's queue has run, is not built.
+- **What the two clients' turns are.** A turn of Claude Code or Codex is counted when the model
+  first acts after the run began or after a tool answered it; the output does not show the
+  model's own requests, so the count is of what it did and not of what the client asked it. Their
+  event shapes are those the clients printed when this was written; a line of another shape says
+  nothing and is not a failure.
+- **How long the one ahead has run, for a connection with more than one place.** It is the
+  attempt that has run longest, which is how long the place the request waits for has been held;
+  it is not a forecast of when the place is free.
 - **The cause of a failed generator that is neither of ours.** An executor that says no kind is
   recorded as `unclassified`, and is said as that.
 - **Why the 40- and 60-room runs ended in empty messages.** The records now say it was reasoning

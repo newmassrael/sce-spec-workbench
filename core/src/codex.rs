@@ -40,12 +40,13 @@ use crate::auth_policy::Observed;
 use crate::claude_code::AuthorServer;
 use crate::client_find::{find_programs, Candidate, Search};
 use crate::client_run::{
-    blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise, tail, Ended,
-    Scratch, SERVER, SYSTEM_PROMPT,
+    blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise_lines, tail,
+    Ended, Scratch, SERVER, SYSTEM_PROMPT,
 };
 use crate::codex_environment::environment_for;
 use crate::codex_support::{enabled_features, Support};
 use crate::connection::AuthSource;
+use crate::run_steps::Steps;
 use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 // The authoring server's tools a client may use, said once for every client that has them
@@ -755,11 +756,20 @@ impl Generator for Codex {
             ))
             .because(cause::CLIENT_FAULT)
         })?;
-        let ended =
-            supervise(child, Some(prompt(job).into_bytes()), cancel, allowed).map_err(|e| {
-                GenerateError::installation(format!("the client could not be read: {e}"))
-                    .because(cause::CLIENT_FAULT)
-            })?;
+        // The events it prints as it works (`exec --json`) are what the run says it has done; the
+        // answer is read from the file it writes its last message to.
+        let mut steps = Steps::new(&job.progress);
+        let ended = supervise_lines(
+            child,
+            Some(prompt(job).into_bytes()),
+            cancel,
+            allowed,
+            &mut |line| steps.codex_line(line),
+        )
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
