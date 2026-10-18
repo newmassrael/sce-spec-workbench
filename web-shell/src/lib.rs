@@ -132,6 +132,9 @@ fn status_of(kind: &str) -> u16 {
         | "invalid-model"
         | "invalid-requirements"
         | "bad-candidate"
+        // A bundle that is not an original: a path that could leave it, two that differ only in case,
+        // a rendition with no source. The call was understood and what it carries is refused.
+        | "bad-original"
         | "check-refused"
         | "fresh-ids-not-issued"
         | "model-for-an-unknown-text"
@@ -295,6 +298,7 @@ mod tests {
         ("bad-host", 400),
         ("bad-instructions", 400),
         ("bad-lease", 400),
+        ("bad-original", 422),
         ("bad-request", 400),
         ("bad-server-address", 400),
         ("busy", 503),

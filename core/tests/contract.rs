@@ -1615,6 +1615,88 @@ fn replies() -> Value {
         refusal(&store, "read_revision_report", json!({"id": revision_id})),
     );
 
+    // What a spec is brought in from, and what was read out of it (ADR 0032, 0026): an original is a
+    // bundle of members named by the hash of their bytes, and an extraction is kept as it was made.
+    // The bytes of a member cross the command layer as base64: here "# Door lock\n" and the eight
+    // bytes every PNG begins with, which is enough for a store that keeps bytes and reads none.
+    let original_spec = answer(
+        &store,
+        "create_spec",
+        json!({"title": "Door lock, from a document"}),
+    );
+    let original_id = original_spec["id"].as_str().unwrap().to_string();
+    let added = answer(
+        &store,
+        "add_original",
+        json!({
+            "id": original_id,
+            "label": "from the customer",
+            "members": [
+                {"path": "spec.md", "role": "document", "data": "IyBEb29yIGxvY2sK"},
+                {"path": "images/lock.png", "role": "picture", "data": "iVBORw0KGgo="},
+            ],
+            "missing": ["images/gone.png"],
+        }),
+    );
+    let original = added["digest"].clone();
+    answers.insert("add_original".into(), added);
+    answers.insert(
+        "read_original".into(),
+        answer(
+            &store,
+            "read_original",
+            json!({"id": original_id, "original": original}),
+        ),
+    );
+    answers.insert(
+        "list_originals".into(),
+        answer(&store, "list_originals", json!({"id": original_id})),
+    );
+    answers.insert(
+        "read_original_member".into(),
+        answer(
+            &store,
+            "read_original_member",
+            json!({"id": original_id, "original": original, "path": "spec.md"}),
+        ),
+    );
+    let extraction_text = json!({
+        "v": 1, "extractor": "plain", "extractor_version": "1", "member": "spec.md",
+        "blocks": [], "not_carried": [],
+    })
+    .to_string();
+    let saved_extraction = answer(
+        &store,
+        "save_extraction",
+        json!({"id": original_id, "original": original, "member": "spec.md", "text": extraction_text}),
+    );
+    let extraction = saved_extraction["digest"].clone();
+    answers.insert("save_extraction".into(), saved_extraction);
+    answers.insert(
+        "read_extraction".into(),
+        answer(
+            &store,
+            "read_extraction",
+            json!({"id": original_id, "digest": extraction}),
+        ),
+    );
+    answers.insert(
+        "list_extractions".into(),
+        answer(
+            &store,
+            "list_extractions",
+            json!({"id": original_id, "original": original}),
+        ),
+    );
+    refusals.insert(
+        "bad-original".into(),
+        refusal(
+            &store,
+            "add_original",
+            json!({"id": original_id, "members": [{"path": "../up.md", "role": "document", "data": ""}]}),
+        ),
+    );
+
     // A command without a written-down reply is a command the screen's test
     // cannot hold to account.
     for command in all_commands() {

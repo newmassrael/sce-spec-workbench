@@ -6,6 +6,12 @@
       "parent": null,
       "revision": "93e3f3785b8745e6f7b2f70208f65def3de581686c8e109d6fea653094a7c7a1"
     },
+    "add_original": {
+      "bytes": 20,
+      "created": true,
+      "digest": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73",
+      "members": 2
+    },
     "bundle_history": {
       "entries": [
         {
@@ -117,7 +123,7 @@
     },
     "describe": {
       "application_command_set_version": 3,
-      "command_set_version": 30,
+      "command_set_version": 31,
       "commands": [
         "describe",
         "list_specs",
@@ -163,6 +169,13 @@
         "read_request_journal",
         "read_bundle",
         "bundle_history",
+        "add_original",
+        "read_original",
+        "list_originals",
+        "read_original_member",
+        "save_extraction",
+        "read_extraction",
+        "list_extractions",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -182,7 +195,7 @@
     },
     "describe_desktop": {
       "application_command_set_version": 3,
-      "command_set_version": 30,
+      "command_set_version": 31,
       "commands": [
         "describe",
         "list_specs",
@@ -228,6 +241,13 @@
         "read_request_journal",
         "read_bundle",
         "bundle_history",
+        "add_original",
+        "read_original",
+        "list_originals",
+        "read_original_member",
+        "save_extraction",
+        "read_extraction",
+        "list_extractions",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -401,6 +421,18 @@
       "default": null,
       "unreadable": []
     },
+    "list_extractions": {
+      "extractions": [
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "digest": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029",
+          "extractor": "plain",
+          "extractor_version": "1",
+          "member": "spec.md",
+          "original": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73"
+        }
+      ]
+    },
     "list_open_requests": {
       "requests": [
         {
@@ -425,6 +457,17 @@
           "spec": "<spec-id>",
           "state": "queued",
           "stored_state": "queued"
+        }
+      ]
+    },
+    "list_originals": {
+      "originals": [
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "bytes": 20,
+          "digest": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73",
+          "label": "from the customer",
+          "members": 2
         }
       ]
     },
@@ -1468,6 +1511,10 @@
         "revision": "d7c2eaebdba65eb95838462adbf7d9a82110d576b0e1691d9b11b873f0c02f2f"
       }
     },
+    "read_extraction": {
+      "digest": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029",
+      "text": "{\"blocks\":[],\"extractor\":\"plain\",\"extractor_version\":\"1\",\"member\":\"spec.md\",\"not_carried\":[],\"v\":1}"
+    },
     "read_host_status": {
       "hosts": [
         {
@@ -1744,6 +1791,33 @@
       },
       "source_head": null,
       "standing": "unstated"
+    },
+    "read_original": {
+      "bytes": 20,
+      "label": "from the customer",
+      "members": [
+        {
+          "hash": "4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6",
+          "path": "images/lock.png",
+          "role": "picture",
+          "size": 8
+        },
+        {
+          "hash": "b2d7c7936cdd528b93bfecd1697b0b754f9487d9abfb5539eeee635614606f0e",
+          "path": "spec.md",
+          "role": "document",
+          "size": 12
+        }
+      ],
+      "missing": [
+        "images/gone.png"
+      ],
+      "original": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73"
+    },
+    "read_original_member": {
+      "data": "IyBEb29yIGxvY2sK",
+      "path": "spec.md",
+      "size": 12
     },
     "read_queue_none": {
       "now": "2026-10-03T09:00:00Z",
@@ -2539,6 +2613,10 @@
       "outcome": "unchanged",
       "revision": "d7c2eaebdba65eb95838462adbf7d9a82110d576b0e1691d9b11b873f0c02f2f"
     },
+    "save_extraction": {
+      "created": true,
+      "digest": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029"
+    },
     "save_model_first": {
       "outcome": "saved",
       "parent": null,
@@ -2625,7 +2703,7 @@
     }
   },
   "application_command_set_version": 3,
-  "command_set_version": 30,
+  "command_set_version": 31,
   "refusals": {
     "active-request": {
       "detail": {
@@ -2650,6 +2728,13 @@
       },
       "kind": "bad-lease",
       "message": "a lease of 5 seconds cannot be kept or is not worth holding: ask for 10 to 900"
+    },
+    "bad-original": {
+      "detail": {
+        "path": "../up.md"
+      },
+      "kind": "bad-original",
+      "message": "the path `../up.md` names `..`, which could leave the bundle"
     },
     "bad-request": {
       "kind": "bad-request",
@@ -2927,7 +3012,7 @@
     },
     "unknown-command": {
       "kind": "unknown-command",
-      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
+      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection"
     },
     "wrong-connection": {
       "detail": {

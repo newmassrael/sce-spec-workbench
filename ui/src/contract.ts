@@ -11,7 +11,7 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 30;
+export const SUPPORTED_COMMAND_SET_VERSION = 31;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
@@ -1721,6 +1721,186 @@ export function parseBundleRead(value: unknown): BundleRead | null {
     revision: revision(r["revision"], `${where}.bundle.revision`),
     bundle: parseBundle(r["bundle"], `${where}.bundle.bundle`),
   };
+}
+
+/** What a member of an original is to the original (ADR 0032). */
+export const ORIGINAL_ROLES = ["document", "picture", "attachment", "rendition"] as const;
+export type OriginalRole = (typeof ORIGINAL_ROLES)[number];
+
+/** One member of an original, as its manifest says it: the bytes are named by their hash. */
+export interface OriginalMember {
+  path: string;
+  hash: Revision;
+  size: number;
+  role: OriginalRole;
+  /** For a rendition: the hash of the member it was made from. */
+  of: Revision | null;
+  /** For a rendition: what drew it. */
+  renderer: string | null;
+}
+
+/** `add_original`: the original is named by the hash of its manifest. */
+export interface OriginalAdded {
+  digest: Revision;
+  /** `false` when this bundle was added before, and this is that original. */
+  created: boolean;
+  members: number;
+  bytes: number;
+}
+
+/** `read_original`: what an original holds, and what it names and was not brought with. */
+export interface OriginalRead {
+  original: Revision;
+  label: string;
+  members: OriginalMember[];
+  /** Paths the original refers to and does not hold: pictures that were not brought. */
+  missing: string[];
+  bytes: number;
+}
+
+/** One line of `list_originals`. */
+export interface OriginalEntry {
+  digest: Revision;
+  at: string;
+  label: string;
+  members: number;
+  bytes: number;
+}
+
+/** `read_original_member`: the bytes of one member, as base64, checked against their hash by the core. */
+export interface OriginalMemberRead {
+  path: string;
+  size: number;
+  data: string;
+}
+
+/** `save_extraction`. */
+export interface ExtractionSaved {
+  digest: Revision;
+  /** `false` when exactly these bytes were saved before for this member of this original. */
+  created: boolean;
+}
+
+/** `read_extraction`: the text as it was saved. Its form is the authoring tools' (`extraction.v1`). */
+export interface ExtractionRead {
+  digest: Revision;
+  text: string;
+}
+
+/** One line of `list_extractions`. */
+export interface ExtractionEntry {
+  digest: Revision;
+  at: string;
+  original: Revision;
+  member: string;
+  extractor: string;
+  extractor_version: string;
+}
+
+function originalRole(value: unknown, where: string): OriginalRole {
+  const found = ORIGINAL_ROLES.find((role) => role === value);
+  if (found === undefined) {
+    throw new ContractError(where, `one of ${ORIGINAL_ROLES.map((role) => `"${role}"`).join(", ")}`);
+  }
+  return found;
+}
+
+function parseOriginalMember(value: unknown, where: string): OriginalMember {
+  const r = record(value, where);
+  return {
+    path: text(r, "path", where),
+    hash: revision(r["hash"], `${where}.hash`),
+    size: count(r, "size", where),
+    role: originalRole(r["role"], `${where}.role`),
+    // A member that is not a rendition has neither: the core leaves an absent field out and does not
+    // write it as null, and the screen reads both the same.
+    of: r["of"] === undefined ? null : nullableRevision(r["of"], `${where}.of`),
+    renderer: nullableText(r, "renderer", where),
+  };
+}
+
+function created(r: Obj, where: string): boolean {
+  if (typeof r["created"] !== "boolean") throw new ContractError(`${where}.created`, "true or false");
+  return r["created"];
+}
+
+/** `add_original`. */
+export function parseOriginalAdded(value: unknown): OriginalAdded {
+  const where = "add_original";
+  const r = record(value, where);
+  return {
+    digest: revision(r["digest"], `${where}.digest`),
+    created: created(r, where),
+    members: count(r, "members", where),
+    bytes: count(r, "bytes", where),
+  };
+}
+
+/** `read_original`. */
+export function parseOriginalRead(value: unknown): OriginalRead {
+  const where = "read_original";
+  const r = record(value, where);
+  return {
+    original: revision(r["original"], `${where}.original`),
+    label: text(r, "label", where),
+    members: list(r, "members", where).map((m, i) => parseOriginalMember(m, `${where}.members[${i}]`)),
+    missing: stringList(r, "missing", where),
+    bytes: count(r, "bytes", where),
+  };
+}
+
+/** `list_originals`: the originals added to the spec, the newest first. */
+export function parseOriginalList(value: unknown): OriginalEntry[] {
+  const where = "list_originals";
+  return list(record(value, where), "originals", where).map((item, i) => {
+    const at = `${where}.originals[${i}]`;
+    const r = record(item, at);
+    return {
+      digest: revision(r["digest"], `${at}.digest`),
+      at: text(r, "at", at),
+      label: text(r, "label", at),
+      members: count(r, "members", at),
+      bytes: count(r, "bytes", at),
+    };
+  });
+}
+
+/** `read_original_member`. */
+export function parseOriginalMemberRead(value: unknown): OriginalMemberRead {
+  const where = "read_original_member";
+  const r = record(value, where);
+  return { path: text(r, "path", where), size: count(r, "size", where), data: text(r, "data", where) };
+}
+
+/** `save_extraction`. */
+export function parseExtractionSaved(value: unknown): ExtractionSaved {
+  const where = "save_extraction";
+  const r = record(value, where);
+  return { digest: revision(r["digest"], `${where}.digest`), created: created(r, where) };
+}
+
+/** `read_extraction`. */
+export function parseExtractionRead(value: unknown): ExtractionRead {
+  const where = "read_extraction";
+  const r = record(value, where);
+  return { digest: revision(r["digest"], `${where}.digest`), text: text(r, "text", where) };
+}
+
+/** `list_extractions`: the extractions saved for the spec, the newest first. */
+export function parseExtractionList(value: unknown): ExtractionEntry[] {
+  const where = "list_extractions";
+  return list(record(value, where), "extractions", where).map((item, i) => {
+    const at = `${where}.extractions[${i}]`;
+    const r = record(item, at);
+    return {
+      digest: revision(r["digest"], `${at}.digest`),
+      at: text(r, "at", at),
+      original: revision(r["original"], `${at}.original`),
+      member: text(r, "member", at),
+      extractor: text(r, "extractor", at),
+      extractor_version: text(r, "extractor_version", at),
+    };
+  });
 }
 
 /** `request_generation`. */
