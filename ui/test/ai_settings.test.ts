@@ -977,10 +977,10 @@ describe("what is shown for each state Codex can be in", () => {
     expect(r.root.querySelector("code")).toBeNull();
   });
 
-  it("says a version this build verified, a login, and that a request will run", async () => {
+  it("says the sandbox the Codex gives, a login, and that a request will run", async () => {
     const r = await shown(codexStatusOf());
 
-    expect(r.root.textContent).toContain("has verified this version");
+    expect(r.root.textContent).toContain("runs commands read-only");
     expect(r.root.textContent).toContain("will run");
     expect(r.root.textContent).not.toContain("will wait");
     expect(r.root.querySelector("#ai-save")).not.toBeNull();
@@ -988,27 +988,27 @@ describe("what is shown for each state Codex can be in", () => {
     expect(sources).toEqual(["official-login", "app-store", "env-api-key"]);
   });
 
-  it("says a version this build did not verify, whoever is signed in, and that a request will wait", async () => {
+  it("says a Codex that gives another sandbox is refused, whoever is signed in, and that a request will wait", async () => {
     const r = await shown(
-      codexStatusOf({ support: { state: "unverified", reason: "this version has not been verified" } }),
+      codexStatusOf({ support: { state: "unverified", reason: "it lets a command read :root" } }),
     );
 
-    expect(r.root.textContent).toContain("has not verified this version");
-    expect(r.root.textContent).toContain("this version has not been verified");
+    expect(r.root.textContent).toContain("does not give the sandbox a run needs");
+    expect(r.root.textContent).toContain("it lets a command read :root");
     expect(r.root.textContent).toContain("will wait");
     // Not offered as the default: every generation would wait. Another program can still be chosen,
-    // which is how a person reaches a version this build did verify.
+    // which is how a person reaches an install that gives the sandbox a run needs.
     expect(r.root.querySelector("#ai-save")).toBeNull();
     expect(r.root.querySelector("#ai-codex-model")).toBeNull();
     expect(r.root.querySelector("#ai-save-program")).not.toBeNull();
     expect(r.root.querySelector("#ai-codex-program")).not.toBeNull();
   });
 
-  it("says a version that could not be checked is not one that was refused", async () => {
+  it("says a Codex that could not be asked is not one that was refused", async () => {
     const r = await shown(codexStatusOf({ support: { state: "unknown", reason: "it did not list its features" } }));
 
     expect(r.root.textContent).toContain("it did not list its features");
-    expect(r.root.textContent).not.toContain("has not verified this version");
+    expect(r.root.textContent).not.toContain("does not give the sandbox a run needs");
   });
 
   it("gives the commands of the source that is chosen, and the folder the application's own login is made in", async () => {
@@ -1256,7 +1256,7 @@ describe("keeping the program a connection runs", () => {
     // A working Claude Code is the default, and the Codex that is found is a version this build did not verify.
     const r = await opened({
       listing: KEPT_CLAUDE,
-      codex: codexStatusOf({ support: { state: "unverified", reason: "this version has not been verified" } }),
+      codex: codexStatusOf({ support: { state: "unverified", reason: "it lets a command read :root" } }),
     });
     await chooseCodex(r);
     choose(r.root, "#ai-codex-program", OTHER_CODEX);
@@ -1449,7 +1449,7 @@ describe("changing the program a connection runs", () => {
     const r = await opened({ listing: KEPT_CODEX });
     r.core.codexStatusOfProgram.set(
       OTHER_CODEX,
-      codexStatusOf({ support: { state: "unverified", reason: "this version has not been verified" } }),
+      codexStatusOf({ support: { state: "unverified", reason: "it lets a command read :root" } }),
     );
     r.core.codexStatusOfProgram.set(CODEX_PROGRAM, codexStatusOf());
     r.core.listing = {

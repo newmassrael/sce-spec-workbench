@@ -379,7 +379,7 @@ describe("the source of the credential the settings show", () => {
 });
 
 describe("whether a request made for Codex would run, and if not why it waits", () => {
-  it("runs when the program is there, this build verified it, and somebody is signed in by a way it uses", () => {
+  it("runs when the program is there, gives the sandbox a run needs, and somebody is signed in by a way it uses", () => {
     expect(outlookOf(codexStatus(), "official-login")).toEqual({ runs: true });
   });
 
@@ -394,8 +394,8 @@ describe("whether a request made for Codex would run, and if not why it waits", 
     });
   });
 
-  it("waits for a version this build did not verify, whoever is signed in", () => {
-    const unverified = codexStatus({ support: { state: "unverified", reason: "has not been verified" } });
+  it("waits for a Codex that gives another sandbox, whoever is signed in", () => {
+    const unverified = codexStatus({ support: { state: "unverified", reason: "it lets a command read :root" } });
     expect(outlookOf(unverified, "official-login")).toEqual({ runs: false, because: "unsupported" });
     const unknown = codexStatus({ support: { state: "unknown", reason: "it did not list its features" } });
     expect(outlookOf(unknown, "official-login")).toEqual({ runs: false, because: "support-unknown" });

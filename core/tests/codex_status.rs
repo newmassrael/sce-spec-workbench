@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! What the screen says of Codex: is it installed, did this build verify that version, and who is
-//! signed in by each of the three ways a connection can take its credential.
+//! What the screen says of Codex: is it installed, does it derive the sandbox a run needs, and who
+//! is signed in by each of the three ways a connection can take its credential.
 //!
 //! `read_codex_status` starts the client to ask it, so it is the desktop application's and no
 //! other entrance's. Four things are kept apart because a screen acts on each differently: the
-//! program being there, this build having verified that version (until it has, a generation
-//! never runs, whoever is signed in), who is signed in by each source (asked the way a generation
+//! program being there, the release saying it derives the sandbox a run needs (asked of it, so no
+//! version is on a list; until it does, a generation never runs, whoever is signed in), who is
+//! signed in by each source (asked the way a generation
 //! is run, so the login shown is the login a generation uses), and whether the build uses that
 //! way of signing in. A client that could not be asked is `unknown` and is said so, and never read
 //! as nobody. Nothing of a credential is read into the answer: a key's variable is named and its
@@ -24,7 +25,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use sce_spec_workbench_core::claude_code::Search;
-use sce_spec_workbench_core::codex::{auth_store_override, instructions_of};
+use sce_spec_workbench_core::codex::auth_store_override;
 use sce_spec_workbench_core::codex_status;
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy, Route};
@@ -33,7 +34,7 @@ use serde_json::{json, Value};
 
 use common::{scratch, FakeRenderer};
 
-// Deliberately outside the shipped support list. Tests that need verification build their own.
+// A version no list names: none does.
 const VERSION: &str = "0.159.1";
 
 const CHATGPT: &str = "Logged in using ChatGPT";
@@ -69,6 +70,14 @@ impl Fake {
              R='{record}'\n\
              if [ \"$1\" = \"--version\" ]; then echo 'codex-cli {VERSION}'; exit 0; fi\n\
              if [ \"$1\" = \"features\" ]; then cat \"$R/features.txt\"; exit 0; fi\n\
+             if [ \"$1\" = \"debug\" ]; then\n\
+               [ -f \"$R/prompt.json\" ] || {{ echo 'no such command' >&2; exit 2; }}\n\
+               sed \"s#__FOLDER__#$(pwd -P)#g\" \"$R/prompt.json\"; exit 0\n\
+             fi\n\
+             if [ \"$1\" = \"app-server\" ]; then\n\
+               read first; echo '{{\"id\":1,\"result\":{{}}}}'\n\
+               read initialized; read start; cat \"$R/session.json\"; exec sleep 30\n\
+             fi\n\
              if [ \"$1\" = \"login\" ]; then\n\
                printf 'home=%s openai=%s codex=%s\\n' \"$CODEX_HOME\" \"$OPENAI_API_KEY\" \"$CODEX_API_KEY\" >> \"$R/logins\"\n\
                for a in \"$@\"; do printf '%s\\0' \"$a\"; done >> \"$R/login-argv\"; printf '\\n' >> \"$R/login-argv\"\n\
@@ -86,7 +95,32 @@ impl Fake {
             record = record.display()
         );
         common::write_program(&binary, &script);
-        Fake { binary, record }
+        let fake = Fake { binary, record };
+        // By default the stand-in derives the sandbox a run needs.
+        fake.will_derive(ONLY_THE_FOLDER, false);
+        fake
+    }
+
+    /// What the stand-in says it derived for a run: the files a command may read, and whether a
+    /// command may use the network.
+    fn will_derive(&self, file_system: &str, network: bool) {
+        let printed = json!([{"type": "message", "role": "developer", "content": [
+            {"type": "input_text", "text": format!("<environment>{file_system}</environment>")},
+        ]}]);
+        fs::write(self.record.join("prompt.json"), printed.to_string()).unwrap();
+        // One line ended as every line a client prints is: a reader of lines waits for the end of it.
+        fs::write(
+            self.record.join("session.json"),
+            format!(
+                "{{\"id\":2,\"result\":{{\"sandbox\":{{\"type\":\"readOnly\",\"networkAccess\":{network}}}}}}}\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    /// The stand-in has no command to say what it derived.
+    fn will_not_say_what_it_derives(&self) {
+        fs::remove_file(self.record.join("prompt.json")).unwrap();
     }
 
     /// How many times it was asked who is signed in.
@@ -115,24 +149,21 @@ impl Fake {
     }
 }
 
-/// A list that verifies this stand-in's version, with `shell_tool` switched off and `fast_mode`
-/// reviewed.
-fn verified() -> Support {
-    let lists = |verified: Value| {
-        Support::from_json(
-            &json!({
-                "verified": verified,
-                "disabled_features": ["shell_tool"],
-                "reviewed_features": ["fast_mode"],
-            })
-            .to_string(),
-        )
-        .unwrap()
-    };
-    let instructions = instructions_of(&lists(json!([])));
-    lists(json!([{
-        "os": std::env::consts::OS, "version": VERSION, "instructions": instructions
-    }]))
+/// What `codex debug prompt-input` prints as the files a run's command may read; `__FOLDER__` is
+/// the folder the stand-in is asked in.
+const ONLY_THE_FOLDER: &str = "<file_system type=\"restricted\">\
+    <entry access=\"read\"><special>:minimal</special></entry>\
+    <entry access=\"read\"><path>__FOLDER__</path></entry></file_system>";
+
+/// A list with `fast_mode` reviewed that does not ask the stand-in what sandbox it derives, for the
+/// tests that are about something else (who is signed in).
+fn stand_in_support() -> Support {
+    Support::from_json(r#"{"reviewed_features": ["fast_mode"], "check_sandbox": false}"#).unwrap()
+}
+
+/// The same list, with the sandbox asked of the stand-in as it is of a real release.
+fn asking_support() -> Support {
+    Support::from_json(r#"{"reviewed_features": ["fast_mode"]}"#).unwrap()
 }
 
 fn environment(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
@@ -186,13 +217,13 @@ fn account<'a>(status: &'a Value, source: &str) -> &'a Value {
 }
 
 #[test]
-fn it_says_which_codex_is_there_and_that_this_build_verified_it() {
+fn it_says_which_codex_is_there_and_that_it_derives_the_sandbox_a_run_needs() {
     let fake = Fake::new("cst-installed", CHATGPT, SIGNED_OUT);
 
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &asking_support(),
         &environment(&[]),
     );
 
@@ -202,23 +233,29 @@ fn it_says_which_codex_is_there_and_that_this_build_verified_it() {
         status["client"]["path"],
         fake.binary.display().to_string().as_str()
     );
+    // No list names this version: it was asked what it derives.
     assert_eq!(status["support"]["state"], "verified");
 }
 
 #[test]
-fn a_version_this_build_did_not_verify_is_said_so_and_accounts_are_still_shown() {
-    let fake = Fake::new("cst-unverified", CHATGPT, SIGNED_OUT);
+fn a_release_whose_sandbox_reads_more_than_the_folder_is_said_so_and_accounts_are_still_shown() {
+    let fake = Fake::new("cst-wide-sandbox", CHATGPT, SIGNED_OUT);
+    fake.will_derive(
+        "<file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry>\
+         <entry access=\"read\"><path>__FOLDER__</path></entry></file_system>",
+        false,
+    );
 
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &Support::shipped(),
+        &asking_support(),
         &environment(&[]),
     );
 
     assert_eq!(status["support"]["state"], "unverified");
     let reason = status["support"]["reason"].as_str().unwrap();
-    assert!(reason.contains("has not been verified"), "{reason}");
+    assert!(reason.contains(":root"), "{reason}");
     assert!(
         !reason.contains(&fake.binary.display().to_string()),
         "{reason}"
@@ -228,20 +265,53 @@ fn a_version_this_build_did_not_verify_is_said_so_and_accounts_are_still_shown()
 }
 
 #[test]
-fn a_feature_that_is_on_and_that_nobody_looked_at_is_said_by_name() {
+fn a_release_that_says_the_network_is_open_is_unverified() {
+    let fake = Fake::new("cst-open-network", CHATGPT, SIGNED_OUT);
+    fake.will_derive(ONLY_THE_FOLDER, true);
+
+    let status = read(
+        Some(&fake.binary),
+        &Policy::shipped(),
+        &asking_support(),
+        &environment(&[]),
+    );
+
+    assert_eq!(status["support"]["state"], "unverified");
+    let reason = status["support"]["reason"].as_str().unwrap();
+    assert!(reason.contains("network"), "{reason}");
+}
+
+#[test]
+fn a_release_that_could_not_be_asked_is_unknown_and_not_unverified() {
+    let fake = Fake::new("cst-unasked", CHATGPT, SIGNED_OUT);
+    fake.will_not_say_what_it_derives();
+
+    let status = read(
+        Some(&fake.binary),
+        &Policy::shipped(),
+        &asking_support(),
+        &environment(&[]),
+    );
+
+    assert_eq!(status["support"]["state"], "unknown");
+    let reason = status["support"]["reason"].as_str().unwrap();
+    assert!(reason.contains("could not be asked"), "{reason}");
+}
+
+#[test]
+fn a_feature_that_is_on_and_that_nobody_reviewed_is_switched_off_and_is_not_a_refusal() {
     let fake = Fake::new("cst-feature", CHATGPT, SIGNED_OUT);
     fake.will_list("shell_tool  stable  true\nunified_exec  stable  true\n");
 
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &asking_support(),
         &environment(&[]),
     );
 
-    assert_eq!(status["support"]["state"], "unverified");
-    let reason = status["support"]["reason"].as_str().unwrap();
-    assert!(reason.contains("unified_exec"), "{reason}");
+    // A release that has more on than was reviewed is run with the rest off, not turned away.
+    assert_eq!(status["support"]["state"], "verified");
 }
 
 #[test]
@@ -260,7 +330,7 @@ fn a_client_that_would_not_list_its_features_is_unknown_and_not_unverified() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -278,7 +348,7 @@ fn a_variable_that_is_empty_is_not_a_key() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[("CODEX_API_KEY", "")]),
     );
 
@@ -296,7 +366,7 @@ fn the_check_and_a_run_look_for_a_login_in_the_same_place() {
     read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -319,7 +389,7 @@ fn each_source_is_asked_the_way_a_generation_runs_it() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[("OPENAI_API_KEY", "sk-openai-secret")]),
     );
 
@@ -356,7 +426,7 @@ fn nobody_signed_in_is_a_state_and_is_not_read_as_not_knowing() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -375,7 +445,7 @@ fn the_applications_own_home_is_made_before_the_client_is_asked_in_it() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -398,7 +468,7 @@ fn an_answer_that_is_an_error_is_not_somebody_signed_in() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -422,7 +492,7 @@ fn a_login_said_by_a_client_that_failed_is_not_somebody_signed_in() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -443,7 +513,7 @@ fn an_answer_that_names_no_login_is_not_somebody_signed_in_though_the_client_did
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -459,7 +529,7 @@ fn a_key_in_the_environment_is_a_source_that_needs_no_login_and_names_its_variab
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[("CODEX_API_KEY", "sk-codex-secret")]),
     );
 
@@ -483,7 +553,7 @@ fn a_key_that_the_environment_does_not_have_is_signed_out_for_that_source() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         // A key for another purpose is not the one a connection asks for.
         &environment(&[("OPENAI_API_KEY", "sk-openai-secret")]),
     );
@@ -503,7 +573,7 @@ fn a_login_the_build_does_not_use_is_shown_as_the_login_it_is() {
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -519,7 +589,12 @@ fn a_route_a_release_switched_off_is_not_usable_and_says_so() {
     let fake = Fake::new("cst-off", CHATGPT, SIGNED_OUT);
     let policy = Policy::shipped().with_switched_off([Route::CodexCliChatGptLogin]);
 
-    let status = read(Some(&fake.binary), &policy, &verified(), &environment(&[]));
+    let status = read(
+        Some(&fake.binary),
+        &policy,
+        &stand_in_support(),
+        &environment(&[]),
+    );
 
     let official = account(&status, "official-login");
     assert_eq!(official["usable"], false);
@@ -528,7 +603,12 @@ fn a_route_a_release_switched_off_is_not_usable_and_says_so() {
 
 #[test]
 fn no_codex_is_said_and_where_to_say_where_it_is() {
-    let status = read(None, &Policy::shipped(), &verified(), &environment(&[]));
+    let status = read(
+        None,
+        &Policy::shipped(),
+        &stand_in_support(),
+        &environment(&[]),
+    );
 
     assert_eq!(status["client"]["state"], "missing");
     assert_eq!(status["support"]["state"], "unknown");
@@ -554,7 +634,7 @@ fn a_file_that_does_not_say_it_is_codex_is_not_asked_who_is_signed_in() {
     let status = read(
         Some(&impostor),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -574,7 +654,7 @@ fn the_first_codex_the_search_finds_is_the_one_asked_when_none_was_named() {
     let status = serde_json::to_value(codex_status::read(
         None,
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &home_of(&fake.binary),
         &environment(&[]),
         &search,
@@ -595,7 +675,7 @@ fn the_commands_that_sign_in_are_fixed_words_and_the_stored_login_names_its_home
     let status = read(
         Some(&fake.binary),
         &Policy::shipped(),
-        &verified(),
+        &stand_in_support(),
         &environment(&[]),
     );
 
@@ -674,8 +754,8 @@ mod command {
 
         assert_eq!(said["codex"]["client"]["state"], "installed");
         assert_eq!(said["codex"]["client"]["version"], VERSION);
-        // This stand-in's version has not been verified by this build.
-        assert_eq!(said["codex"]["support"]["state"], "unverified");
+        // No list names this stand-in's version, and it says it derives the sandbox a run needs.
+        assert_eq!(said["codex"]["support"]["state"], "verified");
     }
 
     #[test]

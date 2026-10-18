@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! What a screen says of Codex: whether it is installed, whether this build verified that version,
-//! and who is signed in by each of the three ways a connection can take its credential.
+//! What a screen says of Codex: whether it is installed, whether the sandbox it derives is one a
+//! run may be given (asked of that Codex, whatever its version), and who is signed in by each of
+//! the three ways a connection can take its credential.
 //!
 //! Four things are kept apart because a screen acts on each differently. The program being there
-//! says nothing of an account. This build having verified the version is not somebody being
-//! signed in (until a version is verified a generation never runs, whoever is). Somebody being
+//! says nothing of an account. The sandbox being the right one is not somebody being
+//! signed in (a generation never runs on a sandbox that is not, whoever is). Somebody being
 //! signed in is not a way the build uses (the table in `auth_policy` decides that, and a way it
 //! does not use is shown as the login it is, not hidden). And a client that could not be asked is
 //! `unknown` and is said so, and never read as nobody: a screen that offered a sign-in for a
@@ -45,11 +46,13 @@ const SOURCES: [AuthSource; 3] = [
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "state", rename_all = "kebab-case")]
 pub enum SupportState {
-    /// A person verified this version against the instructions this build gives it.
+    /// It was asked what sandbox it derives from the settings a run gives it, and the answer is the
+    /// one a run needs: read-only files in the run's folder, and no network.
     Verified,
-    /// It was asked and the answer is no; says why.
+    /// It was asked and the answer is not that; says what it answered.
     Unverified { reason: String },
-    /// It could not be asked (no program, or the program would not list its features).
+    /// It could not be asked (no program, or the program would not list its features or say what
+    /// it derives).
     Unknown { reason: String },
 }
 
@@ -112,7 +115,7 @@ pub fn read(
     };
     let support_state = match (binary.as_deref(), version.as_deref()) {
         (Some(binary), Some(version)) => match support_verdict(binary, version, support) {
-            Ok(()) => SupportState::Verified,
+            Ok(_) => SupportState::Verified,
             Err(NotRunnable::Unverified(reason)) => SupportState::Unverified { reason },
             Err(NotRunnable::Unasked(reason)) => SupportState::Unknown { reason },
         },

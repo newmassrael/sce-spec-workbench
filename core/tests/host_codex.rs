@@ -54,16 +54,23 @@ struct Programs {
     author: PathBuf,
 }
 
+/// What this `codex` prints when asked what it derives for a run: a sandbox that lets a command
+/// read the whole disk, which the application does not run on.
+const WIDE_SANDBOX: &str = r#"[{"type":"message","content":[{"type":"input_text","text":"<file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system>"}]}]"#;
+
 fn programs(label: &str) -> Programs {
     let dir = common::scratch(label);
     let codex = dir.join("codex");
     common::write_program(
         &codex,
-        "#!/bin/sh\n\
-         if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.159.1'; exit 0; fi\n\
-         if [ \"$1\" = \"features\" ]; then printf 'shell_tool  stable  true\\n'; exit 0; fi\n\
-         if [ \"$1\" = \"login\" ]; then echo 'Logged in using ChatGPT'; exit 0; fi\n\
-         cat > /dev/null\nexit 1\n",
+        &format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.159.1'; exit 0; fi\n\
+             if [ \"$1\" = \"features\" ]; then printf 'shell_tool  stable  true\\n'; exit 0; fi\n\
+             if [ \"$1\" = \"debug\" ]; then cat <<'EOF'\n{WIDE_SANDBOX}\nEOF\nexit 0; fi\n\
+             if [ \"$1\" = \"login\" ]; then echo 'Logged in using ChatGPT'; exit 0; fi\n\
+             cat > /dev/null\nexit 1\n"
+        ),
     );
     let claude = dir.join("claude");
     common::write_program(
@@ -197,8 +204,8 @@ fn a_request_made_for_codex_waits_with_its_reason_where_the_screen_reads_it() {
         Some((connections, Policy::shipped())),
     );
 
-    // This stand-in reports an unverified version, so the request is not run, and the
-    // person is told so instead of waiting for an AI that will not come.
+    // This stand-in says it derives a sandbox that reads the whole disk, so the request is not run,
+    // and the person is told so instead of waiting for an AI that will not come.
     within_ten_seconds("the request was not said to wait", || {
         !store.host_status().unwrap().hosts[0]
             .host
@@ -207,11 +214,7 @@ fn a_request_made_for_codex_waits_with_its_reason_where_the_screen_reads_it() {
     });
     let waiting = &store.host_status().unwrap().hosts[0].host.waiting[0];
     assert_eq!(waiting.request, request);
-    assert!(
-        waiting.reason.contains("has not been verified"),
-        "{}",
-        waiting.reason
-    );
+    assert!(waiting.reason.contains(":root"), "{}", waiting.reason);
     assert_eq!(
         store.read_request(&id, &request).unwrap().state,
         State::Queued
@@ -259,7 +262,7 @@ fn a_computer_with_both_reports_as_claude_code_and_still_runs_for_codex() {
     let reason = store.host_status().unwrap().hosts[0].host.waiting[0]
         .reason
         .clone();
-    assert!(reason.contains("has not been verified"), "{reason}");
+    assert!(reason.contains(":root"), "{reason}");
     drop(host);
 }
 

@@ -58,6 +58,10 @@ struct Programs {
     author: PathBuf,
 }
 
+/// What this `codex` prints when asked what it derives for a run: a sandbox that lets a command
+/// read the whole disk, which the application does not run on.
+const WIDE_SANDBOX: &str = r#"[{"type":"message","content":[{"type":"input_text","text":"<file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system>"}]}]"#;
+
 fn programs(label: &str) -> Programs {
     let dir = common::scratch(label);
     let answer = json!({
@@ -79,15 +83,18 @@ fn programs(label: &str) -> Programs {
         ),
     );
     let codex = dir.join("codex");
-    // A version the shipped support list does not verify: these tests wait on that, and the
-    // version the list verifies would let the request run.
+    // A Codex that says it derives a sandbox reading the whole disk: these tests wait on that, and
+    // a Codex that derived the right one would let the request run.
     common::write_program(
         &codex,
-        "#!/bin/sh\n\
-         if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.159.1'; exit 0; fi\n\
-         if [ \"$1\" = \"features\" ]; then printf 'shell_tool  stable  true\\n'; exit 0; fi\n\
-         if [ \"$1\" = \"login\" ]; then echo 'Logged in using ChatGPT'; exit 0; fi\n\
-         cat > /dev/null\nexit 1\n",
+        &format!(
+            "#!/bin/sh\n\
+             if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.159.1'; exit 0; fi\n\
+             if [ \"$1\" = \"features\" ]; then printf 'shell_tool  stable  true\\n'; exit 0; fi\n\
+             if [ \"$1\" = \"debug\" ]; then cat <<'EOF'\n{WIDE_SANDBOX}\nEOF\nexit 0; fi\n\
+             if [ \"$1\" = \"login\" ]; then echo 'Logged in using ChatGPT'; exit 0; fi\n\
+             cat > /dev/null\nexit 1\n"
+        ),
     );
     let author = dir.join("sce-author-mcp");
     common::write_program(&author, "#!/bin/sh\nexit 0\n");
@@ -246,10 +253,9 @@ fn a_host_that_started_with_claude_code_looks_for_codex_again() {
 
     fs::rename(&back, &programs.codex).unwrap();
 
-    // Codex is judged as Codex now: this build has verified none, and says so, and not that it
-    // was not found.
+    // Codex is judged as Codex now: what it derives is what is said, and not that it was not found.
     within_ten_seconds("the reason did not follow the install", || {
-        waiting_reason(&specs).is_some_and(|r| r.contains("has not been verified"))
+        waiting_reason(&specs).is_some_and(|r| r.contains(":root"))
     });
     drop(host);
 }

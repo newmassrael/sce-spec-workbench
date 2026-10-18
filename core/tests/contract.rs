@@ -1189,8 +1189,9 @@ fn replies() -> Value {
         codex_status_of(
             codex_installed(),
             SupportState::Unverified {
-                reason: "this version of Codex has not been verified by this build, so a request \
-                         made for it waits: choose another connection"
+                reason: "Codex 0.159.0 is not run: asked what sandbox it gives a run, it lets a \
+                         command read :root, which is more than the part it keeps for every \
+                         command. Install another version, or choose another connection"
                     .to_string(),
             },
             [

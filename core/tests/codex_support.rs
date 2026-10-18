@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
 // SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
 
-//! Which Codex the application runs, and what it refuses to run beside.
+//! What the application leaves on in Codex, and what it switches off.
 //!
 //! Codex has no switch that turns its built-in tools off, and it gains tools from one version to
 //! the next. A specification is text a person may have pasted from anywhere, and a client that
 //! has read it must not be one that can be talked into reading the person's files or reaching
-//! the network. So a version is run only when it was verified, by a person, against a
-//! specification written to attack it, and what was verified is recorded: the operating system,
-//! the version, and which instructions and which tools were switched off at the time. A
-//! version that is not on the list is not run, whatever else is true of it, and a feature a
-//! version has switched on that nobody switched off or reviewed is not run beside either, so
-//! that a tool added by an update is a refusal and not an opening.
-//!
-//! The list is data that ships with the application and is empty until somebody has done that
-//! verification.
+//! the network. A release is not judged by its number: every feature it has on that a person did
+//! not review is switched off for the run, and the sandbox it derives is asked of it (held in
+//! `codex_sandbox.rs`). What is held here is the first of those, and that nothing about a version
+//! is in the data any more.
 
-use sce_spec_workbench_core::codex_support::{enabled_features, Support, Unsupported};
+use sce_spec_workbench_core::codex_support::{enabled_features, Support};
 
 /// What `codex features list` printed, in the shape the 0.159.0 install gives it.
 const LISTED: &str = "\
@@ -32,19 +27,9 @@ web_search_cached                        deprecated         false
 apply_patch_freeform                     removed            false
 ";
 
-fn support(verified: &str, disabled: &[&str], reviewed: &[&str]) -> Support {
-    Support::from_json(
-        &serde_json::json!({
-            "verified": serde_json::from_str::<serde_json::Value>(verified).unwrap(),
-            "disabled_features": disabled,
-            "reviewed_features": reviewed,
-        })
-        .to_string(),
-    )
-    .unwrap()
+fn support(reviewed: &[&str]) -> Support {
+    Support::from_json(&serde_json::json!({ "reviewed_features": reviewed }).to_string()).unwrap()
 }
-
-const ONE: &str = r#"[{"os":"linux","version":"0.159.0","instructions":"codex/abc123"}]"#;
 
 #[test]
 fn the_features_a_version_has_switched_on_are_the_ones_that_say_true() {
@@ -76,154 +61,92 @@ fn a_line_that_is_not_a_feature_is_not_one() {
 }
 
 #[test]
-fn nothing_is_verified_in_a_build_nobody_has_verified_a_version_for() {
-    let shipped = support("[]", &["shell_tool"], &[]);
-
-    assert!(shipped.verified().is_empty());
-    let refused = shipped
-        .check("linux", "0.159.0", "codex/abc123", &[])
-        .unwrap_err();
-    assert!(
-        matches!(refused, Unsupported::Version { .. }),
-        "{refused:?}"
-    );
-}
-
-#[test]
-fn shipped_verifications_name_the_current_execution_contract() {
-    let shipped = Support::shipped();
-    let instructions = sce_spec_workbench_core::codex::instructions_of(&shipped);
-    assert!(shipped
-        .verified()
-        .iter()
-        .any(|v| v.os == "linux" && v.version == "0.159.0"));
-    for entry in shipped.verified() {
-        assert_eq!(
-            entry.instructions, instructions,
-            "execution contract changed: rerun codex_live before updating support"
-        );
-        assert!(shipped
-            .check(&entry.os, &entry.version, &instructions, &[])
-            .is_ok());
-    }
-    assert!(shipped
-        .check("windows", "0.159.0", &instructions, &[])
-        .is_err());
-    assert!(shipped
-        .check("linux", "0.159.1", &instructions, &[])
-        .is_err());
-}
-
-#[test]
-fn a_build_that_ships_a_list_switches_the_shell_off_in_it() {
-    // What is switched off is part of what a person verifies, and the shell is the first thing.
-    assert!(Support::shipped()
-        .disabled_features()
-        .iter()
-        .any(|f| f == "shell_tool"));
-}
-
-#[test]
-fn a_version_runs_only_as_it_was_verified() {
-    let listed = support(ONE, &["shell_tool"], &[]);
-
-    assert_eq!(
-        listed.check("linux", "0.159.0", "codex/abc123", &[]),
-        Ok(())
-    );
-    for (os, version, instructions) in [
-        ("windows", "0.159.0", "codex/abc123"),
-        ("linux", "0.159.1", "codex/abc123"),
-        ("linux", "0.159.0", "codex/zzz999"),
-    ] {
-        let refused = listed.check(os, version, instructions, &[]).unwrap_err();
-        assert!(
-            matches!(refused, Unsupported::Version { .. }),
-            "{os} {version} {instructions}"
-        );
-    }
-}
-
-#[test]
-fn a_refusal_says_to_install_one_that_is_supported_or_choose_another_connection() {
-    let refused = Support::shipped()
-        .check("linux", "0.159.0", "codex/abc123", &[])
-        .unwrap_err();
-
-    let said = refused.to_string();
-    assert!(said.contains("0.159.0"), "{said}");
-    assert!(said.contains("not been verified"), "{said}");
-    assert!(said.contains("another connection"), "{said}");
-}
-
-#[test]
-fn a_feature_that_is_on_and_that_nobody_switched_off_or_reviewed_is_not_run_beside() {
-    let listed = support(
-        ONE,
-        &["shell_tool", "unified_exec"],
-        &["fast_mode", "goals"],
-    );
+fn every_feature_that_is_on_and_was_not_reviewed_is_switched_off() {
+    let listed = support(&["fast_mode", "goals"]);
     let on = enabled_features(LISTED);
 
-    let refused = listed
-        .check("linux", "0.159.0", "codex/abc123", &on)
-        .unwrap_err();
-
-    // `apps`, `browser_use` and `view_image` are on, and nobody said what to do about them.
+    // `fast_mode` and `goals` were reviewed and stay on; every other one that is on is switched
+    // off, in the order the client lists them.
     assert_eq!(
-        refused,
-        Unsupported::Features(vec![
-            "apps".to_string(),
-            "browser_use".to_string(),
-            "view_image".to_string()
-        ])
-    );
-    assert!(refused.to_string().contains("browser_use"));
-}
-
-#[test]
-fn what_is_switched_off_or_reviewed_is_not_in_the_way() {
-    let listed = support(
-        ONE,
-        &[
-            "shell_tool",
-            "unified_exec",
+        listed.features_to_disable(&on),
+        vec![
             "apps",
             "browser_use",
-            "view_image",
-        ],
-        &["fast_mode", "goals"],
-    );
-    let on = enabled_features(LISTED);
-
-    assert_eq!(
-        listed.check("linux", "0.159.0", "codex/abc123", &on),
-        Ok(())
+            "shell_tool",
+            "unified_exec",
+            "view_image"
+        ]
     );
 }
 
 #[test]
-fn a_feature_that_is_off_is_not_asked_about() {
-    let listed = support(ONE, &[], &[]);
+fn a_feature_an_update_adds_is_switched_off_and_is_neither_a_refusal_nor_an_opening() {
+    let listed = support(&["fast_mode"]);
+    let mut on = enabled_features(LISTED);
+    on.push("a_tool_the_next_release_adds".to_string());
+
+    let off = listed.features_to_disable(&on);
+
+    assert!(off.contains(&"a_tool_the_next_release_adds".to_string()));
+    assert!(!off.contains(&"fast_mode".to_string()));
+}
+
+#[test]
+fn a_feature_that_is_off_or_unknown_to_this_client_is_never_named() {
+    // The client refuses a command line that switches off a feature it has not heard of ("Unknown
+    // feature"), so what is named is what this client listed as on, and nothing kept from another.
+    let listed = support(&[]);
+
+    assert_eq!(listed.features_to_disable(&[]), Vec::<String>::new());
+    assert_eq!(
+        listed.features_to_disable(&enabled_features(
+            "gone  removed  false\nnew  stable  true\n"
+        )),
+        vec!["new"]
+    );
+}
+
+#[test]
+fn what_is_reviewed_is_left_on_even_when_nothing_else_is() {
+    let listed = support(&["fast_mode", "goals", "apps"]);
 
     assert_eq!(
-        listed.check("linux", "0.159.0", "codex/abc123", &["x".to_string()]),
-        Err(Unsupported::Features(vec!["x".to_string()]))
+        listed.features_to_disable(&["fast_mode".to_string(), "goals".to_string()]),
+        Vec::<String>::new()
     );
-    assert_eq!(
-        listed.check("linux", "0.159.0", "codex/abc123", &[]),
-        Ok(())
-    );
+}
+
+#[test]
+fn the_list_a_build_ships_names_no_version_and_asks_the_sandbox() {
+    let shipped = Support::shipped();
+
+    // A version is not in the data: asked of a release, not looked up in a list.
+    assert!(shipped.checks_sandbox());
+    let data = include_str!("../data/codex_support.json");
+    assert!(!data.contains("version"), "{data}");
+    assert!(!data.contains("verified"), "{data}");
+    assert!(!data.contains("check_sandbox"), "{data}");
 }
 
 #[test]
 fn a_list_that_is_not_one_is_refused_and_says_where() {
     for text in [
         "not json",
-        r#"{"verified": "none"}"#,
-        r#"{"verified": [{"os": "linux"}]}"#,
-        r#"{"verified": [], "unknown_field": 1}"#,
+        r#"{"reviewed_features": "none"}"#,
+        r#"{"reviewed_features": [1]}"#,
+        r#"{"reviewed_features": [], "unknown_field": 1}"#,
+        // The list of versions this replaced is not read, so a stale copy is an error and not a
+        // list that is quietly ignored.
+        r#"{"verified": [], "reviewed_features": []}"#,
     ] {
         assert!(Support::from_json(text).is_err(), "{text}");
     }
+}
+
+#[test]
+fn the_sandbox_is_asked_unless_a_list_a_test_builds_says_it_is_not() {
+    assert!(support(&[]).checks_sandbox());
+    let stand_in =
+        Support::from_json(r#"{"reviewed_features": [], "check_sandbox": false}"#).unwrap();
+    assert!(!stand_in.checks_sandbox());
 }

@@ -7,10 +7,10 @@
 //! The client here is a script. Nothing of a person's account or of a model is used, and what is
 //! held is what the application does: which arguments it starts the client with, what it puts in
 //! its environment and what it keeps out, what it says on standard input, what it will not start
-//! the client for (a version nobody verified, a feature nobody reviewed, a key the environment
-//! does not have), and what it makes of the last message the client writes. That the arguments
-//! keep a real Codex inside the tools it is allowed is not something a script can show: it is
-//! what a person verifies against a real one before a version goes on the list.
+//! the client for (a sandbox the release does not say it derives, a key the environment does not
+//! have), what it switches off, what stops a run that reports a command, and what it makes of the
+//! last message the client writes. That the arguments keep a real Codex inside the tools it is
+//! allowed is not something a script can show: `codex_live.rs` tries it against a real one.
 //!
 //! Unix only: the stand-in is a shell script.
 
@@ -64,6 +64,14 @@ impl Fake {
              R='{record}'\n\
              if [ \"$1\" = \"--version\" ]; then echo 'codex-cli {VERSION}'; exit 0; fi\n\
              if [ \"$1\" = \"features\" ]; then cat \"$R/features.txt\"; exit 0; fi\n\
+             if [ \"$1\" = \"debug\" ]; then\n\
+               [ -f \"$R/prompt.json\" ] || {{ echo 'no such command' >&2; exit 2; }}\n\
+               sed \"s#__FOLDER__#$(pwd -P)#g\" \"$R/prompt.json\"; exit 0\n\
+             fi\n\
+             if [ \"$1\" = \"app-server\" ]; then\n\
+               read first; echo '{{\"id\":1,\"result\":{{}}}}'\n\
+               read initialized; read start; cat \"$R/session.json\"; exec sleep 30\n\
+             fi\n\
              for a in \"$@\"; do printf '%s\\0' \"$a\"; done > \"$R/argv\"\n\
              if [ -n \"$CODEX_HOME\" ] && [ ! -d \"$CODEX_HOME\" ]; then\n\
                echo \"Error loading configuration: CODEX_HOME points to \\\"$CODEX_HOME\\\", but that path does not exist\" >&2\n\
@@ -100,6 +108,20 @@ impl Fake {
 
     fn started(&self) -> bool {
         self.record.join("argv").exists()
+    }
+
+    /// What the stand-in says it derived for a run: the files a command may read, and whether a
+    /// command may use the network.
+    fn derives(&self, file_system: &str, network: bool) {
+        fs::write(self.record.join("prompt.json"), printed(file_system)).unwrap();
+        // One line ended as every line a client prints is: a reader of lines waits for the end of it.
+        fs::write(
+            self.record.join("session.json"),
+            format!(
+                "{{\"id\":2,\"result\":{{\"sandbox\":{{\"type\":\"readOnly\",\"networkAccess\":{network}}}}}}}\n"
+            ),
+        )
+        .unwrap();
     }
 
     /// The application's own home for this stand-in: beside it, and not there until the
@@ -160,30 +182,31 @@ fn answer(text: &str) -> Value {
     })
 }
 
-/// A list that verifies `binary` as it is started with this configuration: the instructions are
-/// the generator's own, so a change to what it is told or what it switches off needs another entry.
-fn verified_for(fake: &Fake, auth: AuthSource, disabled: &[&str]) -> Support {
-    let unverified = codex(fake, auth, support_with(&[], disabled));
-    let instructions = unverified.instructions().expect("instructions are named");
-    support_with(
-        &[(std::env::consts::OS, VERSION, instructions.as_str())],
-        disabled,
-    )
+/// A list that reviews `fast_mode` and does not ask the stand-in what sandbox it derives: what the
+/// stand-in has on and nobody reviewed (`shell_tool`, `unified_exec`) is switched off for every run.
+/// The question about the sandbox is held where it is answered (`codex_sandbox.rs`) and through a
+/// run below (`a_run_is_started_only_on_a_sandbox_the_release_says_it_derives`).
+fn stand_in_support() -> Support {
+    Support::from_json(r#"{"reviewed_features": ["fast_mode"], "check_sandbox": false}"#).unwrap()
 }
 
-fn support_with(verified: &[(&str, &str, &str)], disabled: &[&str]) -> Support {
-    Support::from_json(
-        &json!({
-            "verified": verified.iter().map(|(os, version, instructions)| json!({
-                "os": os, "version": version, "instructions": instructions
-            })).collect::<Vec<_>>(),
-            "disabled_features": disabled,
-            "reviewed_features": ["fast_mode"],
-        })
-        .to_string(),
-    )
-    .unwrap()
+/// The same list, with the sandbox asked of the stand-in as it is of a real release.
+fn asking_support() -> Support {
+    Support::from_json(r#"{"reviewed_features": ["fast_mode"]}"#).unwrap()
 }
+
+/// What `codex debug prompt-input` prints for a run: the files a command may read. `__FOLDER__` is
+/// the folder the question is asked in.
+fn printed(file_system: &str) -> String {
+    json!([{"type": "message", "role": "developer", "content": [
+        {"type": "input_text", "text": format!("<environment>{file_system}</environment>")},
+    ]}])
+    .to_string()
+}
+
+const ONLY_THE_FOLDER: &str = "<file_system type=\"restricted\">\
+    <entry access=\"read\"><special>:minimal</special></entry>\
+    <entry access=\"read\"><path>__FOLDER__</path></entry></file_system>";
 
 fn codex(fake: &Fake, auth: AuthSource, support: Support) -> Codex {
     Codex::new(
@@ -213,12 +236,8 @@ fn codex(fake: &Fake, auth: AuthSource, support: Support) -> Codex {
     ])
 }
 
-fn verified(fake: &Fake) -> Codex {
-    codex(
-        fake,
-        AuthSource::AppStore,
-        verified_for(fake, AuthSource::AppStore, &["shell_tool", "unified_exec"]),
-    )
+fn runnable(fake: &Fake) -> Codex {
+    codex(fake, AuthSource::AppStore, stand_in_support())
 }
 
 fn generate(client: &Codex) -> Result<sce_spec_workbench_core::runner::Draft, GenerateError> {
@@ -235,7 +254,7 @@ fn after<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
 #[test]
 fn it_says_what_it_is_and_which_version() {
     let fake = Fake::new("codex-kind", "exit 0");
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     assert_eq!(client.kind(), "codex");
     assert_eq!(client.version().as_deref(), Some(VERSION));
@@ -258,7 +277,7 @@ fn a_program_that_will_not_say_its_version_has_none() {
 #[test]
 fn a_request_with_no_time_left_does_not_start_codex_and_says_it_ran_out() {
     let fake = Fake::answering("codex-clock-gone", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
     let gone = Job {
         deadline: Some(Instant::now()),
         ..job()
@@ -278,7 +297,7 @@ fn what_is_left_of_the_requests_time_and_not_the_connections_own_is_what_the_cli
     // The connection allows half an hour; the request has a second and a half left of it.
     // `exec`: the shell is replaced by the sleep, so stopping the client stops all of it.
     let fake = Fake::new("codex-clock-left", "exec sleep 60");
-    let client = verified(&fake);
+    let client = runnable(&fake);
     let tight = Job {
         deadline: Some(Instant::now() + Duration::from_millis(1500)),
         ..job()
@@ -299,18 +318,65 @@ fn what_is_left_of_the_requests_time_and_not_the_connections_own_is_what_the_cli
 }
 
 #[test]
-fn a_codex_nobody_verified_is_not_started() {
-    let fake = Fake::answering("codex-unverified", &answer("<scxml/>"));
-    let client = codex(&fake, AuthSource::AppStore, support_with(&[], &[]));
+fn a_release_nobody_listed_is_run_when_it_says_it_derives_the_sandbox_a_run_needs() {
+    // No version is on any list: the release is asked what it derives, and that is all.
+    let fake = Fake::answering("codex-any-version", &answer("<scxml/>"));
+    fake.derives(ONLY_THE_FOLDER, false);
+    let client = codex(&fake, AuthSource::AppStore, asking_support());
+
+    generate(&client).unwrap();
+
+    assert!(fake.started());
+}
+
+#[test]
+fn a_release_whose_sandbox_reads_more_than_the_folder_is_not_started_and_says_what() {
+    let fake = Fake::answering("codex-wide-sandbox", &answer("<scxml/>"));
+    fake.derives(
+        "<file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry>\
+         <entry access=\"read\"><path>__FOLDER__</path></entry></file_system>",
+        false,
+    );
+    let client = codex(&fake, AuthSource::AppStore, asking_support());
 
     let refused = generate(&client).unwrap_err();
 
     let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
         panic!("expected a failure, got {refused:?}");
     };
-    assert!(said.contains("has not been verified"), "{said}");
+    assert!(said.contains(":root"), "{said}");
     assert!(said.contains("another connection"), "{said}");
     // Nothing was started for the run: it was refused before there was one.
+    assert!(!fake.started());
+}
+
+#[test]
+fn a_release_that_says_a_command_may_use_the_network_is_not_started() {
+    let fake = Fake::answering("codex-open-network", &answer("<scxml/>"));
+    fake.derives(ONLY_THE_FOLDER, true);
+    let client = codex(&fake, AuthSource::AppStore, asking_support());
+
+    let refused = generate(&client).unwrap_err();
+
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert!(said.contains("network"), "{said}");
+    assert!(!fake.started());
+}
+
+#[test]
+fn a_release_that_cannot_be_asked_is_not_started_and_is_not_said_to_have_failed() {
+    // This stand-in has no `debug` command to answer with.
+    let fake = Fake::answering("codex-unasked", &answer("<scxml/>"));
+    let client = codex(&fake, AuthSource::AppStore, asking_support());
+
+    let refused = generate(&client).unwrap_err();
+
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert!(said.contains("could not be asked"), "{said}");
     assert!(!fake.started());
 }
 
@@ -342,28 +408,33 @@ fn feature_discovery_uses_an_empty_home_and_does_not_load_personal_settings() {
 }
 
 #[test]
-fn a_feature_that_is_on_and_that_nobody_switched_off_or_reviewed_is_not_run_beside() {
-    let fake = Fake::answering("codex-feature", &answer("<scxml/>"));
-    // Only the shell is switched off: `unified_exec` is on, and nobody said anything of it.
-    let client = codex(
-        &fake,
-        AuthSource::AppStore,
-        verified_for(&fake, AuthSource::AppStore, &["shell_tool"]),
+fn a_feature_an_update_adds_is_switched_off_for_the_run_and_does_not_stop_it() {
+    let fake = Fake::answering("codex-new-feature", &answer("<scxml/>"));
+    fs::write(
+        fake.record.join("features.txt"),
+        format!("{FEATURES}a_tool_the_next_release_adds  stable  true\n"),
+    )
+    .unwrap();
+    let client = runnable(&fake);
+
+    generate(&client).unwrap();
+
+    let args = fake.argv();
+    let disabled: Vec<&str> = args
+        .windows(2)
+        .filter(|w| w[0] == "--disable")
+        .map(|w| w[1].as_str())
+        .collect();
+    assert_eq!(
+        disabled,
+        vec!["shell_tool", "unified_exec", "a_tool_the_next_release_adds"]
     );
-
-    let refused = generate(&client).unwrap_err();
-
-    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
-        panic!("expected a failure, got {refused:?}");
-    };
-    assert!(said.contains("unified_exec"), "{said}");
-    assert!(!fake.started());
 }
 
 #[test]
 fn it_is_started_with_the_arguments_that_were_verified() {
     let fake = Fake::answering("codex-argv", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -433,7 +504,7 @@ fn it_is_started_with_the_arguments_that_were_verified() {
 #[test]
 fn the_features_that_are_switched_off_are_switched_off_on_every_run() {
     let fake = Fake::answering("codex-disable", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -459,7 +530,7 @@ fn no_model_is_asked_for_when_the_connection_names_none() {
         },
         AuthSource::AppStore,
         fake.home(),
-        verified_for(&fake, AuthSource::AppStore, &["shell_tool", "unified_exec"]),
+        stand_in_support(),
     )
     .with_environment(vec![(
         "PATH".to_string(),
@@ -483,7 +554,7 @@ fn codex_with_effort(fake: &Fake, effort: Option<&str>) -> Codex {
         },
         AuthSource::AppStore,
         fake.home(),
-        verified_for(fake, AuthSource::AppStore, &["shell_tool", "unified_exec"]),
+        stand_in_support(),
     )
     .with_environment(vec![(
         "PATH".to_string(),
@@ -531,7 +602,7 @@ fn an_effort_is_a_choice_of_the_run_and_is_not_part_of_what_a_person_verified() 
 #[test]
 fn what_it_is_told_goes_in_on_standard_input_and_not_on_the_command_line() {
     let fake = Fake::answering("codex-stdin", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -557,7 +628,7 @@ fn what_it_is_told_goes_in_on_standard_input_and_not_on_the_command_line() {
 #[test]
 fn only_the_authoring_server_is_reachable_and_only_by_the_tools_the_task_needs() {
     let fake = Fake::answering("codex-mcp", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -637,7 +708,7 @@ fn the_tools_it_may_use_are_the_ones_the_other_client_may() {
 #[test]
 fn the_run_is_in_a_folder_of_its_own_that_is_gone_when_it_is_done() {
     let fake = Fake::answering("codex-folder", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -654,7 +725,7 @@ fn the_run_is_in_a_folder_of_its_own_that_is_gone_when_it_is_done() {
 #[test]
 fn the_folder_is_gone_when_the_run_failed_too() {
     let fake = Fake::new("codex-folder-failed", "echo 'it broke' >&2; exit 3");
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let result = generate(&client);
 
@@ -666,7 +737,7 @@ fn the_folder_is_gone_when_the_run_failed_too() {
 #[test]
 fn a_run_with_the_applications_stored_login_has_that_login_and_none_of_the_other_credentials() {
     let fake = Fake::answering("codex-env-store", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     generate(&client).unwrap();
 
@@ -681,15 +752,7 @@ fn a_run_with_the_applications_stored_login_has_that_login_and_none_of_the_other
 #[test]
 fn a_run_with_a_key_from_the_environment_has_that_key_and_no_other_credential() {
     let fake = Fake::answering("codex-env-key", &answer("<scxml/>"));
-    let client = codex(
-        &fake,
-        AuthSource::EnvApiKey,
-        verified_for(
-            &fake,
-            AuthSource::EnvApiKey,
-            &["shell_tool", "unified_exec"],
-        ),
-    );
+    let client = codex(&fake, AuthSource::EnvApiKey, stand_in_support());
 
     generate(&client).unwrap();
 
@@ -715,7 +778,7 @@ fn an_answer_that_names_a_file_is_refused_before_the_checker_opens_it() {
         private.display()
     );
     let fake = Fake::answering("codex-confined", &answer(&text));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let refused = generate(&client).unwrap_err();
 
@@ -732,7 +795,7 @@ fn the_home_a_run_is_given_is_made_first_because_the_client_does_not_start_in_on
 ) {
     // The stand-in refuses a home that is not there, as the client does.
     let fake = Fake::answering("codex-home-made", &answer("<scxml/>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
     assert!(!fake.home().exists());
 
     generate(&client).unwrap();
@@ -751,7 +814,7 @@ fn a_run_whose_home_cannot_be_made_is_not_started_and_says_why() {
     let fake = Fake::answering("codex-home-blocked", &answer("<scxml/>"));
     // Something that is not a folder is where the home would be.
     fs::write(fake.home(), "a file").unwrap();
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let failed = generate(&client).unwrap_err();
 
@@ -769,11 +832,7 @@ fn a_connection_that_chose_a_key_the_environment_does_not_have_is_not_run_on_any
         CodexConfig::default(),
         AuthSource::EnvApiKey,
         fake.home(),
-        verified_for(
-            &fake,
-            AuthSource::EnvApiKey,
-            &["shell_tool", "unified_exec"],
-        ),
+        stand_in_support(),
     )
     // A stored login is around, and a key for another purpose: neither is what was chosen.
     .with_environment(vec![
@@ -797,7 +856,7 @@ fn a_connection_that_chose_a_key_the_environment_does_not_have_is_not_run_on_any
 #[test]
 fn the_last_message_it_writes_is_the_draft() {
     let fake = Fake::answering("codex-draft", &answer("<scxml><!-- door --></scxml>"));
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let draft = generate(&client).unwrap();
 
@@ -820,7 +879,7 @@ fn a_last_message_that_is_not_the_draft_is_unusable_and_says_what_is_wrong() {
     ] {
         let fake = Fake::new(label, "exit 0");
         fs::write(fake.record.join("answer.json"), written).unwrap();
-        let client = verified(&fake);
+        let client = runnable(&fake);
 
         let refused = generate(&client).unwrap_err();
 
@@ -834,7 +893,7 @@ fn a_last_message_that_is_not_the_draft_is_unusable_and_says_what_is_wrong() {
 #[test]
 fn a_client_that_wrote_no_last_message_has_not_answered() {
     let fake = Fake::new("codex-silent", "exit 0");
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let refused = generate(&client).unwrap_err();
 
@@ -847,7 +906,7 @@ fn a_client_that_wrote_no_last_message_has_not_answered() {
 #[test]
 fn a_client_that_stops_with_an_error_is_a_failure_that_shows_what_it_said() {
     let fake = Fake::new("codex-error", "echo 'not logged in' >&2; exit 3");
-    let client = verified(&fake);
+    let client = runnable(&fake);
 
     let refused = generate(&client).unwrap_err();
 
@@ -858,9 +917,52 @@ fn a_client_that_stops_with_an_error_is_a_failure_that_shows_what_it_said() {
 }
 
 #[test]
+fn a_client_that_reports_running_a_command_is_stopped_at_once_and_the_run_says_what_it_did() {
+    // The sandbox is what stops a command; this is what stops the run when the client reports that
+    // it tried one, so a release whose sandbox did not hold is not left to go on.
+    let fake = Fake::new(
+        "codex-forbidden-item",
+        "echo '{\"type\":\"item.started\",\"item\":{\"type\":\"command_execution\",\"command\":\"cat /etc/passwd\"}}'; \
+         exec sleep 60",
+    );
+    let client = runnable(&fake);
+
+    let begun = Instant::now();
+    let refused = generate(&client).unwrap_err();
+
+    let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
+        panic!("expected a failure, got {refused:?}");
+    };
+    assert!(said.contains("command_execution"), "{said}");
+    assert!(said.contains("stopped"), "{said}");
+    assert!(
+        begun.elapsed() < Duration::from_secs(15),
+        "{:?}",
+        begun.elapsed()
+    );
+}
+
+#[test]
+fn a_client_that_only_speaks_and_calls_the_authoring_server_is_not_stopped() {
+    let fake = Fake::new(
+        "codex-allowed-items",
+        "echo '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"hello\"}}'; \
+         echo '{\"type\":\"item.started\",\"item\":{\"type\":\"mcp_tool_call\",\"server\":\"sce-author\",\"tool\":\"specs_read\"}}'",
+    );
+    fs::write(
+        fake.record.join("answer.json"),
+        answer("<scxml/>").to_string(),
+    )
+    .unwrap();
+    let client = runnable(&fake);
+
+    generate(&client).unwrap();
+}
+
+#[test]
 fn a_client_told_to_stop_is_killed_and_the_run_ends_at_once() {
     let fake = Fake::new("codex-cancel", "touch \"$R/started\"; exec sleep 60");
-    let client = verified(&fake);
+    let client = runnable(&fake);
     let cancel = Cancel::new();
     let stopper = {
         let cancel = cancel.clone();
@@ -902,7 +1004,7 @@ fn a_client_that_takes_longer_than_its_time_is_stopped_and_the_run_failed() {
         },
         AuthSource::AppStore,
         fake.home(),
-        verified_for(&fake, AuthSource::AppStore, &["shell_tool", "unified_exec"]),
+        stand_in_support(),
     )
     .with_environment(vec![(
         "PATH".to_string(),
@@ -921,28 +1023,20 @@ fn a_client_that_takes_longer_than_its_time_is_stopped_and_the_run_failed() {
 }
 
 #[test]
-fn the_instructions_are_named_by_what_the_client_is_told_and_what_is_switched_off() {
+fn the_instructions_are_named_by_what_the_client_is_told_and_what_is_reviewed() {
     let fake = Fake::new("codex-instructions", "exit 0");
-    let one = codex(
-        &fake,
-        AuthSource::AppStore,
-        support_with(&[], &["shell_tool"]),
-    );
-    let again = codex(
-        &fake,
-        AuthSource::AppStore,
-        support_with(&[], &["shell_tool"]),
-    );
+    let one = codex(&fake, AuthSource::AppStore, stand_in_support());
+    let again = codex(&fake, AuthSource::AppStore, stand_in_support());
     let other = codex(
         &fake,
         AuthSource::AppStore,
-        support_with(&[], &["shell_tool", "unified_exec"]),
+        Support::from_json(r#"{"reviewed_features": ["fast_mode", "goals"]}"#).unwrap(),
     );
 
     let name = one.instructions().unwrap();
 
     assert!(name.starts_with("codex/"), "{name}");
     assert_eq!(again.instructions(), one.instructions());
-    // Another list of what is off is another verification.
+    // Another list of what was reviewed is another set of instructions.
     assert_ne!(other.instructions(), one.instructions());
 }

@@ -5,7 +5,7 @@
 //! it cannot.
 //!
 //! A request pinned to a Codex connection waits, with a reason, until three things are true: the
-//! Codex this computer has is one a person verified, the credential the connection chose is
+//! Codex this computer has says it derives the sandbox a run needs, the credential the connection chose is
 //! there (a key in the environment, or a login that Codex reports), and that way of signing in is
 //! one the build uses. What is said of a request that waits is kept in the specs folder, which is
 //! shared, so it names no path and nothing Codex printed. The client here is a script: it
@@ -26,16 +26,13 @@ use sce_spec_workbench_core::claude_code::AuthorServer;
 use sce_spec_workbench_core::codex::{observed_from_login_status, CodexLaunch};
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::directory::Connections;
-use sce_spec_workbench_core::runner::{
-    Cancel, Directory, GenerateError, Generator, Job, Unrunnable,
-};
+use sce_spec_workbench_core::runner::{Cancel, Directory, GenerateError, Job, Unrunnable};
 use sce_spec_workbench_core::{
     AdapterKind, AuthSource, Connection, ConnectionStore, Limits, Observed, Policy, Route,
 };
 use sce_specs::{ConnectionId, Pin, Revision, SpecId};
 
 const VERSION: &str = "0.159.0";
-const APP_HOME: &str = "/app/data/codex-home";
 
 /// A stand-in for `codex` that answers `--version`, `features list` and `login status`.
 struct Fake {
@@ -154,28 +151,10 @@ fn codex_connection(auth: AuthSource) -> Connection {
     }
 }
 
-/// A list that verifies this stand-in, as the generator a directory makes would be started.
-fn verified(fake: &Fake) -> Support {
-    // The instructions are the generator's own: ask one for them, then name them.
-    let probe = sce_spec_workbench_core::codex::Codex::new(
-        fake.binary.clone(),
-        author(),
-        sce_spec_workbench_core::codex::CodexConfig::default(),
-        AuthSource::AppStore,
-        PathBuf::from(APP_HOME),
-        Support::from_json(r#"{"verified":[],"disabled_features":["shell_tool"]}"#).unwrap(),
-    );
-    let instructions = probe.instructions().unwrap();
-    Support::from_json(
-        &serde_json::json!({
-            "verified": [{
-                "os": std::env::consts::OS, "version": VERSION, "instructions": instructions
-            }],
-            "disabled_features": ["shell_tool"],
-        })
-        .to_string(),
-    )
-    .unwrap()
+/// A list that does not ask this stand-in what sandbox it derives (it has none to answer with;
+/// `codex_sandbox.rs` holds that question). Every feature it lists as on is switched off for a run.
+fn stand_in_support() -> Support {
+    Support::from_json(r#"{"reviewed_features": [], "check_sandbox": false}"#).unwrap()
 }
 
 struct Rig {
@@ -311,7 +290,7 @@ fn a_codex_that_could_not_say_who_is_signed_in_waits_and_says_to_ask_again() {
         ),
     );
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
 
     let said = refused(rig.directory(Some(launch)).generator_for(&pin));
 
@@ -326,7 +305,7 @@ fn a_verified_codex_with_a_login_the_build_uses_is_run_with_the_model_and_time_t
 {
     let rig = Rig::new("cdir-ok", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
 
     let generator = rig.directory(Some(launch)).generator_for(&pin).unwrap();
 
@@ -344,7 +323,7 @@ fn the_model_a_request_pinned_is_the_one_the_run_asks_for() {
     let mut changed = connection.clone();
     changed.model = Some("gpt-later".to_string());
     rig.settings.save(&changed, Some(&pin.revision)).unwrap();
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
     let generator = rig.directory(Some(launch)).generator_for(&pin).unwrap();
 
     generator.generate(&job(), &Cancel::new()).unwrap();
@@ -364,7 +343,7 @@ fn the_time_a_request_pinned_is_how_long_the_run_may_take() {
     let mut connection = codex_connection(AuthSource::OfficialLogin);
     connection.limits.seconds = Some(1);
     let pin = rig.pin(&connection);
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
     let generator = rig.directory(Some(launch)).generator_for(&pin).unwrap();
 
     let begun = std::time::Instant::now();
@@ -382,7 +361,7 @@ fn the_time_a_request_pinned_is_how_long_the_run_may_take() {
 fn what_was_found_of_codex_is_not_asked_again_for_every_look() {
     let rig = Rig::new("cdir-cache", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
     let directory = rig.directory(Some(launch));
 
     directory.generator_for(&pin).unwrap();
@@ -394,18 +373,16 @@ fn what_was_found_of_codex_is_not_asked_again_for_every_look() {
 }
 
 #[test]
-fn a_codex_nobody_verified_waits_and_says_so_without_naming_a_path() {
-    let rig = Rig::new("cdir-unverified", "Logged in using ChatGPT");
+fn a_codex_whose_sandbox_is_not_the_one_a_run_needs_waits_and_says_so_without_naming_a_path() {
+    let rig = Rig::new("cdir-wide-sandbox", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    // A list that verifies nothing, spelled out: the shipped one verifies a version, and this
-    // stand-in says that version.
-    let nothing_verified =
-        Support::from_json(r#"{"verified":[],"disabled_features":["shell_tool"]}"#).unwrap();
-    let launch = rig.launch(nothing_verified, &[PATH]);
+    // The sandbox is asked of this stand-in, and what it prints for it is not a list of items.
+    let asking = Support::from_json(r#"{"reviewed_features": []}"#).unwrap();
+    let launch = rig.launch(asking, &[PATH]);
 
     let said = refused(rig.directory(Some(launch)).generator_for(&pin));
 
-    assert!(said.contains("has not been verified"), "{said}");
+    assert!(said.contains("what sandbox it gives a run"), "{said}");
     assert!(said.contains("another connection"), "{said}");
     assert!(!said.contains(rig.fake.binary.to_str().unwrap()), "{said}");
 }
@@ -414,7 +391,7 @@ fn a_codex_nobody_verified_waits_and_says_so_without_naming_a_path() {
 fn nobody_signed_in_to_codex_waits_and_says_to_sign_in() {
     let rig = Rig::new("cdir-signed-out", "Not logged in");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
 
     let said = refused(rig.directory(Some(launch)).generator_for(&pin));
 
@@ -425,7 +402,7 @@ fn nobody_signed_in_to_codex_waits_and_says_to_sign_in() {
 fn a_login_the_build_does_not_use_waits_and_says_which_way_it_is() {
     let rig = Rig::new("cdir-token", "Logged in using an access token");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
 
     let said = refused(rig.directory(Some(launch)).generator_for(&pin));
 
@@ -436,7 +413,7 @@ fn a_login_the_build_does_not_use_waits_and_says_which_way_it_is() {
 fn the_stored_login_of_the_application_is_asked_of_in_the_home_it_is_kept_in() {
     let rig = Rig::new("cdir-home", "Logged in using an API key - sk-...abcd");
     let pin = rig.pin(&codex_connection(AuthSource::AppStore));
-    let launch = rig.launch(verified(&rig.fake), &[PATH, ("OPENAI_API_KEY", "sk-other")]);
+    let launch = rig.launch(stand_in_support(), &[PATH, ("OPENAI_API_KEY", "sk-other")]);
 
     rig.directory(Some(launch)).generator_for(&pin).unwrap();
 
@@ -454,7 +431,7 @@ fn the_stored_login_of_the_application_is_asked_of_in_the_home_it_is_kept_in() {
 fn the_login_of_the_official_client_is_asked_of_where_the_client_keeps_it() {
     let rig = Rig::new("cdir-official", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
 
     rig.directory(Some(launch)).generator_for(&pin).unwrap();
 
@@ -467,7 +444,7 @@ fn a_key_from_the_environment_needs_no_login_and_is_run() {
     let rig = Rig::new("cdir-key", "Not logged in");
     let pin = rig.pin(&codex_connection(AuthSource::EnvApiKey));
     let launch = rig.launch(
-        verified(&rig.fake),
+        stand_in_support(),
         &[PATH, ("CODEX_API_KEY", "sk-codex-secret")],
     );
 
@@ -481,7 +458,7 @@ fn a_key_from_the_environment_needs_no_login_and_is_run() {
 fn a_connection_that_chose_a_key_the_environment_lacks_waits_and_says_what_to_set() {
     let rig = Rig::new("cdir-key-missing", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::EnvApiKey));
-    let launch = rig.launch(verified(&rig.fake), &[PATH, ("OPENAI_API_KEY", "sk-other")]);
+    let launch = rig.launch(stand_in_support(), &[PATH, ("OPENAI_API_KEY", "sk-other")]);
 
     let said = refused(rig.directory(Some(launch)).generator_for(&pin));
 
@@ -503,7 +480,7 @@ fn a_computer_with_no_codex_waits_and_says_so() {
 fn a_route_a_release_switched_off_waits_and_says_so() {
     let rig = Rig::new("cdir-off", "Logged in using ChatGPT");
     let pin = rig.pin(&codex_connection(AuthSource::OfficialLogin));
-    let launch = rig.launch(verified(&rig.fake), &[PATH]);
+    let launch = rig.launch(stand_in_support(), &[PATH]);
     let directory = Connections::new(
         rig.settings.clone(),
         Policy::shipped().with_switched_off([Route::CodexCliChatGptLogin]),

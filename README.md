@@ -507,9 +507,10 @@ credential, so a computer with Codex and no Claude Code hosts too (`SCE_CODEX` n
 or `codex` is beside the program or on the search path). A shell without the settings runs the
 requests nobody chose a connection for, and Codex has no credential to run those on, so it still
 needs Claude Code. The executor reports itself as Claude Code when that is there and as Codex when
-it is the only one. This build supports Codex CLI **0.159.0 on Linux**, recorded in
-`core/data/codex_support.json`. Other versions and operating systems wait with a reason until
-they have been verified with the real client and the current execution contract.
+it is the only one. No Codex version is pinned: the release that is installed is asked what sandbox
+it gives a run, and is run when the answer is the one a run needs (see "A Codex release is asked,
+not looked up" below). `core/data/codex_support.json` holds the features that were reviewed, and
+no version.
 
 **A model server is found when the person registers one.** It is no program to look for: a
 connection names it (`adapter` `local`), and the executor then needs the authoring server and
@@ -567,9 +568,9 @@ such flag and reads it, so a file that says the login is in the system's keychai
 say somebody was signed in whom a run could not see. A run, the check and the sign-in commands the
 screen offers (`codex login -c cli_auth_credentials_store=file`) are all told the same store. What
 else a settings file can say about a login (`forced_login_method`, `forced_chatgpt_workspace_id`, a
-model provider) cannot be unsaid on the command line, and is part of what a version is verified
-against: the name of a verified version covers the arguments a run is started with, so a change to
-them is another version.
+model provider) cannot be unsaid on the command line, and is part of what the instructions are
+named by: the name covers the arguments a run is started with and the features that were reviewed
+(`codex/<digest>`), so a change to them is another set of instructions.
 
 `SCE_EXECUTOR=off` hosts nothing, `SCE_CLAUDE_MODEL` names the model a run uses, and
 `SCE_CLAUDE_BUDGET_USD` bounds what one run may cost (anything that is not a positive number is
@@ -735,7 +736,7 @@ chosen for one is kept while another is looked at. Each keeps its own connection
 a request is made for.
 
 For Codex (`read_codex_status`, which starts the person's program and so is the desktop window's)
-the panel shows the program and its version, whether this build verified that version, and who is
+the panel shows the program and its version, whether that Codex says it gives a run the sandbox it needs, and who is
 signed in by the source that is chosen among three: the official client's own login, a login the
 application keeps of its own in a folder of its own, or a key in the environment. Each source is
 asked on its own, the way a generation runs it, so the screen can say of the one chosen what a
@@ -753,11 +754,36 @@ in a `CODEX_HOME` that is not there and the commands that sign in start it in th
 
 One line says whether a request made for the connection would run and, if not, the first thing it
 waits for, in the order the things are true in: a program that is not there or is not Codex, a
-version this build did not verify (whoever is signed in), then the login. The save is offered only
-when a request would run, because a connection that only waits is not one to make the default;
-while it would wait, another Codex program can still be chosen among those found, which is how a
-person reaches a version this build did verify. Linux Codex 0.159.0 is verified; an updated client
-or another operating system still needs verification before generation is offered.
+sandbox that is not the one a run needs (whoever is signed in), then the login. The save is offered
+only when a request would run, because a connection that only waits is not one to make the
+default; while it would wait, another Codex program can still be chosen among those found, which
+is how a person reaches an install that gives the sandbox a run needs.
+
+**A Codex release is asked, not looked up (2026-10-18).** The application used to run only the
+Codex versions on a list, so an updated client stopped generation until somebody verified it again.
+No version is on a list now. What kept a run inside its tools was never the number; it is three
+things, each decided of the release in front of the application:
+
+1. Every feature the installed Codex has on (`codex features list`) that is not in
+   `reviewed_features` is switched off for the run with `--disable`, so a tool a release adds is
+   off until somebody reviews it. A feature that is off or that this release does not list is never
+   named, because Codex exits on a `--disable` of a name it does not know.
+2. The sandbox that release derives is asked of it, with the same settings and the same features
+   switched off, in an empty folder and an empty home: the files from `codex debug prompt-input`
+   (only the part every command needs, the run's folder, and the folder Codex's own programs are
+   installed in, read and never written) and the network from the answer to a session's start in
+   `codex app-server` (`networkAccess` false). Another answer is a release that is not run, with
+   what it answered; a release that could not be asked is not run either and is said to be one to
+   ask again. The answer is kept for the process by program, version and switched-off features.
+3. A run is stopped at once, and says so, when Codex's stream reports anything but its words, its
+   reasoning, its plan, an error, or a call of one of the authoring server's tools (a command, a
+   web search, a file change, a call of another server). This is not the sandbox: the sandbox stops
+   a command and this stops the run. An item of a kind nobody has seen is refused by name, so a
+   harmless one a newer release adds is one line in the list and not a gap.
+
+`reviewed_features` is the one list left, and it names features and no version. The tests that
+need a release to say something use stand-ins that print the shapes a real Codex printed (0.163.0
+when this was written); `codex_live` tries the real one.
 
 **Codex verification (2026-10-08).** The ignored `core/tests/codex_live.rs` tests use the real
 CLI, an existing official ChatGPT login, `gpt-6.1-sol`, the authoring MCP and `sce-codegen`.
@@ -887,11 +913,10 @@ SCE_LIVE_MODEL=gpt-6.1-sol cargo test -p sce-spec-workbench-core --test codex_li
 ```
 
 These tests run a paid model. Traces and the rendered pseudocode contain only synthetic test
-material and remain in the build's temporary folder. To evaluate an unregistered version,
-`SCE_CODEX_VERIFY=1` creates an in-memory candidate entry **only in this ignored test**; it never
-changes the application's support list. Register a version only after both tests pass. Changes
-to the prompt, schema, arguments or feature lists invalidate the recorded contract digest;
-the offline support test catches a stale entry.
+material and remain in the build's temporary folder. They run with the list the build ships, so a
+newer Codex is tried as the application would run it: asked its sandbox, with what nobody reviewed
+switched off. A feature a release adds is reviewed by reading what it does and, when it is safe,
+adding its name to `reviewed_features`.
 
 For a server of the person's own (Ollama, LM Studio, llama.cpp, vLLM, anything that speaks the
 OpenAI chat protocol with tool calls) nothing is installed or signed in to, so the panel asks the

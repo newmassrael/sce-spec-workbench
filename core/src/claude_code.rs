@@ -255,7 +255,10 @@ impl Generator for ClaudeCode {
             Some(prompt(job).into_bytes()),
             cancel,
             allowed,
-            &mut |line| steps.claude_line(line),
+            &mut |line| {
+                steps.claude_line(line);
+                false
+            },
         )
         .map_err(|e| {
             GenerateError::installation(format!("the client could not be read: {e}"))
@@ -264,6 +267,12 @@ impl Generator for ClaudeCode {
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
+            // Nothing in a stream of this client stops it: the tools it may use are what it is
+            // given, and the client refuses the rest.
+            Ended::Stopped => Err(GenerateError::installation(
+                "the client was stopped by the application".to_string(),
+            )
+            .because(cause::CLIENT_FAULT)),
             Ended::TimedOut => Err(GenerateError::time(format!(
                 "the client took longer than {} and was stopped",
                 span_words(self.config.timeout)

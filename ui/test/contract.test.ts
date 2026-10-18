@@ -821,18 +821,18 @@ describe("the replies the core gives", () => {
     ).toThrow(/models\[0\]/);
   });
 
-  it("carry what the screen says of Codex: which one, whether this build verified it, who is signed in by each source", () => {
+  it("carry what the screen says of Codex: which one, what sandbox it says it gives, who is signed in by each source", () => {
     const status = (name: string) => parseCodexStatus(replies.answers[name]);
     const account = (name: string, source: string) =>
       status(name).accounts.find((a) => a.source === source);
     expect(status("read_codex_status_missing").client).toEqual({ state: "missing" });
-    // A version that could not be asked about is not an unverified one.
+    // A release that could not be asked about is not one that gave another sandbox.
     expect(status("read_codex_status_missing").support).toMatchObject({ state: "unknown" });
     expect(status("read_codex_status_unknown_support").support).toMatchObject({ state: "unknown" });
     expect(status("read_codex_status_verified").support).toEqual({ state: "verified" });
     expect(status("read_codex_status_unverified")).toMatchObject({
       client: { state: "installed", version: "0.159.0" },
-      support: { state: "unverified", reason: expect.stringContaining("has not been verified") },
+      support: { state: "unverified", reason: expect.stringContaining(":root") },
     });
     // Each of the three sources is answered on its own, in the same words as Claude Code's.
     expect(status("read_codex_status_verified").accounts.map((a) => a.source)).toEqual([

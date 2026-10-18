@@ -6,11 +6,12 @@
 //
 // Codex differs from Claude Code in two ways the screen must not hide. A connection to it takes its
 // credential from one of three sources (the official client's login, a login the application keeps
-// of its own, or a key in the environment), and each is asked on its own. And until this build has
-// verified the version that is installed, a request made for Codex never runs, whoever is signed
-// in: so the screen says, in one line, whether a request made for this connection would run and,
-// if not, what it waits for, and does not offer to make a connection the default that would only
-// wait. What is decided is not decided here: the core says what is usable and what is verified.
+// of its own, or a key in the environment), and each is asked on its own. And until the Codex that
+// is installed says it gives a run the sandbox it needs (it is asked, whatever its version), a
+// request made for Codex never runs, whoever is signed in: so the screen says, in one line,
+// whether a request made for this connection would run and, if not, what it waits for, and does
+// not offer to make a connection the default that would only wait. What is decided is not decided
+// here: the core says what is usable and what the sandbox is.
 
 import {
   CODEX_CONNECTION_ID,
@@ -365,8 +366,8 @@ export class CodexSection {
 
   /**
    * The program choice with a button that keeps it, for the states where a request would not run,
-   * which is when another program is what the person wants: a version this build verified may be
-   * another one.
+   * which is when another program is what the person wants: another install may give the sandbox
+   * a run needs.
    */
   private programBlock(): HTMLElement {
     const t = this.env.t;

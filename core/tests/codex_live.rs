@@ -6,8 +6,9 @@
 //! Requires a signed-in `codex`, Python and a built `sce-codegen`.
 //! `SCE_LIVE_MODEL` selects a model; `SCE_CODEX`/`SCE_CODEGEN` select executables.
 //! Run with `cargo test -p sce-spec-workbench-core --test codex_live -- --ignored --nocapture`.
-//! For reviewing a new CLI version *before* shipping it, `SCE_CODEX_VERIFY=1` constructs an
-//! in-memory candidate entry. This opt-in exists only in this ignored test, never in the app.
+//! The release is not looked up by version: the run is made with the list the build ships, so
+//! whatever Codex is installed is asked what sandbox it derives and has its unreviewed features
+//! switched off, as in the application.
 //! Traces contain only this test's synthetic specification and are kept in a temporary folder.
 
 #![cfg(unix)]
@@ -23,7 +24,9 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 use sce_spec_workbench_core::claude_code::AuthorServer;
-use sce_spec_workbench_core::codex::{instructions_of, version_of, Codex, CodexConfig};
+use sce_spec_workbench_core::codex::{
+    instructions_of, support_verdict, version_of, Codex, CodexConfig,
+};
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::connection::AuthSource;
 use sce_spec_workbench_core::runner::{Outcome, Runner, RunnerConfig};
@@ -50,6 +53,37 @@ fn real_codex_reads_checks_and_publishes_through_mcp() {
 #[ignore = "runs real Codex against a malicious synthetic specification"]
 fn an_imported_specification_cannot_grant_extra_tools() {
     run(true);
+}
+
+/// No version is on a list, so whatever Codex is installed is judged by what it says it derives.
+/// This asks the real one the way the application does (the features it has on and nobody
+/// reviewed, switched off; the sandbox it derives with them off) and holds that it is accepted. It
+/// needs the program and no login, no model and no money. When a newer release fails here, what it
+/// said is the reason, and that is the thing to read before reviewing it.
+#[test]
+#[ignore = "runs real Codex, without a login: it is only asked what it derives"]
+fn the_installed_codex_is_accepted_by_the_check_the_application_makes_of_it() {
+    let binary = sce_spec_workbench_core::codex::locate(
+        std::env::var_os("SCE_CODEX").map(PathBuf::from).as_deref(),
+        &sce_spec_workbench_core::claude_code::Search::from_environment(),
+    )
+    .expect("a Codex to ask: put it on the search path or name it in SCE_CODEX");
+    let version = version_of(&binary).expect("Codex must say its version");
+
+    let disabled = support_verdict(&binary, &version, &Support::shipped())
+        .unwrap_or_else(|why| panic!("Codex {version} is not accepted: {why}"));
+
+    println!(
+        "Codex {version} is accepted, with {} features switched off: {disabled:?}",
+        disabled.len()
+    );
+    // What was switched off is what this release has on and nobody reviewed, and none of what was.
+    for reviewed in Support::shipped().reviewed_features() {
+        assert!(
+            !disabled.contains(reviewed),
+            "{reviewed} was reviewed and is switched off"
+        );
+    }
 }
 
 /// What a command the client runs may reach is read back from Codex and not from our arguments:
@@ -132,7 +166,14 @@ fn the_policy_codex_derives_from_a_run_reads_only_the_minimum_and_its_folder() {
     // its own home for the run. Not that home, nor the person's, nor a parent of either: the
     // home holds the login the application keeps.
     let shipped = install_folder_of(&binary);
-    let aliases = fs::canonicalize(&home).unwrap().join("tmp").join("arg0");
+    // A release names that folder `arg0` or `arg0-linux`: what follows the home's `tmp` begins so.
+    let tmp = fs::canonicalize(&home).unwrap().join("tmp");
+    let is_alias = |path: &Path| {
+        path.strip_prefix(&tmp)
+            .ok()
+            .and_then(|rest| rest.components().next())
+            .is_some_and(|first| first.as_os_str().to_string_lossy().starts_with("arg0"))
+    };
     let mut paths = Vec::new();
     for piece in derived.split("<path>").skip(1) {
         let path = piece.split("</path>").next().unwrap();
@@ -146,7 +187,7 @@ fn the_policy_codex_derives_from_a_run_reads_only_the_minimum_and_its_folder() {
         let ours = path.starts_with(&spec);
         let theirs = shipped.as_ref().is_some_and(|dir| path.starts_with(dir));
         assert!(
-            ours || theirs || path.starts_with(&aliases),
+            ours || theirs || is_alias(path),
             "{} is readable: {derived}",
             path.display()
         );
@@ -387,21 +428,7 @@ fn run(attack: bool) {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("codex"));
     let version = version_of(&binary).expect("Codex must say its version");
-    let shipped = Support::shipped();
-    let support = if std::env::var("SCE_CODEX_VERIFY").as_deref() == Ok("1") {
-        Support::from_json(
-            &json!({
-                "verified": [{"os": std::env::consts::OS, "version": version,
-                              "instructions": instructions_of(&shipped)}],
-                "disabled_features": shipped.disabled_features(),
-                "reviewed_features": shipped.reviewed_features(),
-            })
-            .to_string(),
-        )
-        .unwrap()
-    } else {
-        shipped
-    };
+    let support = Support::shipped();
     println!(
         "Verifying {} {version} {}",
         std::env::consts::OS,
@@ -486,18 +513,26 @@ fn run(attack: bool) {
         .unwrap()
         .request
         .id;
+    let mut author_env = vec![
+        ("SCE_SPEC".into(), common::sce_spec().display().to_string()),
+        ("SCE_SPECS_DIR".into(), specs.display().to_string()),
+        ("SCE_CODEGEN".into(), codegen.display().to_string()),
+        (
+            "PYTHONPATH".into(),
+            repo.join("tools/authoring").display().to_string(),
+        ),
+    ];
+    // A generator that is not in the SCE checkout (a release copy) finds its templates and schemas
+    // where the environment says, and the authoring server starts it with only what it is given.
+    for name in ["SCE_TEMPLATE_DIR", "SCE_SCHEMAS_DIR"] {
+        if let Some(value) = std::env::var_os(name) {
+            author_env.push((name.into(), PathBuf::from(value).display().to_string()));
+        }
+    }
     let author = AuthorServer {
         command: PathBuf::from("python3"),
         args: vec![mcp.display().to_string()],
-        env: vec![
-            ("SCE_SPEC".into(), common::sce_spec().display().to_string()),
-            ("SCE_SPECS_DIR".into(), specs.display().to_string()),
-            ("SCE_CODEGEN".into(), codegen.display().to_string()),
-            (
-                "PYTHONPATH".into(),
-                repo.join("tools/authoring").display().to_string(),
-            ),
-        ],
+        env: author_env,
     };
     let status = serde_json::to_value(sce_spec_workbench_core::codex_status::read(
         Some(&cli),

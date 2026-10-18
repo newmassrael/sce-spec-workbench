@@ -300,6 +300,8 @@ pub(crate) enum Ended {
     },
     Cancelled,
     TimedOut,
+    /// The reader of its lines said it did something that is not allowed, and it was stopped.
+    Stopped,
 }
 
 /// Feed the client its input, read everything it says as it says it, and wait for it to end,
@@ -313,19 +315,24 @@ pub(crate) fn supervise(
     cancel: &Cancel,
     timeout: Duration,
 ) -> io::Result<Ended> {
-    supervise_lines(child, input, cancel, timeout, &mut |_| {})
+    supervise_lines(child, input, cancel, timeout, &mut |_| false)
 }
 
 /// [`supervise`], and each line the client writes to its standard output is handed to `on_line`
 /// as it is written, on the thread that supervises, in order, and every one of them before this
 /// returns. A client that prints what it does while it works (a stream of events) can be read
 /// without waiting for it to end.
+///
+/// `on_line` answers whether the client is to be stopped for what that line says. It is stopped at
+/// once, and every line it had printed is still handed over, the stopping one last. A client whose
+/// forbidden line is read only after it has exited is `Stopped` too: a run that did what it must
+/// not is not one whose answer is taken.
 pub(crate) fn supervise_lines(
     mut child: Child,
     input: Option<Vec<u8>>,
     cancel: &Cancel,
     timeout: Duration,
-    on_line: &mut dyn FnMut(&str),
+    on_line: &mut dyn FnMut(&str) -> bool,
 ) -> io::Result<Ended> {
     let writer = child.stdin.take().map(|mut stdin| {
         thread::spawn(move || {
@@ -342,7 +349,11 @@ pub(crate) fn supervise_lines(
 
     let started = Instant::now();
     let status = loop {
-        pass_on(&lines_out, on_line);
+        if pass_on(&lines_out, on_line) {
+            stop(&mut child);
+            let _ = join(writer, out, err);
+            return Ok(Ended::Stopped);
+        }
         if let Some(status) = child.try_wait()? {
             break Some(status);
         }
@@ -359,7 +370,9 @@ pub(crate) fn supervise_lines(
         thread::sleep(Duration::from_millis(20));
     };
     let (stdout, stderr) = join(writer, out, err);
-    pass_on(&lines_out, on_line);
+    if pass_on(&lines_out, on_line) {
+        return Ok(Ended::Stopped);
+    }
     Ok(match status {
         Some(status) => Ended::Exited {
             status,
@@ -375,11 +388,14 @@ fn stop(child: &mut Child) {
     let _ = child.wait();
 }
 
-/// Hand every line that has been read and not yet passed on to `on_line`.
-fn pass_on(lines: &Receiver<String>, on_line: &mut dyn FnMut(&str)) {
+/// Hand every line that has been read and not yet passed on to `on_line`, and say whether any of
+/// them asked for the client to be stopped. Every line is handed over, the stopping one among them.
+fn pass_on(lines: &Receiver<String>, on_line: &mut dyn FnMut(&str) -> bool) -> bool {
+    let mut stop = false;
     for line in lines.try_iter() {
-        on_line(&line);
+        stop |= on_line(&line);
     }
+    stop
 }
 
 /// Read a pipe to its end on a thread of its own; what is kept is the first part of it. When
@@ -514,7 +530,7 @@ pub(crate) fn capture(mut command: Command, timeout: Duration) -> Result<Capture
             "it did not answer within {} seconds",
             timeout.as_secs()
         )),
-        Ended::Cancelled => Err("it was stopped".to_string()),
+        Ended::Cancelled | Ended::Stopped => Err("it was stopped".to_string()),
     }
 }
 

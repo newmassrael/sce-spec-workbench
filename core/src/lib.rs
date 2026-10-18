@@ -30,6 +30,7 @@ mod client_find;
 mod client_run;
 pub mod codex;
 pub mod codex_environment;
+pub mod codex_sandbox;
 pub mod codex_status;
 pub mod codex_support;
 pub mod commands;

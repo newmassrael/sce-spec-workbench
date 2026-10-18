@@ -44,9 +44,10 @@ use crate::client_run::{
     Ended, Scratch, SERVER, SYSTEM_PROMPT,
 };
 use crate::codex_environment::environment_for;
+use crate::codex_sandbox::{self, Refusal};
 use crate::codex_support::{enabled_features, Support};
 use crate::connection::AuthSource;
-use crate::run_steps::Steps;
+use crate::run_steps::{codex_forbidden, Steps};
 use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 // The authoring server's tools a client may use, said once for every client that has them
@@ -147,6 +148,7 @@ impl Codex {
     /// works in, and `last` the file it writes its last message to.
     fn arguments(
         &self,
+        disabled: &[String],
         scratch: &Path,
         schema_file: &Path,
         last: &Path,
@@ -154,7 +156,7 @@ impl Codex {
     ) -> Vec<String> {
         exec_arguments(
             &scoped_to(&self.author, spec),
-            self.support.disabled_features(),
+            disabled,
             self.config.model.as_deref(),
             self.config.effort.as_deref(),
             scratch,
@@ -172,8 +174,11 @@ impl Codex {
             .version
             .as_deref()
             .ok_or("the program did not say it is Codex, so it is not run")?;
-        support_verdict(&self.binary, version, &self.support).map_err(|e| e.to_string())?;
-        run_environment(self.auth, &self.app_home, &self.environment)
+        let disabled =
+            support_verdict(&self.binary, version, &self.support).map_err(|e| e.to_string())?;
+        let mut run = run_environment(self.auth, &self.app_home, &self.environment)?;
+        run.disabled = disabled;
+        Ok(run)
     }
 
     /// Why this Codex cannot be run now, or `None` when it can: for the request that waits.
@@ -348,6 +353,9 @@ struct Run {
     kept: Vec<(String, String)>,
     /// The home to give the client, when it is not the one it would use itself.
     home: Option<PathBuf>,
+    /// The features of this Codex to switch off for the run: every one it has on that nobody
+    /// reviewed. Empty where the environment alone was asked for (who is signed in).
+    disabled: Vec<String>,
 }
 
 /// The environment a client is started in for a connection that chose `auth`: `environment` (the
@@ -367,6 +375,7 @@ fn run_environment(
     Ok(Run {
         kept,
         home: policy.home,
+        disabled: Vec::new(),
     })
 }
 
@@ -452,9 +461,9 @@ pub fn features_on(binary: &Path) -> Result<Vec<String>, String> {
 /// "ask again"), and a request that waits says either as the sentence it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotRunnable {
-    /// The version is not one a person verified, or something is on that nobody looked at.
+    /// It was asked what sandbox it derives, and the answer is not one a run is given.
     Unverified(String),
-    /// What is on could not be listed, so nothing is known of the version.
+    /// What is on, or what sandbox it derives, could not be asked, so nothing is known of it.
     Unasked(String),
 }
 
@@ -466,20 +475,31 @@ impl std::fmt::Display for NotRunnable {
     }
 }
 
-/// Whether this build may run `binary`, which says it is Codex `version`: a version a person
-/// verified against the instructions this build gives it, with nothing switched on that nobody
-/// looked at. The reason is a sentence that names no path. Needs no authoring server: a screen
-/// asks it too.
-pub fn support_verdict(binary: &Path, version: &str, support: &Support) -> Result<(), NotRunnable> {
+/// Whether this build may run `binary`, which says it is Codex `version`, and which features of it
+/// are to be switched off for a run.
+///
+/// Any release may be run that derives the sandbox a run needs (`codex_sandbox`), once every
+/// feature it has on that nobody reviewed is switched off. There is no list of versions: a release
+/// is judged by what it says it derives when asked, and a release that says anything else is not
+/// run. The reason is a sentence that names no path. Needs no authoring server: a screen asks it
+/// too.
+pub fn support_verdict(
+    binary: &Path,
+    version: &str,
+    support: &Support,
+) -> Result<Vec<String>, NotRunnable> {
     let enabled = features_on(binary).map_err(NotRunnable::Unasked)?;
-    support
-        .check(
-            std::env::consts::OS,
-            version,
-            &instructions_of(support),
-            &enabled,
-        )
-        .map_err(|e| NotRunnable::Unverified(e.to_string()))
+    let disabled = support.features_to_disable(&enabled);
+    if support.checks_sandbox() {
+        codex_sandbox::held(binary, version, &disabled).map_err(|refusal| match refusal {
+            Refusal::Broken(why) => NotRunnable::Unverified(format!(
+                "Codex {version} is not run: asked what sandbox it gives a run, it {why}. \
+                 Install another version, or choose another connection"
+            )),
+            Refusal::Unasked(why) => NotRunnable::Unasked(why),
+        })?;
+    }
+    Ok(disabled)
 }
 
 /// What the client's program is called on this system. An installer that leaves a shim of another
@@ -525,9 +545,13 @@ fn instruction_material(support: &Support) -> String {
         args: vec!["<argument>".to_string()],
         env: vec![("<name>".to_string(), "<value>".to_string())],
     };
+    // The features switched off are the ones the Codex in front of the application has on and
+    // nobody reviewed, so they are a rule and not a list: what names this build's instructions is
+    // the rule and the list of what is left on.
+    let rule = "<every feature the client has on that is not reviewed>".to_string();
     let arguments = exec_arguments(
         &scoped_to(&author, "<spec>"),
-        support.disabled_features(),
+        std::slice::from_ref(&rule),
         None,
         None,
         Path::new("<scratch>"),
@@ -535,11 +559,10 @@ fn instruction_material(support: &Support) -> String {
         Path::new("<last>"),
     );
     format!(
-        "{SYSTEM_PROMPT}\n{}\n{}\n{}\n{}\n{}\n{}",
+        "{SYSTEM_PROMPT}\n{}\n{}\n{}\n{}\n{}",
         prompt(&blank_job()),
         schema(),
         AUTHOR_TOOLS.join(","),
-        support.disabled_features().join(","),
         support.reviewed_features().join(","),
         arguments.join("\n"),
     )
@@ -550,10 +573,7 @@ mod tests {
     use super::*;
 
     fn support() -> Support {
-        Support::from_json(
-            r#"{"verified":[],"disabled_features":["shell_tool"],"reviewed_features":["fast_mode"]}"#,
-        )
-        .unwrap()
+        Support::from_json(r#"{"reviewed_features":["fast_mode"]}"#).unwrap()
     }
 
     #[test]
@@ -566,7 +586,7 @@ mod tests {
             "default_permissions=",
             "approval_policy=\"never\"",
             "web_search=\"disabled\"",
-            "--disable\nshell_tool",
+            "--disable\n<every feature the client has on that is not reviewed>",
             &auth_store_override(),
             "mcp_servers.sce-author.enabled_tools=",
         ] {
@@ -615,6 +635,13 @@ mod tests {
         assert!(!material.contains("/home"), "{material}");
         assert_eq!(instructions_of(&support()), instructions_of(&support()));
     }
+
+    #[test]
+    fn what_is_reviewed_is_part_of_the_name() {
+        let reviewed = Support::from_json(r#"{"reviewed_features":["goals"]}"#).unwrap();
+
+        assert_ne!(instructions_of(&support()), instructions_of(&reviewed));
+    }
 }
 
 /// What `codex login status` said, as the kind of credential in use, `None` for nobody, or that it
@@ -658,7 +685,8 @@ pub struct CodexLaunch {
     /// The application's own home for the client, which a connection that chose the application's
     /// stored login uses.
     pub app_home: PathBuf,
-    /// Which versions were verified, and what is switched off.
+    /// Which features were reviewed (every other one a release has on is switched off), and whether
+    /// the sandbox a release derives is asked of it.
     pub support: Support,
     /// The environment a run is worked out from: the process's own.
     pub environment: Vec<(String, String)>,
@@ -720,9 +748,13 @@ impl Generator for Codex {
                 span_words(self.config.timeout)
             )));
         }
-        // Nothing is started before it is known to be a Codex this build has verified, with
-        // nothing on that nobody looked at, and a credential to give it.
-        let Run { kept, home } = self
+        // Nothing is started before it is known to be a Codex that derives the sandbox a run needs,
+        // with every feature that nobody reviewed switched off, and a credential to give it.
+        let Run {
+            kept,
+            home,
+            disabled,
+        } = self
             .preflight()
             .map_err(|why| GenerateError::installation(why).because(cause::CLIENT_FAULT))?;
 
@@ -740,7 +772,13 @@ impl Generator for Codex {
         let mut command = Command::new(&self.binary);
         command
             .current_dir(scratch.path())
-            .args(self.arguments(scratch.path(), &schema_file, &last, job.spec.as_str()))
+            .args(self.arguments(
+                &disabled,
+                scratch.path(),
+                &schema_file,
+                &last,
+                job.spec.as_str(),
+            ))
             .env_clear()
             .envs(kept)
             .stdin(Stdio::piped())
@@ -759,12 +797,24 @@ impl Generator for Codex {
         // The events it prints as it works (`exec --json`) are what the run says it has done; the
         // answer is read from the file it writes its last message to.
         let mut steps = Steps::new(&job.progress);
+        // What the client reports that a run must not do stops the run at once: the sandbox is what
+        // stops a command, and this is what stops the run that tried one.
+        let mut forbidden: Option<String> = None;
         let ended = supervise_lines(
             child,
             Some(prompt(job).into_bytes()),
             cancel,
             allowed,
-            &mut |line| steps.codex_line(line),
+            &mut |line| {
+                steps.codex_line(line);
+                match codex_forbidden(line) {
+                    Some(what) => {
+                        forbidden.get_or_insert(what);
+                        true
+                    }
+                    None => false,
+                }
+            },
         )
         .map_err(|e| {
             GenerateError::installation(format!("the client could not be read: {e}"))
@@ -773,6 +823,12 @@ impl Generator for Codex {
 
         match ended {
             Ended::Cancelled => Err(GenerateError::Cancelled),
+            Ended::Stopped => Err(GenerateError::installation(format!(
+                "the client was stopped because it {}: a run may only speak and call the \
+                 authoring server's tools",
+                forbidden.unwrap_or_else(|| "did something that is not allowed".to_string())
+            ))
+            .because(cause::CLIENT_FAULT)),
             Ended::TimedOut => Err(GenerateError::time(format!(
                 "the client took longer than {} and was stopped",
                 span_words(self.config.timeout)

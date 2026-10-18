@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use sce_specs::journal::{is_code, Event, ToolVerdict, CODES_MAX};
 use serde_json::Value;
 
-use crate::client_run::SERVER;
+use crate::client_run::{AUTHOR_TOOLS, SERVER};
 use crate::runner::Progress;
 
 /// The tools whose arguments are the design the model is putting right.
@@ -222,6 +222,37 @@ fn content_blocks(event: &Value) -> &[Value] {
         .as_array()
         .map(Vec::as_slice)
         .unwrap_or_default()
+}
+
+/// What a line of Codex's stream says it did that a run must not do, or `None`. A run may say
+/// things (its words, its reasoning, a plan, an error it met) and call the authoring server's tools;
+/// an item of any other kind is the client acting (running a command, changing a file, searching the
+/// web, starting another agent), and so is a call of a tool of the server that is not one of the
+/// tools a run is given.
+///
+/// This is read of what the client printed and it is not the sandbox: the sandbox is what stops a
+/// command, and this is what stops the run, and says so, when the client reports that it tried. An
+/// item of a kind this build has not seen is refused with its name, so that a kind a newer client
+/// adds that is harmless is one line in this list and not a gap in it.
+pub fn codex_forbidden(line: &str) -> Option<String> {
+    let event: Value = serde_json::from_str(line).ok()?;
+    let item = event.get("item")?;
+    let kind = item["type"].as_str().unwrap_or("");
+    match kind {
+        "agent_message" | "reasoning" | "todo_list" | "error" => None,
+        "mcp_tool_call" => {
+            let server = item["server"].as_str().unwrap_or("");
+            let tool = item["tool"].as_str().unwrap_or("");
+            if server == SERVER && AUTHOR_TOOLS.contains(&tool) {
+                None
+            } else {
+                Some(format!(
+                    "called `{tool}` of `{server}`, which a run is not given"
+                ))
+            }
+        }
+        other => Some(format!("reported an item of the kind `{other}`")),
+    }
 }
 
 /// The name of a tool of the authoring server as the server calls it, for a tool Claude Code names
