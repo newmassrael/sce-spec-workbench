@@ -70,6 +70,7 @@ fn what_an_installer_carried_is_used_where_the_environment_named_nothing() {
         author: Some(PathBuf::from("/opt/app/sce-author/bin/sce-author-mcp")),
         spec: Some(PathBuf::from("/opt/app/sce-author/bin/sce-spec")),
         codegen: Some(PathBuf::from("/opt/app/sce-author/bin/sce-codegen")),
+        import: Some(PathBuf::from("/opt/app/sce-author/bin/sce-author")),
     };
 
     let settings = HostSettings::from_lookup(

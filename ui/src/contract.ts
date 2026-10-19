@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 32;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 3;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 4;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2067,9 +2067,8 @@ export function parseProposalDecided(value: unknown): ProposalDecision {
   return parseProposalDecision(record(value, where)["decision"], `${where}.decision`);
 }
 
-/** `accept_proposal`. */
-export function parseProposalAccepted(value: unknown): ProposalAccepted {
-  const where = "accept_proposal";
+/** `accept_proposal`, and `accept_import`, which answers the same. */
+export function parseProposalAccepted(value: unknown, where = "accept_proposal"): ProposalAccepted {
   const r = record(value, where);
   return {
     proposal: parseProposal(r["proposal"], `${where}.proposal`),
@@ -2082,6 +2081,134 @@ export function parseProposalAccepted(value: unknown): ProposalAccepted {
 export function parseProposalRejected(value: unknown): Proposal {
   const where = "reject_proposal";
   return parseProposal(record(value, where)["proposal"], `${where}.proposal`);
+}
+
+/** Something the document had that the extractor could not carry, and why when it says. */
+export interface NotCarried {
+  what: string;
+  why: string | null;
+}
+
+/** `import_document`: a document brought in, as a proposal waiting for its owner. */
+export interface ImportedDocument {
+  proposal: Proposal;
+  /** `false` when the same press was made before and this is that proposal. */
+  created: boolean;
+  /** Whether the check finds the conversion complete: nothing the owner has to be asked. */
+  complete: boolean;
+  not_carried: NotCarried[];
+}
+
+/** One line of what the assembled text changes in the spec's text now. */
+export interface ChangedLine {
+  op: "keep" | "add" | "remove";
+  text: string;
+}
+
+/** A run of changed lines with the lines around them, and where it starts in each text (from 1). */
+export interface ChangedHunk {
+  old_start: number;
+  new_start: number;
+  lines: ChangedLine[];
+}
+
+/** What the assembled text changes in the spec's text now, by line. */
+export interface TextChanges {
+  /** `false` for a spec that had no text. */
+  had_text: boolean;
+  unchanged: boolean;
+  added: number;
+  removed: number;
+  hunks: ChangedHunk[];
+}
+
+/** What `assemble_import` says of the text beside the text: the ids, the counts and the changes. */
+export interface AssemblyReport {
+  /** The name the specs folder keeps the text under: what accepting would save. */
+  revision: Revision;
+  /** How many decisions the text was made from. */
+  decisions: number;
+  kept: string[];
+  corrected: string[];
+  dropped: string[];
+  added: string[];
+  changes: TextChanges;
+}
+
+/** `assemble_import`: the text accepting would save, and what it changes. Nothing is written. */
+export interface AssembledImport {
+  text: string;
+  report: AssemblyReport;
+}
+
+const CHANGE_OPS = ["keep", "add", "remove"] as const;
+
+function parseNotCarried(value: unknown, where: string): NotCarried {
+  const r = record(value, where);
+  return { what: text(r, "what", where), why: r["why"] === undefined ? null : nullableText(r, "why", where) };
+}
+
+/** `import_document`. */
+export function parseImportedDocument(value: unknown): ImportedDocument {
+  const where = "import_document";
+  const r = record(value, where);
+  if (typeof r["complete"] !== "boolean") throw new ContractError(`${where}.complete`, "true or false");
+  return {
+    proposal: parseProposal(r["proposal"], `${where}.proposal`),
+    created: created(r, where),
+    complete: r["complete"],
+    not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
+function parseTextChanges(value: unknown, where: string): TextChanges {
+  const r = record(value, where);
+  if (typeof r["had_text"] !== "boolean") throw new ContractError(`${where}.had_text`, "true or false");
+  if (typeof r["unchanged"] !== "boolean") throw new ContractError(`${where}.unchanged`, "true or false");
+  return {
+    had_text: r["had_text"],
+    unchanged: r["unchanged"],
+    added: count(r, "added", where),
+    removed: count(r, "removed", where),
+    hunks: list(r, "hunks", where).map((h, i) => {
+      const at = `${where}.hunks[${i}]`;
+      const hunk = record(h, at);
+      return {
+        old_start: count(hunk, "old_start", at),
+        new_start: count(hunk, "new_start", at),
+        lines: list(hunk, "lines", at).map((l, k) => {
+          const place = `${at}.lines[${k}]`;
+          const line = record(l, place);
+          return { op: oneOf(line, "op", place, CHANGE_OPS), text: text(line, "text", place) };
+        }),
+      };
+    }),
+  };
+}
+
+/** `assemble_import`. */
+export function parseAssembledImport(value: unknown): AssembledImport {
+  const where = "assemble_import";
+  const r = record(value, where);
+  const report = record(r["report"], `${where}.report`);
+  const at = `${where}.report`;
+  return {
+    text: text(r, "text", where),
+    report: {
+      revision: revision(report["revision"], `${at}.revision`),
+      decisions: count(report, "decisions", at),
+      kept: stringList(report, "kept", at),
+      corrected: stringList(report, "corrected", at),
+      dropped: stringList(report, "dropped", at),
+      added: stringList(report, "added", at),
+      changes: parseTextChanges(report["changes"], `${at}.changes`),
+    },
+  };
+}
+
+/** `accept_import`: the same answer as `accept_proposal`. */
+export function parseImportAccepted(value: unknown): ProposalAccepted {
+  return parseProposalAccepted(value, "accept_import");
 }
 
 /** `request_generation`. */

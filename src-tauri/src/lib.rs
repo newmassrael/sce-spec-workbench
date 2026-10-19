@@ -27,7 +27,7 @@ use close_gate::{CloseGate, Decision};
 use sce_spec_workbench_core::host::{self, ExecutorHost, HostSettings};
 use sce_spec_workbench_core::installed::{self, Installed};
 use sce_spec_workbench_core::{
-    call_in, default_settings_root, ConnectionStore, Context, Entrance, Policy,
+    call_in, default_settings_root, ConnectionStore, Context, Entrance, ImportTools, Policy,
 };
 use sce_specs::{default_root, renderer_with_bundle, CommandError, Product, SpecStore};
 use serde_json::Value;
@@ -54,6 +54,9 @@ struct Specs {
     claude: Option<std::path::PathBuf>,
     /// The program the environment named as Codex (`SCE_CODEX`), looked for the same way.
     codex: Option<std::path::PathBuf>,
+    /// The authoring tools that bring a document in (`SCE_AUTHOR`, else the installer's), or why
+    /// they were not found.
+    import_tools: Result<ImportTools, String>,
 }
 
 /// The executor this application hosts, when it found what it needs: a runner on a thread of
@@ -106,7 +109,8 @@ fn sce_call(
     )
     .with_connections(Some(&specs.settings))
     .with_claude(specs.claude.as_deref())
-    .with_codex(specs.codex.as_deref());
+    .with_codex(specs.codex.as_deref())
+    .with_import_tools(Some(&specs.import_tools));
     call_in(&context, &name, args.unwrap_or(Value::Null))
 }
 
@@ -175,6 +179,10 @@ pub fn run() {
             // The programs the environment named as the clients, which the status asked of each
             // is about.
             let named = HostSettings::from_environment("desktop");
+            let import_tools = ImportTools::from_environment(&bundle);
+            if let Err(why) = &import_tools {
+                eprintln!("sce-spec-workbench: no tools to bring a document in with: {why}");
+            }
             app.manage(Specs {
                 store: SpecStore::at(root),
                 figures: renderer_with_bundle(bundle.codegen.as_deref()),
@@ -182,6 +190,7 @@ pub fn run() {
                 policy: Policy::shipped(),
                 claude: named.claude,
                 codex: named.codex,
+                import_tools,
             });
             Ok(())
         })

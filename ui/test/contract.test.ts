@@ -38,6 +38,9 @@ import {
   parseOriginalList,
   parseOriginalMemberRead,
   parseOriginalRead,
+  parseAssembledImport,
+  parseImportAccepted,
+  parseImportedDocument,
   parseProposalAccepted,
   parseProposalDecided,
   parseProposalDocuments,
@@ -90,8 +93,19 @@ const replies = JSON.parse(
   readFileSync(new URL("../../core/contract/replies.json", import.meta.url), "utf8"),
 ) as Replies;
 
+/**
+ * The replies of the commands that run SCE's authoring tools, written down in a file of their own:
+ * the lane that runs on Windows has no tools to produce them, and reads this one.
+ */
+const importReplies = JSON.parse(
+  readFileSync(new URL("../../core/contract/import_replies.json", import.meta.url), "utf8"),
+) as Pick<Replies, "answers" | "refusals">;
+
 const parsers: Record<string, (value: unknown) => unknown> = {
   describe: parseDescribed,
+  import_document: parseImportedDocument,
+  assemble_import: parseAssembledImport,
+  accept_import: parseImportAccepted,
   list_specs: parseListing,
   create_spec: (v) => parseSpec(v),
   read_spec: parseSpecAndHead,
@@ -181,7 +195,7 @@ describe("the replies the core gives", () => {
   });
 
   it("are all accepted by the guard of their command", () => {
-    for (const [name, reply] of Object.entries(replies.answers)) {
+    for (const [name, reply] of [...Object.entries(replies.answers), ...Object.entries(importReplies.answers)]) {
       const parse = parsers[commandOf(name)];
       expect(parse, name).toBeDefined();
       expect(() => parse?.(reply), name).not.toThrow();
@@ -192,7 +206,9 @@ describe("the replies the core gives", () => {
     const described = parseDescribed(replies.answers["describe"]);
     for (const command of described.commands) {
       expect(parsers[command], `the screen has no guard for \`${command}\``).toBeDefined();
-      const covered = Object.keys(replies.answers).some((name) => commandOf(name) === command);
+      const covered = [...Object.keys(replies.answers), ...Object.keys(importReplies.answers)].some(
+        (name) => commandOf(name) === command,
+      );
       expect(covered, `no reply of \`${command}\` is written down`).toBe(true);
     }
   });
@@ -658,6 +674,43 @@ describe("the replies the core gives", () => {
     for (const kind of ["bad-proposal", "nothing-to-carry"]) {
       expect(asCommandError(replies.refusals[kind])?.kind).toBe(kind);
     }
+  });
+
+  it("say what bringing a document in made, what accepting it writes and what that changes", () => {
+    const imported = parseImportedDocument(importReplies.answers["import_document"]);
+    expect(imported).toMatchObject({ created: true, complete: true, not_carried: [] });
+    expect(imported.proposal.state).toBe("pending");
+    expect(imported.proposal.asks).toEqual([]);
+    const assembled = parseAssembledImport(importReplies.answers["assemble_import"]);
+    expect(assembled.text).toBe("# Door lock\n\nThe lock opens when the code matches.\n");
+    expect(assembled.report).toMatchObject({ decisions: 1, dropped: ["m0003"], kept: ["m0001", "m0002"] });
+    // A spec with no text gains every line, and the lines say so one by one.
+    expect(assembled.report.changes).toMatchObject({ had_text: false, unchanged: false, added: 3, removed: 0 });
+    expect(assembled.report.changes.hunks[0]?.lines.map((l) => l.op)).toEqual(["add", "add", "add"]);
+    const accepted = parseImportAccepted(importReplies.answers["accept_import"]);
+    expect(accepted.proposal.state).toBe("accepted");
+    expect(accepted.saved).toBe(assembled.report.revision);
+  });
+
+  it("refuse a document by the word the screen branches on, and carry what it needs to say it", () => {
+    const unreadable = asCommandError(importReplies.refusals["unreadable-original"]);
+    expect(unreadable?.detail).toMatchObject({ kind: "sniff-mismatch", tool: "extract" });
+    expect(unreadable?.message.startsWith("broken.docx:")).toBe(true);
+    expect(asCommandError(importReplies.refusals["assembly-refused"])?.message).toContain("nothing");
+    expect(asCommandError(importReplies.refusals["import-tool-timeout"])?.detail).toMatchObject({ seconds: 1 });
+    for (const kind of ["import-tool-missing", "import-tool-failed"]) {
+      expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
+    }
+  });
+
+  it("are refused when what an import changes is not a line the screen knows how to show", () => {
+    const assembled = structuredClone(importReplies.answers["assemble_import"]) as {
+      report: { changes: { hunks: { lines: { op: string }[] }[] } };
+    };
+    const line = assembled.report.changes.hunks[0]?.lines[0];
+    if (line === undefined) throw new Error("the recorded import changes no line");
+    line.op = "move";
+    expect(() => parseAssembledImport(assembled)).toThrow(/op/);
   });
 
   it("are refused when a proposal is in a state or a decision of a kind the screen does not know", () => {

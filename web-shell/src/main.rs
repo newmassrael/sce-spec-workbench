@@ -19,8 +19,9 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use sce_spec_workbench_core::host::{self, HostSettings};
+use sce_spec_workbench_core::installed::Installed;
 use sce_spec_workbench_core::{
-    default_settings_root, AdapterKind, AuthSource, Connection, ConnectionStore,
+    default_settings_root, AdapterKind, AuthSource, Connection, ConnectionStore, ImportTools,
     Limits as RunLimits, Policy,
 };
 use sce_specs::{default_renderer, default_root, ConnectionId, SceCodegen, SpecStore};
@@ -181,7 +182,16 @@ fn run() -> Result<(), String> {
         Some(why) => eprintln!("executor:     none ({why})"),
     }
 
-    let mut shell = Shell::new(SpecStore::at(root), figures, token, assets);
+    // The tools that bring a document in: named by `SCE_AUTHOR`, else beside the program or on the
+    // search path. A development shell carries no bundle.
+    let import_tools = ImportTools::from_environment(&Installed::default());
+    match &import_tools {
+        Ok(tools) => eprintln!("import tools: {}", tools.program().display()),
+        Err(why) => eprintln!("import tools: none ({why})"),
+    }
+
+    let mut shell =
+        Shell::new(SpecStore::at(root), figures, token, assets).with_import_tools(import_tools);
     if let Some(dir) = settings {
         shell = shell.with_settings(ConnectionStore::at(dir));
     }

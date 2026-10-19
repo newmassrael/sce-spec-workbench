@@ -26,6 +26,7 @@ use sce_spec_workbench_core::claude_status::{
 };
 use sce_spec_workbench_core::codex_environment::API_KEY_VARIABLE;
 use sce_spec_workbench_core::codex_status::{self, CodexStatus, SourceAccount, SupportState};
+use sce_spec_workbench_core::commands::IMPORT_COMMANDS;
 use sce_spec_workbench_core::server_status::{Reach, ServerState, ServerStatus};
 use sce_spec_workbench_core::{
     all_commands, call_in, AuthSource, ConnectionStore, Context, Entrance, Policy, Route,
@@ -1885,6 +1886,11 @@ fn replies() -> Value {
     // A command without a written-down reply is a command the screen's test
     // cannot hold to account.
     for command in all_commands() {
+        // The commands that run SCE's authoring tools are written down in a file of their own
+        // (`tests/contract_import.rs`): this lane runs where those tools cannot.
+        if IMPORT_COMMANDS.contains(&command) {
+            continue;
+        }
         assert!(
             answers
                 .keys()

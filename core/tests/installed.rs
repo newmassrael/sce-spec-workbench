@@ -29,7 +29,7 @@ fn exe(name: &str) -> String {
 #[test]
 fn a_bundle_that_carries_everything_is_found_program_by_program() {
     let root = common::scratch("installed-all");
-    for name in ["sce-author-mcp", "sce-spec", "sce-codegen"] {
+    for name in ["sce-author-mcp", "sce-spec", "sce-codegen", "sce-author"] {
         touch(&root.join("bin").join(exe(name)));
     }
 
@@ -41,6 +41,7 @@ fn a_bundle_that_carries_everything_is_found_program_by_program() {
             author: Some(root.join("bin").join(exe("sce-author-mcp"))),
             spec: Some(root.join("bin").join(exe("sce-spec"))),
             codegen: Some(root.join("bin").join(exe("sce-codegen"))),
+            import: Some(root.join("bin").join(exe("sce-author"))),
         }
     );
     assert!(found.is_complete());
@@ -60,8 +61,27 @@ fn what_the_bundle_lacks_is_named() {
     );
     assert_eq!(found.author, None);
     assert_eq!(found.spec, None);
+    assert_eq!(found.import, None);
     assert!(!found.is_complete());
-    assert_eq!(found.missing(), vec!["sce-author-mcp", "sce-spec"]);
+    assert_eq!(
+        found.missing(),
+        vec!["sce-author-mcp", "sce-spec", "sce-author"]
+    );
+}
+
+#[test]
+fn the_launcher_of_the_server_is_not_the_tools_command_line() {
+    // `sce-author-mcp` starts with `sce-author`: finding one must not be taken for the other.
+    let root = common::scratch("installed-mcp-only");
+    touch(&root.join("bin").join(exe("sce-author-mcp")));
+
+    let found = in_bundle(&root);
+
+    assert_eq!(
+        found.author,
+        Some(root.join("bin").join(exe("sce-author-mcp")))
+    );
+    assert_eq!(found.import, None);
 }
 
 #[test]
@@ -73,7 +93,7 @@ fn a_folder_with_no_bundle_in_it_has_nothing() {
     assert_eq!(found, Installed::default());
     assert_eq!(
         found.missing(),
-        vec!["sce-author-mcp", "sce-spec", "sce-codegen"]
+        vec!["sce-author-mcp", "sce-spec", "sce-codegen", "sce-author"]
     );
     assert_eq!(
         in_bundle(&PathBuf::from("/nowhere/at/all")),

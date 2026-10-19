@@ -20,6 +20,8 @@
 //!   ([`claude_code`]), Codex ([`codex`]) or a model server of the person's ([`local`]).
 //! - [`claude_status`], [`codex_status`] and [`server_status`] are what a screen says of the
 //!   clients and servers a person has.
+//! - [`import_host`] brings a document in and ends a review with SCE's authoring tools, run as
+//!   programs, and hands the specs folder what they made.
 //!
 //! Nothing in this crate knows what a specification is about.
 
@@ -39,6 +41,7 @@ pub mod connection_store;
 pub mod directory;
 pub mod host;
 pub mod http_client;
+pub mod import_host;
 pub mod installed;
 pub mod local;
 pub mod mcp_client;
@@ -55,3 +58,4 @@ pub use connection::{AdapterKind, AuthSource, Connection, Limits, PinnedRun};
 pub use connection_store::{
     default_settings_root, ConnectionListing, ConnectionStore, StoredConnection,
 };
+pub use import_host::ImportTools;

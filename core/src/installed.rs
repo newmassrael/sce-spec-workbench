@@ -21,6 +21,8 @@ pub struct Installed {
     pub spec: Option<PathBuf>,
     /// The product's generator, which every check and drawing answers from.
     pub codegen: Option<PathBuf>,
+    /// The authoring tools' command line, which brings a document in and ends a review.
+    pub import: Option<PathBuf>,
 }
 
 impl Installed {
@@ -35,6 +37,7 @@ impl Installed {
             ("sce-author-mcp", &self.author),
             ("sce-spec", &self.spec),
             ("sce-codegen", &self.codegen),
+            ("sce-author", &self.import),
         ]
         .into_iter()
         .filter(|(_, found)| found.is_none())
@@ -55,5 +58,6 @@ pub fn in_bundle(root: &Path) -> Installed {
         author: find("sce-author-mcp"),
         spec: find("sce-spec"),
         codegen: find("sce-codegen"),
+        import: find("sce-author"),
     }
 }

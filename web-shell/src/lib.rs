@@ -29,7 +29,7 @@ pub mod assets;
 pub mod server;
 pub mod token;
 
-use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, Policy};
+use sce_spec_workbench_core::{call_in, ConnectionStore, Context, Entrance, ImportTools, Policy};
 use sce_specs::{CommandError, Product, SpecStore, MAX_SOURCE_BYTES};
 use serde::Deserialize;
 use serde_json::Value;
@@ -142,6 +142,10 @@ fn status_of(kind: &str) -> u16 {
         // A bundle that is not an original: a path that could leave it, two that differ only in case,
         // a rendition with no source. The call was understood and what it carries is refused.
         | "bad-original"
+        // A document the authoring tools would not take (a file that is not what its name says, one
+        // with no words in it), and decisions the assembly could not apply: refused on their content.
+        | "unreadable-original"
+        | "assembly-refused"
         // A proposal whose parts do not name each other, a decision on a block nobody has, words
         // where a decision carries none.
         | "bad-proposal"
@@ -152,9 +156,11 @@ fn status_of(kind: &str) -> u16 {
         | "lineage-of-another-list"
         | "revision-not-judged"
         | "sce-refused" => 422,
-        "busy" | "sce-unavailable" => 503,
-        "sce-timeout" => 504,
-        "sce-failed" => 502,
+        // The authoring tools are not installed, did not finish in time, or failed: the shell's, and
+        // not the document's.
+        "busy" | "sce-unavailable" | "import-tool-missing" => 503,
+        "sce-timeout" | "import-tool-timeout" => 504,
+        "sce-failed" | "import-tool-failed" => 502,
         // `corrupt` and `io` are the server's own; a kind nobody mapped is one too.
         _ => 500,
     }
@@ -180,6 +186,7 @@ pub struct Shell {
     assets: Option<Assets>,
     connections: Option<ConnectionStore>,
     policy: Policy,
+    import_tools: Option<Result<ImportTools, String>>,
 }
 
 impl Shell {
@@ -196,7 +203,16 @@ impl Shell {
             assets,
             connections: None,
             policy: Policy::shipped(),
+            import_tools: None,
         }
+    }
+
+    /// The same, with the authoring tools that bring a document in, or the reason there are none.
+    /// Without them `import_document` and the commands that end a review say so
+    /// (`import-tool-missing`).
+    pub fn with_import_tools(mut self, tools: Result<ImportTools, String>) -> Self {
+        self.import_tools = Some(tools);
+        self
     }
 
     /// The same, with the person's settings folder to read. Changing it stays the desktop
@@ -281,7 +297,8 @@ impl Shell {
             &self.policy,
             Entrance::Browser,
         )
-        .with_connections(self.connections.as_ref());
+        .with_connections(self.connections.as_ref())
+        .with_import_tools(self.import_tools.as_ref());
         match call_in(&context, &envelope.name, envelope.args) {
             Ok(answer) => Reply {
                 status: 200,
@@ -314,6 +331,7 @@ mod tests {
         ("bad-request", 400),
         ("bad-server-address", 400),
         ("busy", 503),
+        ("assembly-refused", 422),
         ("bundled-spec", 409),
         ("candidate-moved", 409),
         ("check-refused", 422),
@@ -324,6 +342,9 @@ mod tests {
         // The server's own faults: a store that is damaged or cannot be written.
         ("corrupt", 500),
         ("decisions-moved", 409),
+        ("import-tool-failed", 502),
+        ("import-tool-missing", 503),
+        ("import-tool-timeout", 504),
         ("invalid-answers", 422),
         ("invalid-id", 400),
         ("invalid-model", 422),
@@ -365,6 +386,7 @@ mod tests {
         ("too-large", 413),
         ("undecided", 409),
         ("unknown-command", 404),
+        ("unreadable-original", 422),
         ("wrong-connection", 409),
     ];
 
@@ -391,19 +413,25 @@ mod tests {
     /// fails here, and the person who added it says which.
     #[test]
     fn every_kind_the_core_gives_travels_under_a_chosen_status() {
-        let contract: serde_json::Value =
-            serde_json::from_str(include_str!("../../core/contract/replies.json"))
-                .expect("the contract file is JSON");
-        let refusals = contract["refusals"]
-            .as_object()
-            .expect("the contract has refusals");
-        assert!(!refusals.is_empty());
-        for kind in refusals.keys() {
-            assert!(
-                CHOSEN.iter().any(|(chosen, _)| chosen == kind),
-                "`{kind}` is a kind the core gives and no status was chosen for it: add it to \
-                 `CHOSEN` and to `status_of`"
-            );
+        // The replies of every command, and the replies of the ones that run the authoring tools,
+        // which are written down in a file of their own (`core/tests/contract_import.rs`).
+        for file in [
+            include_str!("../../core/contract/replies.json"),
+            include_str!("../../core/contract/import_replies.json"),
+        ] {
+            let contract: serde_json::Value =
+                serde_json::from_str(file).expect("the contract file is JSON");
+            let refusals = contract["refusals"]
+                .as_object()
+                .expect("the contract has refusals");
+            assert!(!refusals.is_empty());
+            for kind in refusals.keys() {
+                assert!(
+                    CHOSEN.iter().any(|(chosen, _)| chosen == kind),
+                    "`{kind}` is a kind the core gives and no status was chosen for it: add it to \
+                     `CHOSEN` and to `status_of`"
+                );
+            }
         }
     }
 }

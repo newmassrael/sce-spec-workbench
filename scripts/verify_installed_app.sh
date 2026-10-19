@@ -65,7 +65,7 @@ app="$root/usr/bin/sce-spec-workbench"
 [[ -x "$app" ]] || fail "the installer does not install usr/bin/sce-spec-workbench"
 bundle="$(find "$root/usr/lib" -maxdepth 2 -type d -name sce-author -print -quit)"
 [[ -n "$bundle" ]] || fail "the installer carries no sce-author bundle under usr/lib"
-for program in sce-author-mcp sce-spec sce-codegen; do
+for program in sce-author-mcp sce-author sce-spec sce-codegen; do
     [[ -x "$bundle/bin/$program" ]] || fail "the bundle carries no bin/$program"
 done
 

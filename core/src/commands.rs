@@ -32,6 +32,7 @@ use crate::codex_status;
 use crate::codex_support::Support;
 use crate::connection::{AdapterKind, Connection};
 use crate::connection_store::ConnectionStore;
+use crate::import_host::{self, ImportTools};
 use crate::server_status;
 
 /// The application's own commands, in the order a person would meet them. The specs' come first
@@ -47,6 +48,9 @@ pub const COMMANDS: &[&str] = &[
     "save_connection",
     "delete_connection",
     "set_default_connection",
+    "import_document",
+    "assemble_import",
+    "accept_import",
 ];
 
 /// The version of the application's own commands and of what `describe` adds to the specs'
@@ -67,7 +71,12 @@ pub const COMMANDS: &[&str] = &[
 /// server's word for it (`save_connection` takes it and every reply that is a connection says it,
 /// `null` when none is chosen). A core of the last version refuses a connection that says it (a
 /// field it does not know), so a screen that sends it is held to this one.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 3;
+///
+/// 4: `import_document`, `assemble_import` and `accept_import`, which run SCE's authoring tools to
+/// bring a document in and to end a review (ADR 0037 of SCE) and hand the specs folder what they made.
+/// They are added, so no caller of 3 misreads one; the version moves because a screen that offers an
+/// import is held to a core that answers it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 4;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -100,6 +109,11 @@ const SETTINGS_WRITE: &[&str] = &[
     "delete_connection",
     "set_default_connection",
 ];
+
+/// The commands that run the authoring tools to bring a document in or to end a review. Both
+/// entrances may: the program is the installation's own and never one a caller names, and what a
+/// caller can send it is a document, which the same caller may already keep in the specs folder.
+pub const IMPORT_COMMANDS: &[&str] = &["import_document", "assemble_import", "accept_import"];
 
 /// Which door a command came in by. Who is asking decides what may be changed, so it is said
 /// where the command is run and not left to each shell to check.
@@ -145,6 +159,10 @@ pub struct Context<'a, C: Clock> {
     /// Where to look for the programs a connection may name; this process's own places when
     /// absent.
     pub search: Option<&'a Search>,
+    /// The authoring tools that bring a document in, found once by the shell, or why they were not.
+    /// Not a program a caller names: a command that runs them says only which spec and which
+    /// document.
+    pub import_tools: Option<&'a Result<ImportTools, String>>,
 }
 
 impl<'a, C: Clock> Context<'a, C> {
@@ -164,7 +182,14 @@ impl<'a, C: Clock> Context<'a, C> {
             claude: None,
             codex: None,
             search: None,
+            import_tools: None,
         }
+    }
+
+    /// With the authoring tools that bring a document in (or the reason there are none).
+    pub fn with_import_tools(mut self, tools: Option<&'a Result<ImportTools, String>>) -> Self {
+        self.import_tools = tools;
+        self
     }
 
     /// With the person's settings folder.
@@ -216,6 +241,9 @@ pub fn call_in<C: Clock>(
     }
     if SETTINGS_READ.contains(&name) || SETTINGS_WRITE.contains(&name) {
         return call_settings(context, name, args);
+    }
+    if IMPORT_COMMANDS.contains(&name) {
+        return call_import(context, name, args);
     }
     let pins = SettingsPins {
         connections: context.connections,
@@ -444,6 +472,20 @@ fn connection_program<C: Clock>(
 }
 
 /// The commands that start a program of the person's to ask it something.
+/// Bring a document in, or end a review, with the authoring tools ([`import_host`]).
+fn call_import<C: Clock>(
+    context: &Context<'_, C>,
+    name: &str,
+    args: Value,
+) -> Result<Value, CommandError> {
+    match name {
+        "import_document" => import_host::import_document(context, arguments(args)?),
+        "assemble_import" => import_host::assemble_import(context, arguments(args)?),
+        "accept_import" => import_host::accept_import(context, arguments(args)?),
+        other => Err(unknown_command(other, &all_commands())),
+    }
+}
+
 fn call_program<C: Clock>(
     context: &Context<'_, C>,
     name: &str,

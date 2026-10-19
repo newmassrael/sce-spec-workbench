@@ -1,0 +1,130 @@
+{
+  "about": "The replies of the commands that bring a document in and end a review, produced by tests/contract_import.rs and read by the screen's tests.",
+  "answers": {
+    "accept_import": {
+      "created": true,
+      "proposal": {
+        "against": null,
+        "asks": [],
+        "conversion": "2ef66a064a5fa42a59cacd7e67f41cf9217c0f75c71face4e03c58f2dfee8622",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "ended_at": "2026-10-03T09:00:00Z",
+        "extraction": "b4918e0295d978c5ff39793580a5fe0679d995adb52a3a7c09cc6847e74dfbd7",
+        "id": "<proposal-id>",
+        "key": "press-1",
+        "origin": "gui",
+        "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
+        "report": "34f60e820d36f38973b724311d0b608d56a93f8610a4d4ab0b2f7126fe45becb",
+        "saved": "446def139b8f6469dff0684ab896b0f579cbf22883f9fe4816644bb7552d5835",
+        "seq": 1,
+        "state": "accepted"
+      },
+      "saved": "446def139b8f6469dff0684ab896b0f579cbf22883f9fe4816644bb7552d5835"
+    },
+    "assemble_import": {
+      "report": {
+        "added": [],
+        "changes": {
+          "added": 3,
+          "had_text": false,
+          "hunks": [
+            {
+              "lines": [
+                {
+                  "op": "add",
+                  "text": "# Door lock"
+                },
+                {
+                  "op": "add",
+                  "text": ""
+                },
+                {
+                  "op": "add",
+                  "text": "The lock opens when the code matches."
+                }
+              ],
+              "new_start": 1,
+              "old_start": 1
+            }
+          ],
+          "removed": 0,
+          "unchanged": false
+        },
+        "corrected": [],
+        "decisions": 1,
+        "dropped": [
+          "m0003"
+        ],
+        "kept": [
+          "m0001",
+          "m0002"
+        ],
+        "revision": "446def139b8f6469dff0684ab896b0f579cbf22883f9fe4816644bb7552d5835"
+      },
+      "text": "# Door lock\n\nThe lock opens when the code matches.\n"
+    },
+    "import_document": {
+      "complete": true,
+      "created": true,
+      "not_carried": [],
+      "proposal": {
+        "against": null,
+        "asks": [],
+        "conversion": "2ef66a064a5fa42a59cacd7e67f41cf9217c0f75c71face4e03c58f2dfee8622",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "b4918e0295d978c5ff39793580a5fe0679d995adb52a3a7c09cc6847e74dfbd7",
+        "id": "<proposal-id>",
+        "key": "press-1",
+        "origin": "gui",
+        "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
+        "report": "34f60e820d36f38973b724311d0b608d56a93f8610a4d4ab0b2f7126fe45becb",
+        "seq": 1,
+        "state": "pending"
+      }
+    }
+  },
+  "refusals": {
+    "assembly-refused": {
+      "detail": {
+        "kind": null,
+        "tool": "assemble"
+      },
+      "kind": "assembly-refused",
+      "message": "an assembly would leave nothing: every block of the conversion was dropped"
+    },
+    "import-tool-failed": {
+      "kind": "import-tool-failed",
+      "message": "`extract` ended with 7: it broke"
+    },
+    "import-tool-missing": {
+      "kind": "import-tool-missing",
+      "message": "`sce-author` is not in the installation"
+    },
+    "import-tool-timeout": {
+      "detail": {
+        "seconds": 1,
+        "tool": "extract"
+      },
+      "kind": "import-tool-timeout",
+      "message": "the authoring tools did not finish `extract` in time: it did not answer within 1 seconds"
+    },
+    "unreadable-original": {
+      "detail": {
+        "kind": "sniff-mismatch",
+        "tool": "extract"
+      },
+      "kind": "unreadable-original",
+      "message": "broken.docx: is called .docx and does not begin as a docx file does, so it is not handed to its reader: a file with the wrong name is read wrongly and reads clean"
+    }
+  }
+}
