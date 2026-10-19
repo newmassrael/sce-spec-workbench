@@ -28,7 +28,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -45,6 +45,27 @@ const LINE_MAX: usize = 8 * 1024 * 1024;
 
 /// The most of the server's standard error that is kept to say why it failed.
 const STDERR_KEPT: usize = 4096;
+
+/// How long a sentence about why the server is gone waits for the rest of what it said on its standard
+/// error. Its output closing and its error being read are two threads: without the wait the sentence is
+/// sometimes made before the last words are in. The wait is bounded because a process the server started
+/// can hold the error open after the server is gone.
+const STDERR_WAIT: Duration = Duration::from_millis(500);
+
+/// What the server said on its standard error, kept to the last of it, and whether it has said it all.
+struct Tail {
+    kept: Mutex<(VecDeque<u8>, bool)>,
+    changed: Condvar,
+}
+
+impl Tail {
+    fn new() -> Tail {
+        Tail {
+            kept: Mutex::new((VecDeque::new(), false)),
+            changed: Condvar::new(),
+        }
+    }
+}
 
 /// The protocol revision this asks for. The server answers with the one it speaks; what is used is
 /// only what every revision since has kept (`tools/list`, `tools/call`).
@@ -114,7 +135,7 @@ pub struct McpClient {
     /// Why that thread stopped, when it did: the server closed its input or went away.
     write_failed: Arc<Mutex<Option<String>>>,
     lines: Receiver<Result<String, String>>,
-    stderr: Arc<Mutex<VecDeque<u8>>>,
+    stderr: Arc<Tail>,
     next: u64,
     /// What the server said of how to use it, when it said (`initialize`'s `instructions`).
     instructions: Option<String>,
@@ -142,7 +163,7 @@ impl McpClient {
         let stderr = child.stderr.take().expect("stderr was piped");
         let (send, lines) = mpsc::channel();
         thread::spawn(move || read_lines(stdout, &send));
-        let kept = Arc::new(Mutex::new(VecDeque::new()));
+        let kept = Arc::new(Tail::new());
         let keep = Arc::clone(&kept);
         thread::spawn(move || keep_tail(stderr, &keep));
         let (writes, to_write) = mpsc::channel();
@@ -261,8 +282,14 @@ impl McpClient {
 
     /// What the server last said on its standard error, for a sentence about why it is gone.
     fn said(&self) -> String {
-        let kept = self.stderr.lock().unwrap_or_else(|e| e.into_inner());
-        let bytes: Vec<u8> = kept.iter().copied().collect();
+        let guard = self.stderr.kept.lock().unwrap_or_else(|e| e.into_inner());
+        // The server may be gone and the last of its words still on their way: wait for the end of them.
+        let (kept, _) = self
+            .stderr
+            .changed
+            .wait_timeout_while(guard, STDERR_WAIT, |(_, done)| !*done)
+            .unwrap_or_else(|e| e.into_inner());
+        let bytes: Vec<u8> = kept.0.iter().copied().collect();
         let text = String::from_utf8_lossy(&bytes);
         let text = text.trim();
         if text.is_empty() {
@@ -387,17 +414,21 @@ fn read_lines(stdout: impl Read, send: &mpsc::Sender<Result<String, String>>) {
 }
 
 /// Keep the last of what the server says on its standard error.
-fn keep_tail(stderr: impl Read, kept: &Mutex<VecDeque<u8>>) {
+fn keep_tail(stderr: impl Read, tail: &Tail) {
     let mut reader = BufReader::new(stderr);
     let mut chunk = [0u8; 1024];
     while let Ok(count) = reader.read(&mut chunk) {
         if count == 0 {
-            return;
+            break;
         }
-        let mut kept = kept.lock().unwrap_or_else(|e| e.into_inner());
-        kept.extend(&chunk[..count]);
-        while kept.len() > STDERR_KEPT {
-            kept.pop_front();
+        let mut kept = tail.kept.lock().unwrap_or_else(|e| e.into_inner());
+        kept.0.extend(&chunk[..count]);
+        while kept.0.len() > STDERR_KEPT {
+            kept.0.pop_front();
         }
     }
+    // Said it all, or could be read no more: the one who is waiting for the rest is let go.
+    let mut kept = tail.kept.lock().unwrap_or_else(|e| e.into_inner());
+    kept.1 = true;
+    tail.changed.notify_all();
 }
