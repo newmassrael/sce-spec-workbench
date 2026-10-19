@@ -122,7 +122,7 @@ export function dropTarget(options: DropTargetOptions): HTMLElement {
   return h(
     "div",
     { class: "imp-stage" },
-    h("h2", { class: "imp-title" }, options.title),
+    h("h2", { class: "imp-title", tabindex: "-1", "data-focus": "stage" }, options.title),
     h("p", { class: "imp-lead" }, options.lead),
     area,
   );
@@ -143,7 +143,7 @@ export function workingCard(say: Say, name: string): HTMLElement {
         h(
           "div",
           { class: "file-words" },
-          h("div", { class: "file-name" }, say("impWorking", { name })),
+          h("div", { class: "file-name", tabindex: "-1", "data-focus": "stage" }, say("impWorking", { name })),
           h("div", { class: "file-sub" }, say("impWorkingNote")),
         ),
       ),
@@ -177,7 +177,12 @@ export function refusedCard(options: RefusedOptions): HTMLElement {
     h(
       "div",
       { class: "card", role: "alert" },
-      h("div", { class: "card-head" }, h("span", { class: "badge b-attn round" }, icon("alert")), h("h2", {}, heading)),
+      h(
+        "div",
+        { class: "card-head" },
+        h("span", { class: "badge b-attn round" }, icon("alert")),
+        h("h2", { tabindex: "-1", "data-focus": "stage" }, heading),
+      ),
       h("div", { class: "file-ref" }, icon("doc"), h("span", {}, options.name)),
       h("p", { class: "card-body" }, failureWords(say, failure)),
       toolWords(failure) === null ? null : h("p", { class: "card-tool" }, say("impToolWords", { words: toolWords(failure) ?? "" })),
@@ -228,8 +233,12 @@ export function reviewBar(options: BarOptions): HTMLElement {
   return h(
     "div",
     { class: "bar-top" },
-    h("button", { type: "button", class: "btn quiet icon", "aria-label": say("rvwBack"), onclick: options.onBack }, icon("back")),
-    h("span", { class: "bar-title" }, options.title),
+    h(
+      "button",
+      { type: "button", class: "btn quiet icon", "aria-label": say("rvwBack"), "data-focus": "review:back", onclick: options.onBack },
+      icon("back"),
+    ),
+    h("h2", { class: "bar-title", tabindex: "-1", "data-focus": "stage" }, options.title),
     ...counts,
     h(
       "span",
@@ -238,7 +247,14 @@ export function reviewBar(options: BarOptions): HTMLElement {
         ? null
         : h(
             "button",
-            { type: "button", class: "btn quiet", disabled: busy, onclick: options.onDiscard },
+            {
+              type: "button",
+              class: "btn quiet",
+              // Busy is said by `aria-disabled` and not `disabled`, which would take the keyboard's place with it.
+              "aria-disabled": busy ? "true" : undefined,
+              "data-focus": "review:discard",
+              onclick: options.onDiscard,
+            },
             options.discarding ? say("rvwDiscarding") : say("rvwDiscard"),
           ),
       options.ended
@@ -249,7 +265,9 @@ export function reviewBar(options: BarOptions): HTMLElement {
               type: "button",
               class: "btn",
               id: "review-save",
-              disabled: !options.canSave || busy,
+              "data-focus": "review:save",
+              disabled: !options.canSave && !busy,
+              "aria-disabled": busy ? "true" : undefined,
               // A button that is off says why in words, to a reader who cannot see it is off.
               "aria-describedby": options.saveWithheld === null ? undefined : "review-withheld",
               onclick: options.onSave,
@@ -423,7 +441,17 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
       h(
         "div",
         { class: "acts" },
-        h("button", { type: "button", class: "mini", disabled: options.busy, onclick: () => options.onReopen(row.id) }, say("rvwChangeMind")),
+        h(
+          "button",
+          {
+            type: "button",
+            class: "mini",
+            "aria-disabled": options.busy ? "true" : undefined,
+            "data-focus": `row:${row.id}:change`,
+            onclick: () => options.onReopen(row.id),
+          },
+          say("rvwChangeMind"),
+        ),
       ),
     );
   }
@@ -437,7 +465,9 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
       {
         type: "button",
         class: "mini pri",
-        disabled: options.busy || editing.text.trim() === "",
+        disabled: editing.text.trim() === "",
+        "aria-disabled": options.busy ? "true" : undefined,
+        "data-focus": `row:${row.id}:fix-save`,
         onclick: () => options.onFixSave(row.id),
       },
       say("rvwFixSave"),
@@ -446,10 +476,11 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
       class: "fix",
       rows: "3",
       "aria-label": say("rvwFixLabel"),
+      "data-focus": `row:${row.id}:fix`,
       oninput: (event) => {
         const words = (event.target as HTMLTextAreaElement).value;
         options.onType(words);
-        save.disabled = options.busy || words.trim() === "";
+        save.disabled = words.trim() === "";
       },
     });
     area.value = editing.text;
@@ -461,7 +492,11 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
         "div",
         { class: "acts" },
         save,
-        h("button", { type: "button", class: "mini", onclick: () => options.onEdit(row.id, null) }, say("rvwFixCancel")),
+        h(
+          "button",
+          { type: "button", class: "mini", "data-focus": `row:${row.id}:fix-cancel`, onclick: () => options.onEdit(row.id, null) },
+          say("rvwFixCancel"),
+        ),
       ),
     );
   }
@@ -471,7 +506,8 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
       {
         type: "button",
         class: primary ? "mini pri" : "mini",
-        disabled: options.busy,
+        "aria-disabled": options.busy ? "true" : undefined,
+        "data-focus": `row:${row.id}:choice-${what}`,
         onclick: () => options.onDecide(row.id, what),
       },
       say(label),
@@ -481,7 +517,8 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
     {
       type: "button",
       class: "mini",
-      disabled: options.busy,
+      "aria-disabled": options.busy ? "true" : undefined,
+      "data-focus": `row:${row.id}:choice-correct`,
       onclick: () => options.onEdit(row.id, row.original ?? row.written ?? ""),
     },
     say("rvwFix"),

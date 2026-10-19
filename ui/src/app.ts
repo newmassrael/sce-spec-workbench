@@ -111,6 +111,7 @@ import {
 } from "./generation_model";
 import { movedParts, sameRequest, UNREAD, type SpecOnScreen } from "./heads_model";
 import { initialLocale, languageName, LOCALES, translate, type Key, type Locale } from "./i18n";
+import { focusKey, keyedFocus } from "./focus_keys";
 import { ImportFlow } from "./import_flow";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED, type Transport } from "./ipc";
 import {
@@ -1732,11 +1733,15 @@ export class App {
     const keep = this.captureEditorFocus();
     const keepAnswer = this.captureAnswerFocus();
     const keepSettings = this.captureSettingsFocus();
+    const keepKeyed = keyedFocus(this.root.ownerDocument);
     this.root.ownerDocument.documentElement.lang = this.locale;
+    const shown = !this.needsToken && this.fatal === null && !this.loading;
     this.root.replaceChildren(
       h(
         "div",
         { class: "shell" },
+        // First on the page, so that the keyboard can pass the header and the list of specs.
+        shown ? this.skipLink() : null,
         this.header(),
         this.needsToken
           ? this.tokenForm()
@@ -1751,10 +1756,37 @@ export class App {
     this.refreshAnswersChrome();
     this.restoreAnswerFocus(keepAnswer);
     this.restoreSettingsFocus(keepSettings);
+    // The keyboard goes where a screen asked it to (a new screen's heading, the control that was
+    // pressed to come in), else back to the control that had it, which a redraw replaced.
+    const asked = this.importFlow.takeFocusRequest();
+    const doc = this.root.ownerDocument;
+    if (asked !== null) focusKey(this.root, asked);
+    else if (keepKeyed !== null && (doc.activeElement === null || doc.activeElement === doc.body)) {
+      focusKey(this.root, keepKeyed);
+    }
     // Whatever moved what is unsaved (a save, a removal, another spec) is told to
     // the desktop shell here too: the two chrome refreshes above return early when
     // there is no editor or no answers on screen.
     this.reportUnsaved();
+  }
+
+  /** The link that takes the keyboard past the header and the list of specs to the main part. */
+  private skipLink(): HTMLElement {
+    return h(
+      "a",
+      {
+        class: "skip",
+        href: "#main",
+        onclick: (event) => {
+          // Not the page's own jump: the hash is where a token is passed, and is not ours to change.
+          event.preventDefault();
+          const main = this.root.querySelector<HTMLElement>("#main");
+          main?.focus();
+          main?.scrollIntoView?.();
+        },
+      },
+      this.t("skipToMain"),
+    );
   }
 
   /**
@@ -1857,7 +1889,7 @@ export class App {
       this.sidebar(),
       h(
         "main",
-        { class: "spec" },
+        { class: "spec", id: "main", tabindex: "-1" },
         this.switchBanner(),
         this.notice === null ? null : h("p", { class: "banner banner-error", role: "alert" }, this.notice),
         this.info === null ? null : h("p", { class: "banner banner-ok", role: "status" }, this.info),
@@ -2000,7 +2032,8 @@ export class App {
           id: "import-open",
           type: "button",
           class: "import-open",
-          onclick: () => this.importFlow.open({ kind: "new" }),
+          "data-focus": "import-open",
+          onclick: () => this.importFlow.open({ kind: "new" }, "import-open"),
         },
         this.t("impOpen"),
       ),
@@ -2054,8 +2087,9 @@ export class App {
             id: "import-into-spec",
             type: "button",
             class: "quiet",
+            "data-focus": "import-into-spec",
             disabled: this.somethingIsSaving(),
-            onclick: () => this.importFlow.open({ kind: "spec", spec }),
+            onclick: () => this.importFlow.open({ kind: "spec", spec }, "import-into-spec"),
           },
           this.t("impOpenIntoSpec"),
         ),

@@ -102,6 +102,9 @@ export class ImportFlow {
   private panel: ReviewPanel | null = null;
   private parts: Parts | null = null;
   private busy: Busy | null = null;
+  /** The key of the control that was pressed to come in, and what the screen is asked to focus next. */
+  private opener: string | null = null;
+  private focusRequest: string | null = null;
   private notice: { readonly tone: "ok" | "error"; readonly text: string } | null = null;
   /** The correction being typed: which block, and the words so far. */
   private editing: { block: string; text: string } | null = null;
@@ -116,21 +119,45 @@ export class ImportFlow {
     return this.stage !== null;
   }
 
-  /** Show the drop target for a new spec, or for the text of one that is kept. */
-  open(target: ImportTarget): void {
+  /**
+   * Show the drop target for a new spec, or for the text of one that is kept. `opener` is the key of the
+   * control that was pressed to come here (`data-focus`), which gets the keyboard back when the person
+   * leaves; it is kept until another is given.
+   */
+  open(target: ImportTarget, opener?: string | null): void {
     this.ticket += 1;
     this.target = target;
-    this.stage = { kind: "choose" };
+    if (opener !== undefined) this.opener = opener;
+    this.enter({ kind: "choose" });
     this.over = false;
     this.clearReview();
     this.host.redraw();
   }
 
-  close(): void {
+  /**
+   * Leave. `returnFocus` is for a person who left by something they pressed here (back, save, discard):
+   * the keyboard goes back to where they came in. Leaving because they chose a spec in the list does not
+   * take it from the spec they chose.
+   */
+  close(returnFocus = false): void {
     if (this.stage === null) return;
     this.ticket += 1;
     this.stage = null;
+    if (returnFocus && this.opener !== null) this.focusRequest = this.opener;
     this.clearReview();
+  }
+
+  /** What the screen should put the keyboard on after the next drawing, once: a key, or nothing. */
+  takeFocusRequest(): string | null {
+    const wanted = this.focusRequest;
+    this.focusRequest = null;
+    return wanted;
+  }
+
+  /** Move to `stage`. A new kind of screen takes the keyboard to its heading, so a reader is told where it is. */
+  private enter(stage: ImportStage): void {
+    if (stage.kind !== this.stage?.kind) this.focusRequest = "stage";
+    this.stage = stage;
   }
 
   private clearReview(): void {
@@ -164,7 +191,7 @@ export class ImportFlow {
   async review(spec: Spec, proposal: string): Promise<void> {
     const ticket = ++this.ticket;
     this.clearReview();
-    this.stage = { kind: "review", spec, proposal };
+    this.enter({ kind: "review", spec, proposal });
     this.host.redraw();
     try {
       const [view, documents] = await Promise.all([
@@ -208,6 +235,9 @@ export class ImportFlow {
       }
     }
     if (ticket !== this.ticket) return;
+    // The review's heading is there from now on, and not while it was being read: that is where the
+    // keyboard goes the first time.
+    if (this.panel === null) this.focusRequest = "stage";
     this.panel = {
       view,
       rows: rowsOf(view, parts.written, parts.original),
@@ -232,7 +262,7 @@ export class ImportFlow {
     const ticket = ++this.ticket;
     this.over = false;
     this.held = file;
-    this.stage = { kind: "working", name: file.name };
+    this.enter({ kind: "working", name: file.name });
     this.host.redraw();
     try {
       const data = base64Of(new Uint8Array(await file.arrayBuffer()));
@@ -287,10 +317,10 @@ export class ImportFlow {
     if (this.host.handled(cause)) return;
     const failure = failureOf(cause);
     if (failure === null) {
-      this.stage = { kind: "choose" };
+      this.enter({ kind: "choose" });
       this.notice = { tone: "error", text: this.host.explain(cause) };
     } else {
-      this.stage = { kind: "refused", name, failure };
+      this.enter({ kind: "refused", name, failure });
     }
     this.host.redraw();
   }
@@ -334,7 +364,7 @@ export class ImportFlow {
     try {
       await this.host.api.acceptImport(stage.spec.id, stage.proposal);
       this.made.delete(stage.spec.id);
-      this.close();
+      this.close(true);
       this.host.finished(stage.spec, this.host.t("rvwSaved"));
     } catch (error) {
       this.busy = null;
@@ -369,11 +399,11 @@ export class ImportFlow {
           // It stays in the list, empty; the discard itself went through.
         }
         this.made.delete(stage.spec.id);
-        this.close();
+        this.close(true);
         this.host.finished(stage.spec, null);
         return;
       }
-      this.close();
+      this.close(true);
       this.host.finished(stage.spec, this.host.t("rvwDiscarded"));
     } catch (error) {
       this.busy = null;
@@ -466,7 +496,7 @@ export class ImportFlow {
   /** Leave the import without a document: back to the spec that was shown. */
   private leave(): void {
     const target = this.target;
-    this.close();
+    this.close(true);
     if (target.kind === "spec") this.host.finished(target.spec, null);
     else this.host.redraw();
   }
@@ -476,7 +506,7 @@ export class ImportFlow {
       say: this.host.t,
       name,
       failure,
-      onOther: () => this.open(this.target),
+      onOther: () => this.open(this.target, undefined),
       onGoToOpen: (proposal) => {
         if (this.target.kind === "spec") void this.review(this.target.spec, proposal);
       },
@@ -591,7 +621,7 @@ export class ImportFlow {
 
   /** Back from the review without ending it: the proposal waits, and the spec is shown. */
   private leaveReview(spec: Spec): void {
-    this.close();
+    this.close(true);
     this.host.finished(spec, null);
   }
 }

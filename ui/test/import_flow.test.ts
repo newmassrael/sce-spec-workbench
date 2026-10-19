@@ -864,6 +864,100 @@ describe("leaving the review", () => {
   });
 });
 
+describe("where the keyboard is asked to go", () => {
+  it("is the heading of each new screen, once, and not again for a redraw of the same one", async () => {
+    r.flow.open({ kind: "new" });
+    expect(r.flow.takeFocusRequest()).toBe("stage");
+    expect(r.flow.takeFocusRequest()).toBeNull();
+
+    // The first screen drawn again (a file dragged over it) keeps it where it is.
+    r.flow.open({ kind: "new" });
+    r.flow.takeFocusRequest();
+    r.root.querySelector(".drop")?.dispatchEvent(new Event("dragenter", { cancelable: true }));
+    expect(r.flow.takeFocusRequest()).toBeNull();
+
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+    // Working, then the review once it is read: one heading to be told of.
+    expect(r.flow.takeFocusRequest()).toBe("stage");
+    expect(r.root.querySelector('[data-focus="stage"]')).not.toBeNull();
+  });
+
+  it("is the heading of a refusal", async () => {
+    r.core.importWith = async () => {
+      throw new CommandFailure("unreadable-original", "x");
+    };
+    r.flow.open({ kind: "new" });
+    r.flow.takeFocusRequest();
+
+    await chooseFile(r, file("a.md", ""));
+
+    expect(r.flow.takeFocusRequest()).toBe("stage");
+    expect(r.root.querySelector('h2[data-focus="stage"]')?.textContent).toBe(say("impRefusedTitle"));
+  });
+
+  it("is the control that was pressed to come in, when the person leaves by something pressed here", async () => {
+    const spec: Spec = { id: "kept", title: "Kept", created_at: "" };
+    r.core.listed.push(spec);
+    r.flow.open({ kind: "spec", spec }, "import-into-spec");
+    r.flow.takeFocusRequest();
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+    r.flow.takeFocusRequest();
+
+    button(r.root, say("rvwDiscard")).click();
+    await settle();
+
+    expect(r.flow.takeFocusRequest()).toBe("import-into-spec");
+  });
+
+  it("is not the opener when the person left by choosing another spec, which has the keyboard", () => {
+    r.flow.open({ kind: "new" }, "import-open");
+    r.flow.takeFocusRequest();
+
+    r.flow.close();
+
+    expect(r.flow.takeFocusRequest()).toBeNull();
+  });
+
+  it("is kept in the choices of a row, so that a decision leaves it on the row", async () => {
+    r.core.asks = [["check", "m2"]];
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+
+    const keep = r.root.querySelector<HTMLElement>('[data-focus="row:m2:choice-keep"]');
+    expect(keep).not.toBeNull();
+    expect(r.root.querySelector('[data-focus="row:m2:choice-correct"]')).not.toBeNull();
+    expect(r.root.querySelector('[data-focus="row:m2:choice-drop"]')).not.toBeNull();
+    expect(r.root.querySelector('[data-focus="review:save"]')).not.toBeNull();
+
+    keep?.click();
+    await settle();
+
+    expect(r.root.querySelector('[data-focus="row:m2:change"]')).not.toBeNull();
+    expect(r.root.querySelector('[data-focus="row:m2:choice-keep"]')).toBeNull();
+  });
+
+  it("stays on a row's control while the core answers, which is marked busy and not turned off", async () => {
+    r.core.asks = [["check", "m2"]];
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+    const wait = gate();
+    const decide = r.core.api.decideBlock;
+    r.core.api.decideBlock = async (...args) => {
+      await wait.opened;
+      return decide(...args);
+    };
+
+    r.root.querySelector<HTMLElement>('[data-focus="row:m2:choice-keep"]')?.click();
+    await settle();
+
+    const held = r.root.querySelector<HTMLElement>('[data-focus="row:m2:choice-keep"]');
+    expect(held?.getAttribute("aria-disabled")).toBe("true");
+    expect((held as HTMLButtonElement).disabled).toBe(false);
+    wait.open();
+    await settle();
+  });
+});
+
 describe("a spec that has a document waiting", () => {
   it("is known when it is asked about, and not when it has none or the answer cannot be read", async () => {
     const spec: Spec = { id: "kept", title: "Kept", created_at: "" };

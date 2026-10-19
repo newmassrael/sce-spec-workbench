@@ -494,6 +494,7 @@ const en = {
   changeTitle: "What changed from the model before ({added} added, {removed} removed)",
   changeNote:
     "Lines of the pseudocode that differ, with the lines around them. A condition, a signal, a value or a time that moved is in the lines that hold it; read them against the text.",
+  skipToMain: "Skip to the main part",
   impOpen: "Bring a document in",
   impOpenIntoSpec: "Bring a document into this spec",
   impTitleNew: "Bring a document in",
@@ -1068,6 +1069,7 @@ const ko: Record<Key, string> = {
   changeTitle: "이전 모델에서 바뀐 것 ({added}줄 추가, {removed}줄 삭제)",
   changeNote:
     "의사코드에서 달라진 줄과 그 앞뒤 줄이에요. 바뀐 조건, 신호, 값, 시간은 그것을 담은 줄에 있어요. 글과 견주어 읽으세요.",
+  skipToMain: "본문으로 건너뛰기",
   impOpen: "문서 가져오기",
   impOpenIntoSpec: "이 사양에 문서 가져오기",
   impTitleNew: "사양 문서를 올려 보세요",

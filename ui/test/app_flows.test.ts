@@ -1121,6 +1121,32 @@ async function start(): Promise<void> {
   await settle();
 }
 
+/**
+ * What a control is called to someone who cannot see it, as the browser works it out: its label, the
+ * element it says it is labelled by, a `label` for it, its own words, its title. A placeholder is not one.
+ */
+function accessibleName(element: Element): string {
+  const labelled = element.getAttribute("aria-label")?.trim();
+  if (labelled) return labelled;
+  const by = element.getAttribute("aria-labelledby");
+  if (by !== null) {
+    const words = by
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+      .join(" ")
+      .trim();
+    if (words !== "") return words;
+  }
+  if (element.id !== "") {
+    const label = document.querySelector(`label[for="${element.id}"]`)?.textContent?.trim();
+    if (label) return label;
+  }
+  const around = element.closest("label")?.textContent?.trim();
+  if (around) return around;
+  const own = ["BUTTON", "A", "SUMMARY"].includes(element.tagName) ? (element.textContent?.trim() ?? "") : "";
+  return own !== "" ? own : (element.getAttribute("title")?.trim() ?? "");
+}
+
 const buttons = (label: string): HTMLButtonElement[] =>
   [...root.querySelectorAll("button")].filter((b) => b.textContent === label);
 
@@ -3596,6 +3622,30 @@ describe("asking for a model", () => {
     // What the browser still says is which connection a generation would use.
     await click("Alpha");
     expect(root.querySelector("#generation-target")).not.toBeNull();
+  });
+
+  it("has a way past the header and the list to the main part, first for the keyboard", async () => {
+    await click("Alpha");
+
+    const focusable = root.querySelector<HTMLElement>("a[href], button, input, select, textarea, summary");
+    expect(focusable?.classList.contains("skip")).toBe(true);
+    expect(focusable?.textContent).toBe("Skip to the main part");
+
+    focusable?.click();
+
+    expect(document.activeElement?.id).toBe("main");
+    expect(root.querySelector("main")?.id).toBe("main");
+  });
+
+  it("names every control it draws, for one that cannot see it", async () => {
+    await click("Alpha");
+
+    const unnamed = [...root.querySelectorAll<HTMLElement>("button, a[href], input, select, textarea, summary")]
+      .filter((e) => !(e instanceof HTMLInputElement && e.type === "hidden"))
+      .filter((e) => accessibleName(e) === "")
+      .map((e) => `${e.tagName.toLowerCase()}${e.id === "" ? "" : `#${e.id}`}.${e.className}`);
+
+    expect(unnamed).toEqual([]);
   });
 
   it("keeps the panel open through a redraw that is not the person's", async () => {

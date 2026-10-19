@@ -123,6 +123,46 @@ body {
   min-height: 100dvh;
 }
 
+/* The way past the header and the list to the main part: out of sight until the keyboard is on it. */
+.skip {
+  position: absolute;
+  left: 8px;
+  top: -64px;
+  z-index: 20;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip:focus {
+  top: 8px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A field says what it is for in words that can be read: the browser's own grey is not set for this page. */
+::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+
+/* The one that holds what is shown when a skip link or a redraw puts the keyboard there: no ring on a
+   region that is not a control. */
+main:focus {
+  outline: none;
+}
+
+/* A summary is a control: as tall as one, so it can be hit. It keeps its marker, which a flex display
+   would take away. */
+details > summary {
+  min-height: 36px;
+  padding-block: 6px;
+  cursor: pointer;
+}
+
 .top {
   display: flex;
   align-items: center;
@@ -183,6 +223,9 @@ body {
   padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
+  /* A title is up to 200 characters, with no space in it when it is one long name: it wraps and does not
+     push the list wider than the column. */
+  overflow-wrap: anywhere;
 }
 
 .spec-link:hover {
@@ -226,7 +269,9 @@ body {
 
 .pane h2 {
   margin: 0;
+  min-width: 0;
   font-size: 1.15rem;
+  overflow-wrap: anywhere;
 }
 
 /* A control the person seldom wants: it stays out of the way of the ones beside it. */
@@ -912,6 +957,17 @@ textarea:focus-visible {
   border-color: var(--line);
   color: var(--ink-3);
   cursor: not-allowed;
+}
+
+/* Busy: the control is where the keyboard is, and answers nothing until the core has. It is `aria-disabled`
+   and not `disabled` so that a redraw does not take the keyboard's place with it. */
+.imp .btn[aria-disabled="true"],
+.imp .mini[aria-disabled="true"] {
+  background: var(--chip-hover);
+  border-color: var(--line);
+  box-shadow: none;
+  color: var(--ink-3);
+  cursor: progress;
 }
 
 .imp .btn:focus-visible,
