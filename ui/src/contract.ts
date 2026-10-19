@@ -2193,6 +2193,11 @@ export interface DocumentSection {
   tree_characters: number;
   page_first: number | null;
   page_last: number | null;
+  /**
+   * The ids of the paragraphs that are its own, with and without words: what a saved ledger, which keeps
+   * paragraphs, is read back into parts by. The screen does not work out which paragraphs a part holds.
+   */
+  block_ids: string[];
 }
 
 /** How a document is divided into parts the owner can choose between. */
@@ -2228,6 +2233,7 @@ function parseDocumentSection(value: unknown, where: string): DocumentSection {
     tree_characters: count(r, "tree_characters", where),
     page_first: optionalCount(r, "page_first", where),
     page_last: optionalCount(r, "page_last", where),
+    block_ids: stringList(r, "block_ids", where),
   };
 }
 

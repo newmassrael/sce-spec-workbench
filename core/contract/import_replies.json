@@ -229,6 +229,10 @@
         "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
         "sections": [
           {
+            "block_ids": [
+              "b0001",
+              "b0002"
+            ],
             "blocks": 2,
             "characters": 19,
             "id": "s1",
@@ -242,6 +246,10 @@
             "tree_characters": 55
           },
           {
+            "block_ids": [
+              "b0003",
+              "b0004"
+            ],
             "blocks": 2,
             "characters": 36,
             "id": "s2",
@@ -255,6 +263,10 @@
             "tree_characters": 36
           },
           {
+            "block_ids": [
+              "b0005",
+              "b0006"
+            ],
             "blocks": 2,
             "characters": 33,
             "id": "s3",
@@ -375,6 +387,10 @@
         "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
         "sections": [
           {
+            "block_ids": [
+              "b0001",
+              "b0002"
+            ],
             "blocks": 2,
             "characters": 19,
             "id": "s1",
@@ -388,6 +404,10 @@
             "tree_characters": 55
           },
           {
+            "block_ids": [
+              "b0003",
+              "b0004"
+            ],
             "blocks": 2,
             "characters": 36,
             "id": "s2",
@@ -401,6 +421,10 @@
             "tree_characters": 36
           },
           {
+            "block_ids": [
+              "b0005",
+              "b0006"
+            ],
             "blocks": 2,
             "characters": 33,
             "id": "s3",
@@ -426,6 +450,10 @@
         "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
         "sections": [
           {
+            "block_ids": [
+              "b0001",
+              "b0002"
+            ],
             "blocks": 2,
             "characters": 19,
             "id": "s1",
@@ -439,6 +467,10 @@
             "tree_characters": 55
           },
           {
+            "block_ids": [
+              "b0003",
+              "b0004"
+            ],
             "blocks": 2,
             "characters": 36,
             "id": "s2",
@@ -452,6 +484,10 @@
             "tree_characters": 36
           },
           {
+            "block_ids": [
+              "b0005",
+              "b0006"
+            ],
             "blocks": 2,
             "characters": 33,
             "id": "s3",

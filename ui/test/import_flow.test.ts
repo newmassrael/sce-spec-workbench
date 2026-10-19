@@ -21,6 +21,7 @@ import type {
   ImportedDocument,
   Intake,
   IntakeExtraction,
+  IntakeView,
   LedgerCount,
   Listing,
   PlannedAllotment,
@@ -77,6 +78,7 @@ function section(id: string, title: string, parent: string | null = null): Docum
     tree_characters: 40,
     page_first: null,
     page_last: null,
+    block_ids: [`${id}-b1`, `${id}-b2`],
   };
 }
 
@@ -190,6 +192,10 @@ class FakeCore {
   readonly partial = new Set<string>();
   /** The documents that were divided, which a document read now may be a new version of. */
   intakes: Intake[] = [];
+  /** The ledger each of them saved, as text; an intake with none has not been placed. */
+  readonly ledgers = new Map<string, string>();
+  /** The intake the next `divide_document` says it already began, as the same key does. */
+  began: Intake | null = null;
   /** What the next `revise_division` answers instead of the default carry. */
   reviseWith: (() => RevisedDivision) | null = null;
   /** What the next `confirm_division` answers instead of a proposal for each spec of the plan. */
@@ -298,6 +304,9 @@ class FakeCore {
     },
     divideDocument: async (id, document, title, key): Promise<DividedDocument> => {
       this.record("divide_document", id, title, key);
+      if (this.began !== null) {
+        return { intake: this.began, created: false, outline: document.outline, not_carried: [] };
+      }
       return {
         intake: {
           id: "intake-1",
@@ -342,6 +351,25 @@ class FakeCore {
     listIntakes: async (): Promise<Intake[]> => {
       this.record("list_intakes");
       return this.intakes;
+    },
+    readIntake: async (id): Promise<IntakeView> => {
+      this.record("read_intake", id);
+      const found = this.intakes.find((i) => i.id === id);
+      if (found === undefined) throw new CommandFailure("not-found", `intake \`${id}\` is not there`);
+      const text = this.ledgers.get(id);
+      return {
+        intake: found,
+        ledger:
+          text === undefined
+            ? null
+            : {
+                entry: { n: 1, digest: hex(5), parent: null, report: hex(6), complete: true, at: "2026-10-19T00:00:00Z" },
+                text,
+                report: "{}",
+              },
+        destinations: [],
+        bindings: [],
+      };
     },
     readIntakeExtraction: async (id): Promise<IntakeExtraction> => {
       this.record("read_intake_extraction", id);
@@ -472,6 +500,7 @@ class FakeCore {
     | "divideDocument"
     | "confirmDivision"
     | "listIntakes"
+    | "readIntake"
     | "readIntakeExtraction"
     | "reviseDivision"
     | "listSpecs"
@@ -1426,6 +1455,32 @@ describe("a document with one part", () => {
     expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
     expect(r.root.textContent).toContain(say("rvwSave"));
   });
+
+  it("is asked about when a division could be carried to it, since a document with no headings is a new version too", async () => {
+    r.core.intakes = [OLD_INTAKE];
+    r.core.ledgers.set(OLD_INTAKE.id, JSON.stringify({ v: 1, allotments: [] }));
+    r.flow.open({ kind: "new" });
+
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+
+    expect(r.root.textContent).toContain(say("impPartsLead"));
+    expect(r.root.querySelector(".part-carry")).not.toBeNull();
+    expect(r.core.callsOf("import_selection")).toEqual([]);
+    // The ordinary way is still there: bringing it in whole.
+    button(r.root, say("impPartsImport", { parts: "1" })).click();
+    await settle();
+    expect(r.core.callsOf("import_selection")).toHaveLength(1);
+  });
+
+  it("is brought in at once when the divisions there are have nothing to carry", async () => {
+    r.core.intakes = [OLD_INTAKE];
+    r.flow.open({ kind: "new" });
+
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+
+    expect(r.root.textContent).not.toContain(say("impPartsLead"));
+    expect(r.core.callsOf("import_selection")).toHaveLength(1);
+  });
 });
 
 function dvBox(root: HTMLElement, id: string): HTMLInputElement {
@@ -1470,6 +1525,72 @@ describe("dividing a document among specs", () => {
     confirm.click();
     await settle();
     expect(r.core.callsOf("confirm_division")).toEqual([]);
+  });
+
+  it("asks for the division by the document's own key, so that dividing it again is the one it began", async () => {
+    await toDivide();
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:back"]')?.click();
+    button(r.root, say("impPartsDivide")).click();
+    await settle();
+
+    const keys = r.core.callsOf("divide_document").map((args) => args[2]);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[0]).toBe(`div-${hex(2).slice(0, 32)}`);
+  });
+
+  it("brings back what was saved of a document that was divided before, and says so until something changes", async () => {
+    r.core.began = { ...OLD_INTAKE, id: "intake-began", title: "functions" };
+    r.core.intakes = [r.core.began];
+    r.core.ledgers.set(
+      "intake-began",
+      JSON.stringify({
+        v: 1,
+        allotments: [
+          { to: { kind: "new", title: "Lamp control" }, blocks: ["s1-b1", "s1-b2", "s2-b1", "s2-b2"] },
+          { to: { kind: "new", title: "Fan control" }, blocks: ["s3-b1", "s3-b2"] },
+        ],
+      }),
+    );
+    await toDivide();
+
+    expect(r.root.querySelector(".banner-ok")?.textContent).toBe(say("dvRestored"));
+    expect(r.root.textContent).toContain(say("dvCountDone"));
+    expect(r.root.querySelector<HTMLInputElement>("input.dv-name")?.value).toBe("Lamp control");
+    expect(confirmButton(r.root).getAttribute("aria-disabled")).toBeNull();
+    // The first thing the owner changes makes it theirs, and the note goes.
+    dvBox(r.root, "s3").click();
+    button(r.root, "Lamp control").click();
+    expect(r.root.querySelector(".banner-ok")).toBeNull();
+  });
+
+  it("begins empty when what was saved cannot be said in parts, and when nothing was saved", async () => {
+    r.core.began = { ...OLD_INTAKE, id: "intake-began", title: "functions" };
+    r.core.intakes = [r.core.began];
+    // A part (s1) whose paragraphs went two ways, as a ledger made by paragraph does.
+    r.core.ledgers.set(
+      "intake-began",
+      JSON.stringify({
+        v: 1,
+        allotments: [
+          { to: { kind: "new", title: "A" }, blocks: ["s1-b1"] },
+          { to: { kind: "new", title: "B" }, blocks: ["s1-b2"] },
+        ],
+      }),
+    );
+    await toDivide();
+
+    // Three parts of two paragraphs each: all six are without a place.
+    expect(r.root.querySelector(".banner-ok")).toBeNull();
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
+
+    r.core.ledgers.clear();
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+    button(r.root, say("impPartsDivide")).click();
+    await settle();
+    expect(r.root.querySelector(".banner-ok")).toBeNull();
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
   });
 
   it("counts paragraphs as parts are sent, and turns the button on when none is left without a place", async () => {
@@ -1712,6 +1833,7 @@ describe("dividing a document among specs", () => {
 async function toCarry(): Promise<void> {
   r.core.sections = twoFunctions();
   r.core.intakes = [OLD_INTAKE];
+  r.core.ledgers.set(OLD_INTAKE.id, JSON.stringify({ v: 1, allotments: [] }));
   r.flow.open({ kind: "new" });
   await chooseFile(r, file("functions-2.md", "# Lamp\n"));
   const select = r.root.querySelector<HTMLSelectElement>(".part-carry");
@@ -1734,8 +1856,14 @@ describe("carrying a division to a revised document", () => {
     await chooseFile(r, file("functions-2.md", "# Lamp\n"));
     expect(r.root.querySelector(".part-carry")).toBeNull();
 
+    // A division begun and not placed has no ledger to carry, so it is not offered.
     r.flow.open({ kind: "new" });
     r.core.intakes = [OLD_INTAKE];
+    await chooseFile(r, file("functions-2.md", "# Lamp\n"));
+    expect(r.root.querySelector(".part-carry")).toBeNull();
+
+    r.flow.open({ kind: "new" });
+    r.core.ledgers.set(OLD_INTAKE.id, JSON.stringify({ v: 1, allotments: [] }));
     await chooseFile(r, file("functions-2.md", "# Lamp\n"));
     const options = [...r.root.querySelectorAll(".part-carry option")].map((o) => o.textContent);
     expect(options).toEqual([say("impPartsCarry"), "functions"]);
@@ -1744,7 +1872,10 @@ describe("carrying a division to a revised document", () => {
   it("carries what is the same and asks about the rest, with the changed words shown in the paragraph", async () => {
     await toCarry();
 
-    expect(r.core.callsOf("revise_division")).toEqual([["intake-old", "spec-1", "functions-2", expect.any(String)]]);
+    // The key is of the revised document and of the earlier version it is carried from.
+    expect(r.core.callsOf("revise_division")).toEqual([
+      ["intake-old", "spec-1", "functions-2", `rev-${hex(2).slice(0, 32)}-intake-old`],
+    ]);
     expect(r.root.textContent).toContain(say("dvRevTitle", { name: "functions-2.md" }));
     expect(r.root.textContent).toContain(say("dvRevLeft", { n: "2" }));
     expect(r.root.textContent).toContain(say("dvRevCarried", { n: "3" }));

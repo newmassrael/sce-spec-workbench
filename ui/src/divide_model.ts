@@ -227,6 +227,63 @@ export function planOf(
   return plan;
 }
 
+/**
+ * The draft a saved ledger makes, for a division of a document by its parts: each destination of the ledger
+ * is one of the draft's, and a part goes where all of its paragraphs went. A part with no paragraph of its own
+ * has nothing to place and is left alone.
+ *
+ * `null` when the ledger cannot be said in parts: a part some of whose paragraphs went one way and the rest
+ * another (a ledger made by paragraph, as a revised document's is), or a paragraph the document has not. A
+ * screen that cannot say what was saved does not make up something near it; the owner starts again.
+ */
+export function restoreDraft(
+  ledger: string,
+  sections: readonly DocumentSection[],
+  specs: readonly Spec[],
+): Draft | null {
+  let allotments: LedgerAllotment[];
+  try {
+    allotments = allotmentsOf(ledger);
+  } catch {
+    return null;
+  }
+  const known = new Set(sections.flatMap((s) => s.block_ids));
+  const dests: Destination[] = [];
+  const keyOf = (to: LedgerAllotment["to"]): string => {
+    if (to.kind === "left-out") return OUT;
+    const found = dests.find((d) =>
+      d.kind === "spec" ? to.kind === "spec" && d.spec.id === to.spec : to.kind === "new" && d.title === to.title,
+    );
+    if (found !== undefined) return found.key;
+    const key = `d${dests.length}`;
+    if (to.kind === "spec") {
+      const spec = specs.find((s) => s.id === to.spec) ?? { id: to.spec ?? "", title: to.spec ?? "", created_at: "" };
+      dests.push({ key, kind: "spec", spec });
+    } else {
+      dests.push({ key, kind: "new", title: to.title ?? "" });
+    }
+    return key;
+  };
+  const gone = allotments.some((a) => a.blocks.some((id) => !known.has(id)));
+  if (gone) return null;
+  const keyed = allotments.map((a) => ({ key: keyOf(a.to), blocks: new Set(a.blocks) }));
+  const to: Record<string, readonly string[]> = {};
+  for (const section of sections) {
+    if (section.block_ids.length === 0) continue;
+    const keys: string[] = [];
+    for (const { key, blocks } of keyed) {
+      const held = section.block_ids.filter((id) => blocks.has(id)).length;
+      if (held === 0) continue;
+      if (held !== section.block_ids.length) return null;
+      if (!keys.includes(key)) keys.push(key);
+    }
+    to[section.id] = keys;
+  }
+  // A part that several specs share is shared on purpose, so that sending again adds to it as the owner left it.
+  const shared = Object.values(to).some((placed) => placed.filter((k) => k !== OUT).length > 1);
+  return { dests, to, picked: new Set(), shared, made: dests.length };
+}
+
 // ---- a revised document ----------------------------------------------------------------------------
 
 /**
@@ -266,6 +323,7 @@ function aPart(id: string): DocumentSection {
     tree_characters: 0,
     page_first: null,
     page_last: null,
+    block_ids: [id],
   };
 }
 

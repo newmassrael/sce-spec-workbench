@@ -37,6 +37,7 @@ import {
   parseDividedDocument,
   parseIntakeExtraction,
   parseIntakeList,
+  parseIntakeRead,
   parseReadDocument,
   parseRevisedDivision,
   parseReadRevisionReport,
@@ -81,6 +82,7 @@ import {
   type DividedDocument,
   type Intake,
   type IntakeExtraction,
+  type IntakeView,
   type PlannedAllotment,
   type RevisedDivision,
   type ReadDocument,
@@ -326,6 +328,8 @@ export interface Api {
   divideDocument(id: string, document: ReadDocument, title: string, key: string): Promise<DividedDocument>;
   /** The documents beside the specs that are divided or being divided, the newest first. */
   listIntakes(): Promise<Intake[]>;
+  /** An intake as it is: the ledger it is at (as text, with SCE's count of it), and how far each spec has come. */
+  readIntake(intake: string): Promise<IntakeView>;
   /** The extraction an intake holds, as text and by its digest. */
   readIntakeExtraction(intake: string): Promise<IntakeExtraction>;
   /**
@@ -570,6 +574,9 @@ export function apiOver(transport: Transport): Api {
     },
     async listIntakes() {
       return parseIntakeList(await transport.call("list_intakes"));
+    },
+    async readIntake(intake) {
+      return parseIntakeRead(await transport.call("read_intake", { id: intake }));
     },
     async readIntakeExtraction(intake) {
       return parseIntakeExtraction(await transport.call("read_intake_extraction", { id: intake }));

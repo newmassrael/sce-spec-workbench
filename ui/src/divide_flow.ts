@@ -71,6 +71,8 @@ interface Held {
   readonly draft: Draft;
   /** Set when the document is a revised one, carried from a division: what is placed is a paragraph. */
   readonly revision: Revision | null;
+  /** The draft is what the owner saved of this document before, until they change it. */
+  readonly restored: boolean;
 }
 
 type Phase =
@@ -91,14 +93,15 @@ export class DivideFlow {
   constructor(private readonly host: DivideHost) {}
 
   /** Begin with a document the core has kept as an intake: the spec that holds it is the first destination. */
-  start(origin: Spec, name: string, divided: DividedDocument): void {
+  start(origin: Spec, name: string, divided: DividedDocument, saved: Draft | null = null): void {
     this.ticket += 1;
     this.held = {
       name,
       intake: divided.intake.id,
       sections: divided.outline.sections,
-      draft: startDraft(origin),
+      draft: saved ?? startDraft(origin),
       revision: null,
+      restored: saved !== null,
     };
     this.phase = { kind: "edit" };
     this.busy = false;
@@ -111,7 +114,7 @@ export class DivideFlow {
    */
   startRevision(name: string, intake: string, draft: Draft, revision: Revision): void {
     this.ticket += 1;
-    this.held = { name, intake, sections: revision.paragraphs, draft, revision };
+    this.held = { name, intake, sections: revision.paragraphs, draft, revision, restored: false };
     this.phase = { kind: "edit" };
     this.busy = false;
     this.notice = null;
@@ -133,7 +136,7 @@ export class DivideFlow {
    */
   private change(update: (draft: Draft, sections: readonly DocumentSection[]) => Draft, focus?: string): void {
     if (this.held === null) return;
-    this.held = { ...this.held, draft: update(this.held.draft, this.held.sections) };
+    this.held = { ...this.held, draft: update(this.held.draft, this.held.sections), restored: false };
     this.notice = null;
     if (focus !== undefined) this.host.focus(focus);
     this.host.redraw();
@@ -201,7 +204,7 @@ export class DivideFlow {
     const held = this.held;
     if (held === null) return;
     const draft = renameNew(held.draft, key, title);
-    this.held = { ...held, draft };
+    this.held = { ...held, draft, restored: false };
     this.notice = null;
     for (const element of this.root?.querySelectorAll(`[data-dest="${key}"]`) ?? []) {
       element.textContent = title;
@@ -258,7 +261,11 @@ export class DivideFlow {
     if (held === null) return h("div", {});
     const say = this.host.t;
     const banner =
-      this.notice === null ? null : h("p", { class: "banner banner-error", role: "alert" }, this.notice);
+      this.notice !== null
+        ? h("p", { class: "banner banner-error", role: "alert" }, this.notice)
+        : held.restored
+          ? h("p", { class: "banner banner-ok", role: "status" }, say("dvRestored"))
+          : null;
     if (this.phase.kind === "done") {
       const result = this.phase.result;
       this.root = null;

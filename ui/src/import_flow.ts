@@ -12,14 +12,16 @@
 
 import type { Api } from "./api";
 import { CommandFailure } from "./ipc";
-import type { AssembledImport, DecisionKind, Intake, ReadDocument, Spec } from "./contract";
-import { startRevision } from "./divide_model";
+import type { AssembledImport, DecisionKind, DocumentSection, Intake, ReadDocument, Spec } from "./contract";
+import { restoreDraft, startRevision, type Draft } from "./divide_model";
 import { DivideFlow } from "./divide_flow";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import {
   allSections,
   base64Of,
+  carryKey,
+  divisionKey,
   failureOf,
   importKey,
   isChoosable,
@@ -69,6 +71,7 @@ export interface ImportHost {
     | "divideDocument"
     | "confirmDivision"
     | "listIntakes"
+    | "readIntake"
     | "readIntakeExtraction"
     | "reviseDivision"
     | "listSpecs"
@@ -343,16 +346,18 @@ export class ImportFlow {
     try {
       const doc = await this.host.api.readDocument(spec.id, name, data);
       if (ticket !== this.ticket) return;
-      if (!isChoosable(doc)) {
+      // The documents that were divided: this one may be a new version of one of them.
+      this.divided = await this.dividedWithLedger();
+      if (ticket !== this.ticket) return;
+      // A document with one part has nothing to choose between and is brought in whole, unless a division could
+      // be carried to it: a document with no headings is as much a new version as one with many, and the choice
+      // of carrying is made on the screen it would otherwise skip.
+      if (!isChoosable(doc) && this.divided.length === 0) {
         await this.bringParts(spec, name, doc, undefined, supersede, ticket);
         return;
       }
       this.chosen = allSections(doc);
       this.replacing = supersede;
-      // The documents that were divided: this one may be a new version of one of them. Not knowing them is
-      // not a reason to stop the choosing, which has no use for them.
-      this.divided = await this.host.api.listIntakes().catch(() => []);
-      if (ticket !== this.ticket) return;
       this.enter({ kind: "parts", name, spec, doc });
       this.host.redraw();
     } catch (error) {
@@ -423,21 +428,49 @@ export class ImportFlow {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
     const ticket = ++this.ticket;
-    this.press += 1;
     try {
       const divided = await this.host.api.divideDocument(
         stage.spec.id,
         stage.doc,
         titleOf(stage.name, this.host.t("impNewSpecFallback")),
-        importKey(this.host.now(), this.press),
+        divisionKey(stage.doc),
       );
       if (ticket !== this.ticket) return;
-      this.divide.start(stage.spec, stage.name, divided);
+      // A document that was divided before is the division it began, and what the owner saved of it comes back.
+      // Not being able to read it back is not a reason to stop: the owner places the parts again.
+      const draft = divided.created ? null : await this.savedDraft(divided.intake.id, divided.outline.sections);
+      if (ticket !== this.ticket) return;
+      this.divide.start(stage.spec, stage.name, divided, draft);
       this.enter({ kind: "divide", name: stage.name, spec: stage.spec, doc: stage.doc });
       this.host.redraw();
     } catch (error) {
       if (ticket !== this.ticket) return;
       this.fail(error);
+    }
+  }
+
+  /**
+   * The documents that were divided and have a ledger to carry: an intake with none (one begun and not placed)
+   * has nothing a new version could take over, and offering it would only end in a refusal. Not knowing them is
+   * not a reason to stop the choosing, which has no use for them.
+   */
+  private async dividedWithLedger(): Promise<readonly Intake[]> {
+    try {
+      const all = await this.host.api.listIntakes();
+      const read = await Promise.all(all.map((intake) => this.host.api.readIntake(intake.id).catch(() => null)));
+      return all.filter((_, at) => read[at]?.ledger != null);
+    } catch {
+      return [];
+    }
+  }
+
+  /** What an intake saved, said in the parts of its document, or `null` when nothing was saved or it cannot be. */
+  private async savedDraft(intake: string, sections: readonly DocumentSection[]): Promise<Draft | null> {
+    try {
+      const view = await this.host.api.readIntake(intake);
+      return view.ledger === null ? null : restoreDraft(view.ledger.text, sections, this.host.specs());
+    } catch {
+      return null;
     }
   }
 
@@ -449,14 +482,13 @@ export class ImportFlow {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
     const ticket = ++this.ticket;
-    this.press += 1;
     try {
       const revised = await this.host.api.reviseDivision(
         from,
         stage.spec.id,
         stage.doc,
         titleOf(stage.name, this.host.t("impNewSpecFallback")),
-        importKey(this.host.now(), this.press),
+        carryKey(stage.doc, from),
       );
       const [now, before, listing] = await Promise.all([
         this.host.api.readIntakeExtraction(revised.intake.id),

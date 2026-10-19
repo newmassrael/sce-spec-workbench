@@ -21,6 +21,7 @@ import {
   readiness,
   removeDest,
   renameNew,
+  restoreDraft,
   send,
   setShared,
   startDraft,
@@ -48,6 +49,7 @@ function part(id: string, blocks: number, parent: string | null = null): Documen
     tree_characters: blocks * 10,
     page_first: null,
     page_last: null,
+    block_ids: Array.from({ length: blocks }, (_, n) => `${id}-b${n + 1}`),
   };
 }
 
@@ -245,6 +247,98 @@ describe("what became of a spec", () => {
     expect(inTheWay(step)).toBe("p-1");
     expect(inTheWay({ ...step, error: { kind: "bad-ledger", message: "x", detail: {} } })).toBeNull();
     expect(inTheWay({ ...step, error: null })).toBeNull();
+  });
+});
+
+describe("a division that was saved", () => {
+  const specs = [spec("lamp-1", "Lamp control")];
+  const sections = [part("s1", 2), part("s2", 2, "s1"), part("s3", 3), part("s4", 0)];
+  const ledger = (allotments: unknown): string => JSON.stringify({ v: 1, allotments });
+
+  it("comes back as the parts that went where all their paragraphs went", () => {
+    const draft = restoreDraft(
+      ledger([
+        { to: { kind: "spec", spec: "lamp-1" }, blocks: ["s1-b1", "s1-b2", "s2-b1", "s2-b2"] },
+        { to: { kind: "new", title: "Fan" }, blocks: ["s3-b1", "s3-b2", "s3-b3"] },
+      ]),
+      sections,
+      specs,
+    );
+
+    expect(draft?.dests.map((d) => (d.kind === "spec" ? d.spec.title : d.title))).toEqual(["Lamp control", "Fan"]);
+    // A part with no paragraph of its own has nothing to place, so it is not in the draft at all.
+    expect(draft?.to).toEqual({ s1: ["d0"], s2: ["d0"], s3: ["d1"] });
+    expect(draft?.picked.size).toBe(0);
+    expect(draft?.shared).toBe(false);
+    // What came back counts as the owner left it: nothing is without a place, and the plan can be sent.
+    if (draft === null) throw new Error("not restored");
+    expect(readiness(draft, sections)).toEqual({ kind: "ready", specs: 2 });
+  });
+
+  it("keeps what was left out and what several specs share, and sends again as the owner left it", () => {
+    const draft = restoreDraft(
+      ledger([
+        { to: { kind: "spec", spec: "lamp-1" }, blocks: ["s1-b1", "s1-b2", "s3-b1", "s3-b2", "s3-b3"] },
+        { to: { kind: "new", title: "Fan" }, blocks: ["s3-b1", "s3-b2", "s3-b3"] },
+        { to: { kind: "left-out" }, reason: "the cover", blocks: ["s2-b1", "s2-b2"] },
+      ]),
+      sections,
+      specs,
+    );
+
+    expect(draft?.to).toMatchObject({ s2: ["out"], s3: ["d0", "d1"] });
+    expect(draft?.shared).toBe(true);
+  });
+
+  it("leaves a part that no allotment holds without a place", () => {
+    const draft = restoreDraft(
+      ledger([{ to: { kind: "spec", spec: "lamp-1" }, blocks: ["s1-b1", "s1-b2"] }]),
+      sections,
+      specs,
+    );
+
+    expect(draft?.to["s2"]).toEqual([]);
+    expect(draft?.to["s3"]).toEqual([]);
+    if (draft === null) throw new Error("not restored");
+    expect(readiness(draft, sections)).toEqual({ kind: "unplaced", paragraphs: 7 - 2 });
+  });
+
+  it("is nothing when a part went two ways, as a ledger made by paragraph does, and not a guess at one", () => {
+    const split = ledger([
+      { to: { kind: "spec", spec: "lamp-1" }, blocks: ["s1-b1", "s1-b2", "s2-b1"] },
+      { to: { kind: "new", title: "Fan" }, blocks: ["s2-b2", "s3-b1", "s3-b2", "s3-b3"] },
+    ]);
+
+    expect(restoreDraft(split, sections, specs)).toBeNull();
+    // The nearest ledger that is not split is restored.
+    expect(
+      restoreDraft(
+        ledger([
+          { to: { kind: "spec", spec: "lamp-1" }, blocks: ["s1-b1", "s1-b2", "s2-b1", "s2-b2"] },
+          { to: { kind: "new", title: "Fan" }, blocks: ["s3-b1", "s3-b2", "s3-b3"] },
+        ]),
+        sections,
+        specs,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("is nothing when the ledger names a paragraph the document has not, or is not a ledger", () => {
+    expect(
+      restoreDraft(ledger([{ to: { kind: "left-out" }, blocks: ["s9-b1"] }]), sections, specs),
+    ).toBeNull();
+    expect(restoreDraft("not json", sections, specs)).toBeNull();
+  });
+
+  it("says a spec it does not know by its id", () => {
+    const draft = restoreDraft(
+      ledger([{ to: { kind: "spec", spec: "gone-1" }, blocks: ["s1-b1", "s1-b2"] }]),
+      sections,
+      [],
+    );
+
+    const first = draft?.dests[0];
+    expect(first?.kind === "spec" ? first.spec.title : null).toBe("gone-1");
   });
 });
 

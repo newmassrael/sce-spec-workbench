@@ -137,6 +137,24 @@ export function importKey(now: number, press: number): string {
   return `ui-${now.toString(36)}-${press.toString(36)}`;
 }
 
+/**
+ * What makes the same document, divided again, the division it already began: a press of "divide" on a document
+ * that was divided is that division, and does not make a second one that every later choice of an earlier
+ * version would list beside the first. The key is the document's own (the extraction is named by the hash of its
+ * text), so a document that is another is another division, and the core refuses a key made of another document.
+ */
+export function divisionKey(doc: ReadDocument): string {
+  return `div-${doc.extraction.slice(0, 32)}`;
+}
+
+/**
+ * The same for a document carried from an earlier version: one intake for the revised document, and the draft
+ * made from each earlier version it is carried from is its own press.
+ */
+export function carryKey(doc: ReadDocument, from: string): string {
+  return `rev-${doc.extraction.slice(0, 32)}-${from}`;
+}
+
 // ---- choosing the parts of a document ------------------------------------------------------------
 
 /**

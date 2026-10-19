@@ -7,8 +7,10 @@ import { ContractError, type DocumentSection, type ReadDocument } from "../src/c
 import {
   allSections,
   base64Of,
+  carryKey,
   chosenState,
   chosenTotals,
+  divisionKey,
   failureOf,
   importKey,
   isChoosable,
@@ -119,6 +121,7 @@ function document(): ReadDocument {
     tree_characters: characters,
     page_first: null,
     page_last: null,
+    block_ids: Array.from({ length: blocks }, (_, n) => `${id}-b${n + 1}`),
   });
   return {
     original: "a".repeat(64),
@@ -195,5 +198,27 @@ describe("what makes a press the proposal it already made", () => {
     expect(importKey(1_000_000, 1)).toBe(importKey(1_000_000, 1));
     expect(importKey(1_000_000, 1)).not.toBe(importKey(1_000_000, 2));
     expect(importKey(1_000_000, 1)).not.toBe(importKey(1_000_001, 1));
+  });
+});
+
+describe("what makes a division the one a document already began", () => {
+  const read = (extraction: string): ReadDocument => ({ ...document(), extraction });
+  const one = "a".repeat(64);
+  const other = `b${"a".repeat(63)}`;
+
+  it("is the document's own, so that dividing it again is the same division and another document is another", () => {
+    expect(divisionKey(read(one))).toBe(divisionKey(read(one)));
+    expect(divisionKey(read(one))).not.toBe(divisionKey(read(other)));
+  });
+
+  it("is within the length a key may have, which the core refuses beyond", () => {
+    expect(divisionKey(read(one)).length).toBeLessThanOrEqual(200);
+    expect(carryKey(read(one), "x".repeat(80)).length).toBeLessThanOrEqual(200);
+  });
+
+  it("for a carried document differs by the earlier version it is carried from", () => {
+    expect(carryKey(read(one), "intake-a")).toBe(carryKey(read(one), "intake-a"));
+    expect(carryKey(read(one), "intake-a")).not.toBe(carryKey(read(one), "intake-b"));
+    expect(carryKey(read(one), "intake-a")).not.toBe(divisionKey(read(one)));
   });
 });
