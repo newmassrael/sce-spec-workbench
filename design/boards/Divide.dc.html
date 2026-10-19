@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>문서 나누기</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <div class="bar-top">
+    <button class="btn quiet icon" type="button" aria-label="뒤로"><span class="ic ic-back" aria-hidden="true"></span></button>
+    <span style="font: 700 16px/24px var(--font)">램프·팬 제어 요구사항.docx 나누기</span>
+    <span class="count {{countClass}}" style="margin-left: 8px">{{countText}}</span>
+  </div>
+
+  <p class="dv-lead">이 문서의 부분마다 어느 사양으로 보낼지 정해 주세요. 보내지 않을 부분은 &lsquo;뺌&rsquo;으로 두면 돼요. 원본은 그대로 남아요.</p>
+
+  <div class="dv-wrap">
+    <section aria-label="문서의 부분">
+      <div class="dv-list">
+        <div class="dv-head">
+          <label class="dv-more" style="color: var(--ink-2)"><input class="dv-box" type="checkbox" checked="{{allChecked}}" onChange="{{toggleAll}}">모두 고르기</label>
+          <span>문서의 부분 {{partCount}}개 · 문단 {{total}}개</span>
+        </div>
+        <sc-if value="{{hasSel}}" hint-placeholder-val="{{ false }}">
+          <div class="dv-bulk" role="group" aria-label="고른 부분을 보낼 곳">
+            <span>{{selText}}</span>
+            <sc-for list="{{targets}}" as="t" hint-placeholder-count="3">
+              <button class="mini" type="button" onClick="{{t.go}}">{{t.label}}</button>
+            </sc-for>
+            <label class="dv-more"><input class="dv-box" type="checkbox" checked="{{more}}" onChange="{{toggleMore}}" style="width: 18px; height: 18px">이미 있는 곳에 더하기 (여러 사양이 함께 써요)</label>
+          </div>
+        </sc-if>
+        <ul style="list-style: none; margin: 0; padding: 0">
+          <sc-for list="{{rows}}" as="row" hint-placeholder-count="6">
+            <li>
+              <label class="dv-row {{row.cls}}" style="{{row.pad}}">
+                <input class="dv-box" type="checkbox" checked="{{row.checked}}" onChange="{{row.toggle}}">
+                <span>
+                  <span class="dv-title">{{row.title}}</span>
+                  <span class="dv-meta">{{row.meta}}</span>
+                </span>
+                <span class="dv-to">
+                  <sc-for list="{{row.pills}}" as="p" hint-placeholder-count="1">
+                    <span class="dv-pill {{p.cls}}">{{p.name}}</span>
+                  </sc-for>
+                </span>
+              </label>
+            </li>
+          </sc-for>
+        </ul>
+      </div>
+    </section>
+
+    <aside class="dv-side" aria-label="사양">
+      <div class="dv-card">
+        <h2>보낼 사양</h2>
+        <sc-for list="{{dests}}" as="d" hint-placeholder-count="2">
+          <div class="dv-dest">
+            <span class="nm"><span class="dv-pill {{d.cls}}" style="align-self: flex-start">{{d.name}}</span><span class="kd">{{d.kind}}</span></span>
+            <span class="ct">문단 {{d.count}}개</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{canAdd}}" hint-placeholder-val="{{ true }}">
+          <button class="mini" type="button" onClick="{{addDest}}" style="margin-top: 12px"><span class="ic ic-plus" style="width: 14px; height: 14px" aria-hidden="true"></span>사양 하나 더</button>
+        </sc-if>
+      </div>
+      <div class="dv-card">
+        <h2>뺀 부분</h2>
+        <div class="dv-dest">
+          <span class="nm"><span class="dv-pill out" style="align-self: flex-start">뺌</span><span class="kd">원본에는 그대로 남아요</span></span>
+          <span class="ct">문단 {{outCount}}개</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="dv-bar">
+    <div class="dv-meter" role="img" aria-label="{{meterLabel}}">
+      <sc-for list="{{segs}}" as="s" hint-placeholder-count="3"><i class="{{s.cls}}" style="{{s.style}}"></i></sc-for>
+    </div>
+    <span class="why {{whyClass}}" id="dv-why">{{why}}</span>
+    <sc-if value="{{canConfirm}}" hint-placeholder-val="{{ false }}">
+      <button class="btn" type="button"><span class="ic ic-check" aria-hidden="true"></span>{{confirmLabel}}</button>
+    </sc-if>
+    <sc-if value="{{cannotConfirm}}" hint-placeholder-val="{{ true }}">
+      <button class="btn off" type="button" aria-disabled="true" aria-describedby="dv-why"><span class="ic ic-check" aria-hidden="true"></span>{{confirmLabel}}</button>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  get parts() {
+    return [
+      { id: 'p1', title: '표지', level: 1, paras: 3, pages: '1쪽' },
+      { id: 'p2', title: '목차', level: 1, paras: 4, pages: '2쪽' },
+      { id: 'p3', title: '램프 제어', level: 1, paras: 6, pages: '3~4쪽' },
+      { id: 'p4', title: '켜짐과 꺼짐', level: 2, paras: 5, pages: '4쪽' },
+      { id: 'p5', title: '예외 처리', level: 2, paras: 3, pages: '5쪽' },
+      { id: 'p6', title: '팬 제어', level: 1, paras: 7, pages: '6~7쪽' },
+      { id: 'p7', title: '온도 기준', level: 2, paras: 4, pages: '7쪽' },
+      { id: 'p8', title: '용어 정의', level: 1, paras: 8, pages: '8쪽' },
+      { id: 'p9', title: '부록 A. 시험 조건', level: 1, paras: 12, pages: '9~10쪽' },
+      { id: 'p10', title: '부록 B. 변경 이력', level: 1, paras: 5, pages: '11쪽' },
+    ];
+  }
+  get hues() {
+    return ['', 'b', 'c'];
+  }
+  constructor(props) {
+    super(props);
+    this.state = {
+      sel: [],
+      more: false,
+      dests: [
+        { id: 'lamp', name: '램프 제어', kind: '이미 있는 사양' },
+        { id: 'fan', name: '팬 제어', kind: '새로 만들 사양' },
+      ],
+      to: { p1: ['out'], p2: ['out'], p3: ['lamp'], p4: ['lamp'], p5: ['lamp'], p6: ['fan'], p7: ['fan'], p8: ['lamp', 'fan'], p9: [], p10: [] },
+    };
+  }
+  hue(id) {
+    const at = this.state.dests.findIndex((d) => d.id === id);
+    return at < 0 ? 'out' : this.hues[at];
+  }
+  nameOf(id) {
+    const found = this.state.dests.find((d) => d.id === id);
+    return found ? found.name : '뺌';
+  }
+  renderVals() {
+    const { sel, more, dests, to } = this.state;
+    const PARTS = this.parts;
+    const HUES = this.hues;
+    const total = PARTS.reduce((n, p) => n + p.paras, 0);
+    const unplaced = PARTS.filter((p) => to[p.id].length === 0).reduce((n, p) => n + p.paras, 0);
+    const out = PARTS.filter((p) => to[p.id].includes('out')).reduce((n, p) => n + p.paras, 0);
+    const selParas = PARTS.filter((p) => sel.includes(p.id)).reduce((n, p) => n + p.paras, 0);
+    const assign = (id) => {
+      const next = { ...to };
+      sel.forEach((partId) => {
+        const had = next[partId].filter((x) => x !== 'out');
+        if (id === 'out') next[partId] = ['out'];
+        else if (more && had.length > 0 && !had.includes(id)) next[partId] = [...had, id];
+        else next[partId] = [id];
+      });
+      this.setState({ to: next, sel: [] });
+    };
+    const segs = dests.map((d, i) => ({
+      cls: HUES[i] === '' ? 'a' : HUES[i],
+      style: 'width: ' + (PARTS.filter((p) => to[p.id][0] === d.id).reduce((n, p) => n + p.paras, 0) / total) * 100 + '%',
+    }));
+    segs.push({ cls: 'o', style: 'width: ' + (PARTS.filter((p) => to[p.id][0] === 'out').reduce((n, p) => n + p.paras, 0) / total) * 100 + '%' });
+    const specs = dests.length;
+    return {
+      countText: unplaced > 0 ? '배치 안 된 문단 ' + unplaced + '개' : '모두 배치했어요',
+      countClass: unplaced > 0 ? '' : 'done',
+      partCount: PARTS.length,
+      total,
+      allChecked: sel.length === PARTS.length,
+      toggleAll: () => this.setState({ sel: sel.length === PARTS.length ? [] : PARTS.map((p) => p.id) }),
+      hasSel: sel.length > 0,
+      selText: sel.length + '개 부분 · 문단 ' + selParas + '개를',
+      more,
+      toggleMore: () => this.setState({ more: !more }),
+      targets: [
+        ...dests.map((d) => ({ label: d.name, go: () => assign(d.id) })),
+        { label: '뺌', go: () => assign('out') },
+      ],
+      rows: PARTS.map((p) => {
+        const here = to[p.id];
+        const none = here.length === 0;
+        const picked = sel.includes(p.id);
+        return {
+          title: p.title,
+          meta: '문단 ' + p.paras + '개 · ' + p.pages + (here.filter((x) => x !== 'out').length > 1 ? ' · 여러 사양이 함께 써요' : ''),
+          pad: p.level === 2 ? 'padding-left: 44px' : '',
+          cls: (picked ? 'sel ' : '') + (none ? 'todo' : ''),
+          checked: picked,
+          toggle: () => this.setState({ sel: picked ? sel.filter((x) => x !== p.id) : [...sel, p.id] }),
+          pills: none ? [{ name: '배치 안 됨', cls: 'none' }] : here.map((id) => ({ name: this.nameOf(id), cls: this.hue(id) })),
+        };
+      }),
+      dests: dests.map((d, i) => ({
+        name: d.name,
+        kind: d.kind,
+        cls: HUES[i],
+        count: PARTS.filter((p) => to[p.id].includes(d.id)).reduce((n, p) => n + p.paras, 0),
+      })),
+      canAdd: specs < 3,
+      addDest: () =>
+        this.setState({ dests: [...dests, { id: 'new' + specs, name: '새 사양 ' + (specs + 1), kind: '새로 만들 사양' }] }),
+      outCount: out,
+      segs,
+      meterLabel: '문단 ' + total + '개 중 ' + (total - unplaced) + '개를 배치했어요',
+      why:
+        unplaced > 0
+          ? '배치 안 된 문단 ' + unplaced + '개가 남아 있어요. 사양으로 보내거나 뺌으로 두세요.'
+          : '다 배치했어요. 나누면 사양마다 검토가 따로 열려요. 저장하기 전에는 사양이 바뀌지 않아요.',
+      whyClass: unplaced > 0 ? 'todo' : '',
+      canConfirm: unplaced === 0,
+      cannotConfirm: unplaced > 0,
+      confirmLabel: specs + '개 사양으로 나누기',
+    };
+  }
+}
+</script>
+</body>
+</html>

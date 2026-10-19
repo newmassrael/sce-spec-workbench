@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>나뉜 문서의 한 사양 검토</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 900px">
+  <div class="bar-top">
+    <button class="btn quiet icon" type="button" aria-label="목록으로"><span class="ic ic-back" aria-hidden="true"></span></button>
+    <span style="font: 700 16px/24px var(--font)">램프 제어</span>
+    <span class="count {{countClass}}" style="margin-left: 8px">{{countText}}</span>
+    <span class="grow" style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px">
+      <sc-if value="{{canSave}}" hint-placeholder-val="{{ false }}">
+        <button class="btn" type="button"><span class="ic ic-check" aria-hidden="true"></span>사양으로 저장</button>
+      </sc-if>
+      <sc-if value="{{cannotSave}}" hint-placeholder-val="{{ true }}">
+        <button class="btn off" type="button" aria-disabled="true" aria-describedby="why"><span class="ic ic-check" aria-hidden="true"></span>사양으로 저장</button>
+      </sc-if>
+    </span>
+  </div>
+
+  <div style="max-width: 1120px; margin: 0 auto; padding: 16px 24px 0">
+    <div class="dv-card" role="region" aria-label="나뉜 문서">
+      <p style="margin: 0 0 10px; font: 500 15px/24px var(--font); color: var(--ink)">이 문서는 3개 사양으로 나뉘었어요. 이 사양에는 문단 14개가 와요.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--sel-bg); box-shadow: inset 0 0 0 1.5px var(--accent)"><span class="dv-pill">램프 제어</span><span class="dv-meta" style="display: inline">문단 14개 · 지금 보는 사양</span></span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line-strong)"><span class="dv-pill b">팬 제어</span><span class="dv-meta" style="display: inline">문단 15개 · 검토를 기다려요</span></a>
+        <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line)"><span class="dv-pill c">냉각 제어</span><span class="dv-meta" style="display: inline">문단 9개 · 아직 제안이 없어요</span></span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line-strong)"><span class="dv-pill out">뺌</span><span class="dv-meta" style="display: inline">문단 8개 · 이유 보기</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols" style='--l1: "원본"; --l2: "사양에 들어갈 글"; padding-top: 8px'>
+    <div class="colhead"><span class="ic ic-doc" style="width: 16px; height: 16px" aria-hidden="true"></span>원본 · 램프·팬 제어 요구사항.docx</div>
+    <div class="colhead"><span class="ic ic-pair" style="width: 16px; height: 16px" aria-hidden="true"></span>사양에 들어갈 글</div>
+
+    <div class="cell h first">램프 제어</div>
+    <div class="cell h first">램프 제어</div>
+
+    <div class="cell">램프는 전원이 들어와 있는 동안 켜져 있다.</div>
+    <div class="cell">램프는 전원이 들어와 있는 동안 켜져 있다.</div>
+
+    <sc-if value="{{open}}" hint-placeholder-val="{{ true }}">
+      <div class="cell flag">전원이 끊기면 5초 뒤에 램프가 꺼진다.</div>
+      <div class="cell flag">
+        <span class="tag"><span class="ic ic-alert" style="width: 13px; height: 13px" aria-hidden="true"></span>숫자가 달라요</span>
+        <div>전원이 끊기면 <del>5</del><ins>50</ins>초 뒤에 램프가 꺼진다.</div>
+        <div class="acts">
+          <button class="mini pri" type="button" onClick="{{fix}}">원본대로 고치기</button>
+          <button class="mini" type="button" onClick="{{keep}}">그대로 두기</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+      <div class="cell">전원이 끊기면 5초 뒤에 램프가 꺼진다.</div>
+      <div class="cell">
+        <span class="tag ok"><span class="ic ic-check" style="width: 13px; height: 13px" aria-hidden="true"></span>{{result}}</span>
+        <div>전원이 끊기면 {{secs}}초 뒤에 램프가 꺼진다.</div>
+      </div>
+    </sc-if>
+
+    <div class="cell last">전원이 다시 들어오면 램프가 바로 켜진다.</div>
+    <div class="cell last">전원이 다시 들어오면 램프가 바로 켜진다.</div>
+  </div>
+
+  <p class="dv-meta" style="max-width: 1120px; margin: 16px auto 0; padding: 0 24px">원본의 다른 문단은 이 사양에서 확인하지 않아요. 팬 제어와 냉각 제어의 문단은 그 사양에서 따로 확인해요.</p>
+  <p id="why" class="dv-meta" style="max-width: 1120px; margin: 4px auto 0; padding: 0 24px; color: var(--attn)">{{whyText}}</p>
+  <div style="height: 64px"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { a: 0 };
+  }
+  renderVals() {
+    const { a } = this.state;
+    const left = a === 0 ? 1 : 0;
+    return {
+      countText: left > 0 ? '확인할 부분 1곳' : '모두 확인했어요',
+      countClass: left > 0 ? '' : 'done',
+      canSave: left === 0,
+      cannotSave: left > 0,
+      open: a === 0,
+      done: a !== 0,
+      result: a === 1 ? '원본대로 고침' : '그대로 둠',
+      secs: a === 1 ? '5' : '50',
+      fix: () => this.setState({ a: 1 }),
+      keep: () => this.setState({ a: 2 }),
+      whyText: left > 0 ? '확인할 부분이 1곳 남아서 저장할 수 없어요.' : '',
+    };
+  }
+}
+</script>
+</body>
+</html>

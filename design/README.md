@@ -53,6 +53,10 @@ starts a browser.
 | `Request` | The other states of a request: running, interrupted, failed, cancelled, ended by a save, finished; asking while one is open; saving while one is running |
 | `Moved` | The spec changed while it was being checked |
 | `Accepted` | Saved as a spec, with the decisions that were made |
+| `Divide` | A document that holds several specs: each part of it goes to a spec or is left out, every paragraph has a place before it can be divided (ADR 0040 of SCE) |
+| `DivideStates` | The other states of dividing: one spec to start, what blocks the division and why, an AI's draft, and the walk after it is confirmed |
+| `DivideReview` | Checking one spec of a divided document: which other specs the rest went to, and what was left out |
+| `DivideRevised` | A revised document: what carried over because its words are the same, what changed, what is new, what is gone (a later step of the same ADR) |
 
 `Library` has two switches in the canvas: `team` shows who is working on what, `multi` shows
 the workspace switcher. `Connect` has `policy`, an organisation that restricts the AI to one kind. The

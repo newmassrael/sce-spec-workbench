@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>문서 나누기의 상태</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="app" style="width: 100%; min-height: 1600px">
+
+  <section class="dv-panel" aria-labelledby="s1">
+    <h2 id="s1">1  처음에는 사양이 하나예요</h2>
+    <p>문서를 읽으면 모든 부분이 이 사양으로 가요. 빼고 싶은 부분만 풀면 지금처럼 한 사양으로 가져오고, 사양이 더 있으면 &lsquo;사양 하나 더&rsquo;를 눌러요.</p>
+    <div class="dv-list">
+      <div class="dv-head">
+        <span>문서의 부분 4개 · 문단 21개</span>
+        <button class="mini" type="button"><span class="ic ic-plus" style="width: 14px; height: 14px" aria-hidden="true"></span>사양 하나 더</button>
+      </div>
+      <ul style="list-style: none; margin: 0; padding: 0">
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="휴대전화 문 잠금" checked><span><span class="dv-title">휴대전화 문 잠금</span><span class="dv-meta">문단 9개 · 1~2쪽</span></span><span class="dv-to"><span class="dv-pill">휴대전화 문 잠금</span></span></div></li>
+        <li><div class="dv-row" style="cursor: default; padding-left: 44px"><input class="dv-box" type="checkbox" aria-label="자동으로 다시 잠김" checked><span><span class="dv-title">자동으로 다시 잠김</span><span class="dv-meta">문단 5개 · 2쪽</span></span><span class="dv-to"><span class="dv-pill">휴대전화 문 잠금</span></span></div></li>
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="알림" checked><span><span class="dv-title">알림</span><span class="dv-meta">문단 4개 · 3쪽</span></span><span class="dv-to"><span class="dv-pill">휴대전화 문 잠금</span></span></div></li>
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="변경 이력"><span><span class="dv-title">변경 이력</span><span class="dv-meta">문단 3개 · 4쪽</span></span><span class="dv-to"><span class="dv-pill out">뺌</span></span></div></li>
+      </ul>
+    </div>
+    <div class="dv-bar" style="position: static; margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r-md)">
+      <span class="why">문단 21개 중 18개를 가져와요. 뺀 3개는 원본에 남아요.</span>
+      <button class="btn" type="button"><span class="ic ic-check" aria-hidden="true"></span>18개 문단 가져오기</button>
+    </div>
+  </section>
+
+  <section class="dv-panel" aria-labelledby="s2">
+    <h2 id="s2">2  나눌 수 없을 때는 이유를 말해요</h2>
+    <p>한 줄씩 무엇이 막는지와 어떻게 하면 되는지를 적고, 그 부분으로 바로 가는 단추를 둬요. 하나라도 있으면 나누기 단추는 꺼져 있어요.</p>
+    <div class="dv-list">
+      <div class="dv-block">
+        <span class="ic ic-alert" aria-hidden="true"></span>
+        <span><b>배치 안 된 문단 17개</b><span class="s">부록 A, 부록 B에 갈 곳이 없어요. 사양으로 보내거나 뺌으로 두세요.</span></span>
+        <button class="mini" type="button">보기</button>
+      </div>
+      <div class="dv-block">
+        <span class="ic ic-alert" aria-hidden="true"></span>
+        <span><b>쓰면서 뺀 문단 2개</b><span class="s">&lsquo;용어 정의&rsquo;가 램프 제어로도 가고 뺌에도 있어요. 한쪽만 남겨 주세요.</span></span>
+        <button class="mini" type="button">보기</button>
+      </div>
+      <div class="dv-block">
+        <span class="ic ic-alert" aria-hidden="true"></span>
+        <span><b>받을 문단이 없는 사양: 냉각 제어</b><span class="s">문단이 없는 사양은 만들 수 없어요. 문단을 보내거나 이 사양을 빼세요.</span></span>
+        <span style="display: inline-flex; gap: 8px"><button class="mini" type="button">보기</button><button class="mini" type="button">사양 빼기</button></span>
+      </div>
+    </div>
+    <div class="dv-bar" style="position: static; margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r-md)">
+      <span class="why todo" id="dv-why-2">막는 것이 3가지 있어요.</span>
+      <button class="btn off" type="button" aria-disabled="true" aria-describedby="dv-why-2"><span class="ic ic-check" aria-hidden="true"></span>3개 사양으로 나누기</button>
+    </div>
+  </section>
+
+  <section class="dv-panel" aria-labelledby="s3">
+    <h2 id="s3">3  AI가 나눈 초안</h2>
+    <p>AI는 초안만 만들어요. 정하는 건 늘 소유자예요. 빠뜨린 부분은 &lsquo;배치 안 됨&rsquo;으로 남아서 나누기가 막혀요.</p>
+    <div class="note" style="background: var(--ai-tint); color: var(--ai); margin-bottom: 12px">
+      <span class="ic ic-pair" style="width: 18px; height: 18px; flex: none; margin-top: 2px" aria-hidden="true"></span>
+      <span>AI가 초안을 나눴어요. 아직 정해진 건 없어요. 훑어보고 고쳐 주세요.</span>
+    </div>
+    <div class="dv-list">
+      <div class="dv-head"><span>문서의 부분 5개 · AI가 배치하지 못한 부분 2개</span><button class="mini" type="button">초안 지우기</button></div>
+      <ul style="list-style: none; margin: 0; padding: 0">
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="램프 제어"><span><span class="dv-title">램프 제어</span><span class="dv-meta">문단 14개 · 3~5쪽</span></span><span class="dv-to"><span class="dv-pill ai">AI 제안</span><span class="dv-pill">램프 제어</span></span></div></li>
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="팬 제어"><span><span class="dv-title">팬 제어</span><span class="dv-meta">문단 15개 · 6~7쪽</span></span><span class="dv-to"><span class="dv-pill ai">AI 제안</span><span class="dv-pill b">팬 제어</span></span></div></li>
+        <li><div class="dv-row" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="표지"><span><span class="dv-title">표지</span><span class="dv-meta">문단 3개 · 1쪽</span></span><span class="dv-to"><span class="dv-pill ai">AI 제안</span><span class="dv-pill out">뺌</span></span></div></li>
+        <li><div class="dv-row todo" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="부록 A. 시험 조건"><span><span class="dv-title">부록 A. 시험 조건</span><span class="dv-meta">문단 12개 · 9~10쪽</span></span><span class="dv-to"><span class="dv-pill none">배치 안 됨</span></span></div></li>
+        <li><div class="dv-row todo" style="cursor: default"><input class="dv-box" type="checkbox" aria-label="부록 B. 변경 이력"><span><span class="dv-title">부록 B. 변경 이력</span><span class="dv-meta">문단 5개 · 11쪽</span></span><span class="dv-to"><span class="dv-pill none">배치 안 됨</span></span></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="dv-panel" aria-labelledby="s4">
+    <h2 id="s4">4  나눈 뒤에는 사양마다 따로 가요</h2>
+    <p>사양마다 제안을 만들고, 검토와 저장은 사양별로 해요. 중간에 멈춰도 다시 누르면 만든 것은 두고 나머지만 이어서 만들어요.</p>
+    <div class="dv-list">
+      <div class="dv-step">
+        <span><span class="st-t">램프 제어</span><span class="st-s">문단 14개 · 이미 있는 사양</span></span>
+        <span class="dv-state ok">제안을 만들었어요</span>
+        <button class="mini pri" type="button">검토하기</button>
+      </div>
+      <div class="dv-step">
+        <span><span class="st-t">팬 제어</span><span class="st-s">문단 15개 · 새로 만든 사양</span></span>
+        <span class="dv-state wait" role="status" style="display: inline-flex; align-items: center; gap: 8px"><span class="spin" aria-hidden="true"></span>만드는 중</span>
+        <span></span>
+      </div>
+      <div class="dv-step">
+        <span><span class="st-t">냉각 제어</span><span class="st-s">문단 9개 · 새로 만들 사양</span></span>
+        <span class="dv-state bad">아직 못 만들었어요</span>
+        <button class="mini" type="button">이어서 만들기</button>
+      </div>
+    </div>
+    <p style="margin: 12px 0 0">3개 중 1개를 만들었어요. 연결이 끊겨서 못 만든 곳은 &lsquo;이어서 만들기&rsquo;를 누르면 돼요. 처음부터 다시 하지 않아요.</p>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

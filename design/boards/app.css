@@ -447,6 +447,74 @@ ins{background:var(--ins-bg);color:var(--ins-ink);text-decoration:none;border-ra
 .demo button{height:28px;padding:0 10px;border:1px solid var(--line-strong);border-radius:999px;background:var(--card);color:var(--ink-2);font:500 12px/1 var(--font);cursor:pointer}
 .demo button.on{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 
+/* dividing a document among specs: the parts, where each goes, and what is left (ADR 0040).
+   A destination is told apart by its name and by its hue; a part with no place is the one thing here that asks. */
+.dv-lead{margin:0;padding:18px 28px 0;max-width:1280px;margin-inline:auto;font:400 15px/24px var(--font);color:var(--ink-2)}
+.dv-wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start;max-width:1280px;margin:0 auto;padding:16px 28px 120px}
+.dv-list{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.dv-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);font:500 14px/22px var(--font);color:var(--ink-2)}
+.dv-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;column-gap:14px;align-items:center;padding:10px 16px;border-top:1px solid var(--line);cursor:pointer}
+.dv-list > li:first-child .dv-row{border-top:0}
+.dv-row:hover{background:var(--hover)}
+.dv-row.sel{background:var(--sel-bg);box-shadow:inset 3px 0 0 var(--accent)}
+.dv-row.todo{background:var(--flag-bg)}
+.dv-row.todo.sel{background:var(--sel-bg)}
+.dv-box{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.dv-title{font:500 15px/24px var(--font);color:var(--ink);overflow-wrap:anywhere}
+.dv-meta{display:block;font:400 13px/20px var(--font);color:var(--ink-3)}
+.dv-to{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:300px}
+.dv-pill{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font:500 12px/1 var(--font);white-space:nowrap;background:var(--pa-bg);color:var(--pa-fg)}
+.dv-pill.b{background:var(--pb-bg);color:var(--pb-fg)}
+.dv-pill.c{background:var(--pc-bg);color:var(--pc-fg)}
+.dv-pill.out{background:var(--chip);color:var(--ink-2)}
+.dv-pill.none{background:transparent;color:var(--attn);box-shadow:inset 0 0 0 1.5px var(--attn-icon);border-radius:999px}
+.dv-pill.ai{background:var(--ai-tint);color:var(--ai)}
+.dv-bulk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:var(--accent-tint);border-bottom:1px solid var(--line);font:500 14px/22px var(--font);color:var(--accent-ink)}
+.dv-bulk .mini{height:32px;font-size:13px}
+.dv-more{display:inline-flex;align-items:center;gap:8px;font:400 13px/20px var(--font);color:var(--accent-ink)}
+.dv-side{position:sticky;top:80px;display:flex;flex-direction:column;gap:12px}
+.dv-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:16px}
+.dv-card h2{margin:0 0 10px;font:700 15px/24px var(--font);color:var(--ink)}
+.dv-dest{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.dv-dest:first-of-type{border-top:0}
+.dv-dest .nm{display:flex;flex-direction:column;gap:2px}
+.dv-dest .kd{font:400 12px/18px var(--font);color:var(--ink-3)}
+.dv-dest .ct{font:600 14px/20px var(--font);color:var(--ink-2);white-space:nowrap}
+.dv-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 28px;background:var(--bar-bg);border-top:1px solid var(--line);backdrop-filter:blur(8px)}
+.dv-bar .why{flex:1 1 320px;font:400 14px/22px var(--font);color:var(--ink-2)}
+.dv-bar .why.todo{color:var(--attn)}
+.dv-meter{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--chip);min-width:160px;flex:0 1 240px}
+.dv-meter i{display:block;height:100%}
+.dv-meter .a{background:var(--pa-fg)}
+.dv-meter .b{background:var(--pb-fg)}
+.dv-meter .c{background:var(--pc-fg)}
+.dv-meter .o{background:var(--faint)}
+.dv-block{display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:14px;align-items:center;padding:14px 16px;border-top:1px solid var(--line);background:var(--card)}
+.dv-block:first-child{border-top:0}
+.dv-block .ic{width:20px;height:20px;color:var(--attn-icon)}
+.dv-block b{display:block;font:600 15px/24px var(--font);color:var(--ink)}
+.dv-block span.s{display:block;font:400 14px/22px var(--font);color:var(--ink-2)}
+.dv-step{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:14px;align-items:center;padding:14px 16px;border-top:1px solid var(--line);background:var(--card)}
+.dv-step:first-child{border-top:0}
+.dv-step .st-t{font:600 15px/24px var(--font);color:var(--ink)}
+.dv-step .st-s{display:block;font:400 13px/20px var(--font);color:var(--ink-3)}
+.dv-state{font:600 13px/20px var(--font);white-space:nowrap}
+.dv-state.ok{color:var(--accent-ink)}
+.dv-state.wait{color:var(--ink-3)}
+.dv-state.bad{color:var(--attn)}
+.dv-panel{max-width:960px;margin:0 auto;padding:28px 28px 40px}
+.dv-panel h2{margin:0 0 6px;font:700 20px/30px var(--font);color:var(--ink)}
+.dv-panel > p{margin:0 0 14px;font:400 15px/24px var(--font);color:var(--ink-2)}
+.dv-panel + .dv-panel{border-top:1px dashed var(--line-strong)}
+.dv-changed{padding:14px 16px;border-top:1px solid var(--line);background:var(--card)}
+.dv-changed:first-child{border-top:0}
+.dv-changed .tx{font:400 16px/28px "Noto Serif KR",serif;color:var(--ink)}
+.dv-changed .tx.old{color:var(--ink-3);text-decoration:line-through}
+.dv-changed.todo{background:var(--flag-bg)}
+.dv-ctx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font:400 13px/20px var(--font);color:var(--ink-3)}
+@media (max-width:900px){.dv-wrap{grid-template-columns:minmax(0,1fr)}.dv-side{position:static}}
+@media (max-width:720px){.dv-lead{padding:14px 16px 0}.dv-wrap{padding:12px 16px 120px}.dv-bar{padding:12px 16px}.dv-row{grid-template-columns:24px minmax(0,1fr)}.dv-to{grid-column:2;justify-content:flex-start;max-width:none}}
+
 /* narrow screens: the two columns become one, each original above what answers it */
 @media (max-width:720px){
   .top{padding:0 16px}
