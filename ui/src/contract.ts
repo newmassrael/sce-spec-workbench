@@ -11,13 +11,13 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 33;
+export const SUPPORTED_COMMAND_SET_VERSION = 35;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 5;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 6;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2246,6 +2246,373 @@ export function parseReadDocument(value: unknown): ReadDocument {
         parseDocumentSection(s, `${where}.outline.sections[${i}]`),
       ),
     },
+  };
+}
+
+/** A document kept beside the specs to be divided among them (ADR 0040 of SCE). */
+export interface Intake {
+  id: string;
+  /** What the document is called. */
+  title: string;
+  key: string;
+  origin: string;
+  created_at: string;
+  /** The member of the original the extraction was read from. */
+  member: string;
+  original: Revision;
+  extraction: Revision;
+}
+
+/** `divide_document`: the division of a document a spec holds is begun, and the parts the owner can send are said. */
+export interface DividedDocument {
+  intake: Intake;
+  created: boolean;
+  outline: DocumentOutline;
+  not_carried: NotCarried[];
+}
+
+function parseIntake(value: unknown, where: string): Intake {
+  const r = record(value, where);
+  return {
+    id: text(r, "id", where),
+    title: text(r, "title", where),
+    key: text(r, "key", where),
+    origin: text(r, "origin", where),
+    created_at: text(r, "created_at", where),
+    member: text(r, "member", where),
+    original: revision(r["original"], `${where}.original`),
+    extraction: revision(r["extraction"], `${where}.extraction`),
+  };
+}
+
+/** `start_intake` and `start_intake_from_spec`. */
+export interface IntakeStarted {
+  intake: Intake;
+  /** `false` when the key had started an intake before, and this is that intake. */
+  created: boolean;
+}
+
+export function parseIntakeStarted(value: unknown, where: string): IntakeStarted {
+  const r = record(value, where);
+  return { intake: parseIntake(r["intake"], `${where}.intake`), created: created(r, where) };
+}
+
+/** `list_intakes`. */
+export function parseIntakeList(value: unknown): Intake[] {
+  const where = "list_intakes";
+  return list(record(value, where), "intakes", where).map((i, k) => parseIntake(i, `${where}.intakes[${k}]`));
+}
+
+/** `read_intake_extraction`: the extraction an intake holds, as text and by its digest. */
+export interface IntakeExtraction {
+  digest: Revision;
+  text: string;
+}
+
+export function parseIntakeExtraction(value: unknown): IntakeExtraction {
+  const where = "read_intake_extraction";
+  const r = record(value, where);
+  return { digest: revision(r["digest"], `${where}.digest`), text: text(r, "text", where) };
+}
+
+/** One save of a ledger, a line of the intake's log. */
+export interface LedgerEntry {
+  n: number;
+  digest: Revision;
+  parent: Revision | null;
+  /** SCE's count of the ledger, by the hash of its text. */
+  report: Revision;
+  complete: boolean;
+  at: string;
+}
+
+function parseLedgerEntry(value: unknown, where: string): LedgerEntry {
+  const r = record(value, where);
+  if (typeof r["complete"] !== "boolean") throw new ContractError(`${where}.complete`, "true or false");
+  return {
+    n: count(r, "n", where),
+    digest: revision(r["digest"], `${where}.digest`),
+    parent: nullableRevision(r["parent"] ?? null, `${where}.parent`),
+    report: revision(r["report"], `${where}.report`),
+    complete: r["complete"],
+    at: text(r, "at", where),
+  };
+}
+
+/** `save_ledger`. */
+export interface LedgerSaved {
+  entry: LedgerEntry;
+  /** `false` when the head was this ledger already. */
+  created: boolean;
+}
+
+export function parseLedgerSaved(value: unknown): LedgerSaved {
+  const where = "save_ledger";
+  const r = record(value, where);
+  return { entry: parseLedgerEntry(r["entry"], `${where}.entry`), created: created(r, where) };
+}
+
+/** A spec to be made, and the spec it was made as. */
+export interface Binding {
+  title: string;
+  spec: string;
+  at: string;
+}
+
+function parseBinding(value: unknown, where: string): Binding {
+  const r = record(value, where);
+  return { title: text(r, "title", where), spec: text(r, "spec", where), at: text(r, "at", where) };
+}
+
+/** `bind_new_spec`. */
+export function parseBound(value: unknown): { binding: Binding; created: boolean } {
+  const where = "bind_new_spec";
+  const r = record(value, where);
+  return { binding: parseBinding(r["binding"], `${where}.binding`), created: created(r, where) };
+}
+
+/** `give_intake_to_spec`: the document and the extraction as the spec now holds them. */
+export function parseIntakeGiven(value: unknown): { original: Revision; extraction: Revision } {
+  const where = "give_intake_to_spec";
+  const r = record(value, where);
+  return {
+    original: revision(r["original"], `${where}.original`),
+    extraction: revision(r["extraction"], `${where}.extraction`),
+  };
+}
+
+/** One allotment of the head ledger, and how far its spec has come. */
+export interface IntakeDestination {
+  to: StepDestination;
+  reason: string;
+  blocks: number;
+  /** The spec it goes to: the one named, or the one a spec to be made was made as. */
+  spec: string | null;
+  /** Whether that spec is gone. */
+  spec_missing: boolean;
+  /** The newest proposal made under this ledger for the spec. */
+  proposal: { id: string; state: string } | null;
+}
+
+/** An intake with how far each spec of its division has come. */
+export interface IntakeView {
+  intake: Intake;
+  /** The ledger the division is at, with SCE's count of it as text; `null` before the first save. */
+  ledger: { entry: LedgerEntry; text: string; report: string } | null;
+  destinations: IntakeDestination[];
+  bindings: Binding[];
+}
+
+function parseStepDestination(value: unknown, where: string): StepDestination {
+  const to = record(value, where);
+  return {
+    kind: oneOf(to, "kind", where, DESTINATION_KINDS),
+    spec: nullableText(to, "spec", where),
+    title: nullableText(to, "title", where),
+  };
+}
+
+function parseIntakeView(value: unknown, where: string): IntakeView {
+  const r = record(value, where);
+  const ledger = r["ledger"] === undefined || r["ledger"] === null ? null : record(r["ledger"], `${where}.ledger`);
+  return {
+    intake: parseIntake(r["intake"], `${where}.intake`),
+    ledger:
+      ledger === null
+        ? null
+        : {
+            entry: parseLedgerEntry(ledger["entry"], `${where}.ledger.entry`),
+            text: text(ledger, "text", `${where}.ledger`),
+            report: text(ledger, "report", `${where}.ledger`),
+          },
+    destinations: list(r, "destinations", where).map((d, i) => {
+      const at = `${where}.destinations[${i}]`;
+      const destination = record(d, at);
+      if (typeof destination["spec_missing"] !== "boolean") throw new ContractError(`${at}.spec_missing`, "true or false");
+      const proposal =
+        destination["proposal"] === undefined || destination["proposal"] === null
+          ? null
+          : record(destination["proposal"], `${at}.proposal`);
+      return {
+        to: parseStepDestination(destination["to"], `${at}.to`),
+        reason: text(destination, "reason", at),
+        blocks: count(destination, "blocks", at),
+        spec: nullableText(destination, "spec", at),
+        spec_missing: destination["spec_missing"],
+        proposal:
+          proposal === null
+            ? null
+            : { id: text(proposal, "id", `${at}.proposal`), state: text(proposal, "state", `${at}.proposal`) },
+      };
+    }),
+    bindings: list(r, "bindings", where).map((b, i) => parseBinding(b, `${where}.bindings[${i}]`)),
+  };
+}
+
+/** `read_intake`. */
+export function parseIntakeRead(value: unknown): IntakeView {
+  return parseIntakeView(value, "read_intake");
+}
+
+/** `read_division`: an intake as it is, and the parts of the document it divides. */
+export interface Division {
+  division: IntakeView;
+  outline: DocumentOutline;
+  not_carried: NotCarried[];
+}
+
+export function parseDivision(value: unknown): Division {
+  const where = "read_division";
+  const r = record(value, where);
+  return {
+    division: parseIntakeView(r["division"], `${where}.division`),
+    outline: parseOutline(r["outline"], `${where}.outline`),
+    not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
+function parseOutline(value: unknown, where: string): DocumentOutline {
+  const outline = record(value, where);
+  return {
+    by: oneOf(outline, "by", where, OUTLINE_WAYS),
+    sections: list(outline, "sections", where).map((s, i) => parseDocumentSection(s, `${where}.sections[${i}]`)),
+  };
+}
+
+/** `divide_document`. */
+export function parseDividedDocument(value: unknown): DividedDocument {
+  const where = "divide_document";
+  const r = record(value, where);
+  return {
+    intake: parseIntake(r["intake"], `${where}.intake`),
+    created: created(r, where),
+    outline: parseOutline(r["outline"], `${where}.outline`),
+    not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
+/** SCE's count of a ledger: what the screen's own count is held to. */
+export interface LedgerCount {
+  complete: boolean;
+  /** Paragraphs with words: what has to have a place. */
+  words: number;
+  in_specs: number;
+  left_out: number;
+  /** Ids of the paragraphs that have no place. */
+  unplaced: string[];
+  /** Paragraphs both sent to a spec and left out. */
+  contradicting: string[];
+  shared: string[];
+  /** Indexes of the destinations given no paragraph with words. */
+  empty: number[];
+}
+
+const STEP_STATES = ["proposed", "failed"] as const;
+const DESTINATION_KINDS = ["spec", "new"] as const;
+
+/** Where a part of the document goes, as the ledger says it. */
+export interface StepDestination {
+  kind: (typeof DESTINATION_KINDS)[number];
+  /** The spec's id, for a spec that is there. */
+  spec: string | null;
+  /** The title, for a spec to be made. */
+  title: string | null;
+}
+
+/** What one spec's step of the walk came to. */
+export interface DivisionStep {
+  to: StepDestination;
+  /** The spec the part went to; `null` when the walk did not get as far as making it. */
+  spec: string | null;
+  state: (typeof STEP_STATES)[number];
+  /** The proposal made, when there is one. */
+  proposal: { id: string; state: string } | null;
+  /** Why the step did not come to a proposal, in the core's own kind and words. */
+  error: { kind: string; message: string; detail: Record<string, unknown> } | null;
+}
+
+/** `confirm_division`: SCE's count, and, when it finds nothing left without a place, what became of each spec. */
+export interface ConfirmedDivision {
+  complete: boolean;
+  report: LedgerCount;
+  proposed: number;
+  failed: number;
+  steps: DivisionStep[];
+}
+
+/**
+ * What the owner asks `confirm_division` to make of the document: for each destination, the parts of the
+ * outline it is given (each taken as its own paragraphs). SCE turns it into a ledger and counts it.
+ */
+export interface PlannedAllotment {
+  to:
+    | { kind: "spec"; spec: string }
+    | { kind: "new"; title: string }
+    | { kind: "left-out" };
+  /** Why the parts are left out; only for what is left out, and allowed to be empty. */
+  reason?: string;
+  sections: string[];
+}
+
+function numberList(value: Obj, key: string, where: string): number[] {
+  return list(value, key, where).map((item, i) => {
+    if (typeof item !== "number" || !Number.isInteger(item) || item < 0) {
+      throw new ContractError(`${where}.${key}[${i}]`, "a count");
+    }
+    return item;
+  });
+}
+
+function parseLedgerCount(value: unknown, where: string): LedgerCount {
+  const r = record(value, where);
+  if (typeof r["complete"] !== "boolean") throw new ContractError(`${where}.complete`, "true or false");
+  return {
+    complete: r["complete"],
+    words: count(r, "words", where),
+    in_specs: count(r, "in_specs", where),
+    left_out: count(r, "left_out", where),
+    unplaced: stringList(r, "unplaced", where),
+    contradicting: stringList(r, "contradicting", where),
+    shared: stringList(r, "shared", where),
+    empty: numberList(r, "empty", where),
+  };
+}
+
+function parseDivisionStep(value: unknown, where: string): DivisionStep {
+  const r = record(value, where);
+  const proposal = r["proposal"] === undefined || r["proposal"] === null ? null : record(r["proposal"], `${where}.proposal`);
+  const error = r["error"] === undefined || r["error"] === null ? null : record(r["error"], `${where}.error`);
+  return {
+    to: parseStepDestination(r["to"], `${where}.to`),
+    spec: nullableText(r, "spec", where),
+    state: oneOf(r, "state", where, STEP_STATES),
+    proposal:
+      proposal === null
+        ? null
+        : { id: text(proposal, "id", `${where}.proposal`), state: text(proposal, "state", `${where}.proposal`) },
+    error:
+      error === null
+        ? null
+        : {
+            kind: text(error, "kind", `${where}.error`),
+            message: text(error, "message", `${where}.error`),
+            detail:
+              error["detail"] === undefined || error["detail"] === null ? {} : record(error["detail"], `${where}.error.detail`),
+          },
+  };
+}
+
+/** `confirm_division`. */
+export function parseConfirmedDivision(value: unknown): ConfirmedDivision {
+  const where = "confirm_division";
+  const r = record(value, where);
+  if (typeof r["complete"] !== "boolean") throw new ContractError(`${where}.complete`, "true or false");
+  return {
+    complete: r["complete"],
+    report: parseLedgerCount(r["report"], `${where}.report`),
+    proposed: count(r, "proposed", where),
+    failed: count(r, "failed", where),
+    steps: list(r, "steps", where).map((s, i) => parseDivisionStep(s, `${where}.steps[${i}]`)),
   };
 }
 

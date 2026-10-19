@@ -46,6 +46,15 @@
   --del-ink: #8c1d18;
   --ins-bg: #ddebff;
   --ins-ink: #1d3fb8;
+  /* The hues of the specs a document is divided among: told apart by name, and the hue only helps the eye. */
+  --pa-bg: #e3e7f8;
+  --pa-fg: #34439a;
+  --pb-bg: #eae4f2;
+  --pb-fg: #5e3a7e;
+  --pc-bg: #e4eddd;
+  --pc-fg: #44622e;
+  --chip: #eef0f4;
+  --faint: #b4bcc9;
   /* Rows of a side-by-side check: needs a decision, changed, empty. */
   --flag-bg: #fff9ea;
   --flag-line: #f1e2b8;
@@ -91,6 +100,14 @@
     --del-ink: #ffb4ad;
     --ins-bg: #1d3266;
     --ins-ink: #b8ccff;
+    --pa-bg: #2a3163;
+    --pa-fg: #c3ccff;
+    --pb-bg: #3a2a52;
+    --pb-fg: #dcc6f5;
+    --pc-bg: #27381f;
+    --pc-fg: #c5e0ae;
+    --chip: #222834;
+    --faint: #4a5363;
     --flag-bg: #2a2312;
     --flag-line: #4a3b16;
     --flag-a: #33290f;
@@ -1605,5 +1622,424 @@ textarea:focus-visible {
 
   .imp .drop {
     padding: 32px 16px 28px;
+  }
+}
+
+/*
+  Dividing a document among specs (`design/boards/Divide`): the parts with where each goes, the specs they go
+  to, and the bar that says what is still to do. A part that is not placed is drawn as a row that needs a
+  decision (the review's flag), a spec by its hue and its name, and what is left out as quiet.
+*/
+.imp .ic-plus {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5v14 M5 12h14' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.imp .dv {
+  text-align: left;
+}
+
+.imp .dv-lead {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 18px 28px 0;
+  font: 400 15px/24px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .dv-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 28px 120px;
+}
+
+.imp .dv-list {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.imp .dv-parts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.imp .dv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font: 500 14px/22px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .dv-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 10px 16px 10px calc(16px + var(--depth, 0) * 28px);
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.imp .dv-parts > li:first-child .dv-row {
+  border-top: 0;
+}
+
+.imp .dv-row:hover {
+  background: var(--hover);
+}
+
+.imp .dv-row.sel {
+  background: var(--sel-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.imp .dv-row.todo {
+  background: var(--flag-bg);
+}
+
+.imp .dv-row.todo.sel {
+  background: var(--sel-bg);
+}
+
+.imp .dv-box {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.imp .dv-title {
+  font: 500 15px/24px var(--font);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.imp .dv-meta {
+  display: block;
+  font: 400 13px/20px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .dv-to {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  max-width: 300px;
+}
+
+.imp .dv-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: 500 12px/1 var(--font);
+  white-space: nowrap;
+  background: var(--pa-bg);
+  color: var(--pa-fg);
+}
+
+.imp .dv-pill.b {
+  background: var(--pb-bg);
+  color: var(--pb-fg);
+}
+
+.imp .dv-pill.c {
+  background: var(--pc-bg);
+  color: var(--pc-fg);
+}
+
+.imp .dv-pill.out {
+  background: var(--chip);
+  color: var(--ink-2);
+}
+
+.imp .dv-pill.none {
+  background: transparent;
+  color: var(--attn);
+  box-shadow: inset 0 0 0 1.5px var(--attn-icon);
+}
+
+/* The name of a spec to be made is typed in its own pill. */
+.imp input.dv-name {
+  height: 32px;
+  width: 100%;
+  max-width: 240px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  font: 500 13px/1 var(--font);
+}
+
+.imp input.dv-name:focus-visible,
+.imp .dv-pick:focus-visible,
+.imp .dv-box:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.imp .dv-bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--accent-tint);
+  border-bottom: 1px solid var(--line);
+  font: 500 14px/22px var(--font);
+  color: var(--accent-ink);
+}
+
+.imp .dv-bulk .mini {
+  height: 32px;
+  font-size: 13px;
+}
+
+.imp .dv-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 13px/20px var(--font);
+  color: var(--accent-ink);
+}
+
+.imp .dv-all {
+  color: var(--ink-2);
+}
+
+.imp .dv-side {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imp .dv-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px;
+}
+
+.imp .dv-card h2 {
+  margin: 0 0 10px;
+  font: 700 15px/24px var(--font);
+  color: var(--ink);
+}
+
+.imp .dv-dest {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.imp .dv-card h2 + .dv-dest {
+  border-top: 0;
+}
+
+.imp .dv-dest .nm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.imp .dv-dest .kd {
+  font: 400 12px/18px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .dv-dest .ct {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 14px/20px var(--font);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.imp .dv-dest .ct .mini {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.imp .dv-adds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.imp .dv-pick {
+  height: 36px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: 500 14px/1 var(--font);
+}
+
+.imp .dv-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 28px;
+  background: var(--bar-bg);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.imp .dv-bar .why {
+  flex: 1 1 320px;
+  font: 400 14px/22px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .dv-bar .why.todo {
+  color: var(--attn);
+}
+
+.imp .dv-meter {
+  display: flex;
+  height: 8px;
+  flex: 0 1 240px;
+  min-width: 160px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--chip);
+}
+
+.imp .dv-meter i {
+  display: block;
+  height: 100%;
+}
+
+.imp .dv-meter .a {
+  background: var(--pa-fg);
+}
+
+.imp .dv-meter .b {
+  background: var(--pb-fg);
+}
+
+.imp .dv-meter .c {
+  background: var(--pc-fg);
+}
+
+.imp .dv-meter .o {
+  background: var(--faint);
+}
+
+.imp .dv-panel {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 28px 40px;
+  text-align: left;
+}
+
+.imp .dv-panel h2 {
+  margin: 0 0 6px;
+  font: 700 20px/30px var(--font);
+  color: var(--ink);
+}
+
+.imp .dv-panel > p {
+  margin: 0 0 14px;
+  font: 400 15px/24px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .dv-panel .imp-actions {
+  margin-top: 20px;
+}
+
+.imp .dv-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.imp .dv-step:first-child {
+  border-top: 0;
+}
+
+.imp .dv-step .st-t {
+  font: 600 15px/24px var(--font);
+  color: var(--ink);
+}
+
+.imp .dv-step .st-s {
+  display: block;
+  font: 400 13px/20px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .dv-state {
+  font: 600 13px/20px var(--font);
+  white-space: nowrap;
+}
+
+.imp .dv-state.ok {
+  color: var(--accent-ink);
+}
+
+.imp .dv-state.bad {
+  color: var(--attn);
+}
+
+@media (max-width: 720px) {
+  .imp .dv-lead {
+    padding: 14px 16px 0;
+  }
+
+  .imp .dv-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px 16px 120px;
+  }
+
+  .imp .dv-side {
+    position: static;
+  }
+
+  .imp .dv-bar {
+    padding: 12px 16px;
+  }
+
+  .imp .dv-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .imp .dv-to {
+    grid-column: 2;
+    justify-content: flex-start;
+    max-width: none;
   }
 }

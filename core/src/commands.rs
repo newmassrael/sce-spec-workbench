@@ -32,6 +32,7 @@ use crate::codex_status;
 use crate::codex_support::Support;
 use crate::connection::{AdapterKind, Connection};
 use crate::connection_store::ConnectionStore;
+use crate::divide_host;
 use crate::import_host::{self, ImportTools};
 use crate::server_status;
 
@@ -51,6 +52,9 @@ pub const COMMANDS: &[&str] = &[
     "import_document",
     "read_document",
     "import_selection",
+    "divide_document",
+    "read_division",
+    "confirm_division",
     "assemble_import",
     "accept_import",
 ];
@@ -84,7 +88,14 @@ pub const COMMANDS: &[&str] = &[
 /// converts, checks and proposes the parts named. `import_document` is the same as choosing every
 /// part. They are added, so no caller of 4 misreads one; the version moves because a screen that offers
 /// a choice of parts is held to a core that answers it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 5;
+///
+/// 6: `divide_document`, `read_division` and `confirm_division`, the division of a document among specs
+/// (ADR 0040 of SCE): the first starts it from a document a spec holds and says the parts the owner can
+/// send, the second says an intake as it is, the third saves the owner's plan as the ledger, has SCE count
+/// it and, when no paragraph is left without a place, walks the specs and proposes each one's part. They
+/// are added, so no caller of 5 misreads one; the version moves because a screen that divides is held to a
+/// core that answers it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 6;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -125,6 +136,9 @@ pub const IMPORT_COMMANDS: &[&str] = &[
     "import_document",
     "read_document",
     "import_selection",
+    "divide_document",
+    "read_division",
+    "confirm_division",
     "assemble_import",
     "accept_import",
 ];
@@ -496,6 +510,9 @@ fn call_import<C: Clock>(
         "import_document" => import_host::import_document(context, arguments(args)?),
         "read_document" => import_host::read_document(context, arguments(args)?),
         "import_selection" => import_host::import_selection(context, arguments(args)?),
+        "divide_document" => divide_host::divide_document(context, arguments(args)?),
+        "read_division" => divide_host::read_division(context, arguments(args)?),
+        "confirm_division" => divide_host::confirm_division(context, arguments(args)?),
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),
         other => Err(unknown_command(other, &all_commands())),

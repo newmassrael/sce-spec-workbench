@@ -68,6 +68,209 @@
       },
       "text": "# Door lock\n\nThe lock opens when the code matches.\n"
     },
+    "confirm_division": {
+      "complete": true,
+      "failed": 0,
+      "ledger": "c91863e94068029aaa860b260729f815f8799b370c2f1ad7d81915fb5a52bcb7",
+      "proposed": 2,
+      "report": {
+        "complete": true,
+        "contradicting": [],
+        "destinations": [
+          {
+            "blocks": 2,
+            "to": {
+              "kind": "new",
+              "title": "Fan control"
+            },
+            "with_words": 2
+          },
+          {
+            "blocks": 4,
+            "to": {
+              "kind": "new",
+              "title": "Lamp control"
+            },
+            "with_words": 4
+          }
+        ],
+        "empty": [],
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "in_specs": 6,
+        "ledger": "c91863e94068029aaa860b260729f815f8799b370c2f1ad7d81915fb5a52bcb7",
+        "left_out": 0,
+        "shared": [],
+        "unplaced": [],
+        "words": 6
+      },
+      "steps": [
+        {
+          "created": true,
+          "proposal": {
+            "id": "<divided-proposal-1>",
+            "state": "pending"
+          },
+          "spec": "<divided-spec-1>",
+          "state": "proposed",
+          "to": {
+            "kind": "new",
+            "title": "Fan control"
+          }
+        },
+        {
+          "created": true,
+          "proposal": {
+            "id": "<divided-proposal-2>",
+            "state": "pending"
+          },
+          "spec": "<divided-spec-2>",
+          "state": "proposed",
+          "to": {
+            "kind": "new",
+            "title": "Lamp control"
+          }
+        }
+      ]
+    },
+    "confirm_division_step_refused": {
+      "complete": true,
+      "failed": 1,
+      "ledger": "00091411f4a2f6906d7e5c4ade441f568de6376d109af2bd8b00e2ec17b8a7a2",
+      "proposed": 0,
+      "report": {
+        "complete": true,
+        "contradicting": [],
+        "destinations": [
+          {
+            "blocks": 6,
+            "to": {
+              "kind": "new",
+              "title": "Lamp control"
+            },
+            "with_words": 6
+          }
+        ],
+        "empty": [],
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "in_specs": 6,
+        "ledger": "00091411f4a2f6906d7e5c4ade441f568de6376d109af2bd8b00e2ec17b8a7a2",
+        "left_out": 0,
+        "shared": [],
+        "unplaced": [],
+        "words": 6
+      },
+      "steps": [
+        {
+          "error": {
+            "detail": {
+              "proposal": "<divided-proposal-2>"
+            },
+            "kind": "active-proposal",
+            "message": "the spec already has an open proposal (<divided-proposal-2>); ask to replace it, or accept or reject it"
+          },
+          "spec": "<divided-spec-2>",
+          "state": "failed",
+          "to": {
+            "kind": "new",
+            "title": "Lamp control"
+          }
+        }
+      ]
+    },
+    "confirm_division_unplaced": {
+      "complete": false,
+      "failed": 0,
+      "ledger": "8ec575b190f23d20b10e80f384fbb0c566392637a23daef35f86c5c0771489bf",
+      "proposed": 0,
+      "report": {
+        "complete": false,
+        "contradicting": [],
+        "destinations": [
+          {
+            "blocks": 2,
+            "to": {
+              "kind": "new",
+              "title": "Lamp control"
+            },
+            "with_words": 2
+          }
+        ],
+        "empty": [],
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "in_specs": 2,
+        "ledger": "8ec575b190f23d20b10e80f384fbb0c566392637a23daef35f86c5c0771489bf",
+        "left_out": 0,
+        "shared": [],
+        "unplaced": [
+          "b0003",
+          "b0004",
+          "b0005",
+          "b0006"
+        ],
+        "words": 6
+      },
+      "steps": []
+    },
+    "divide_document": {
+      "created": true,
+      "intake": {
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "id": "<intake-id>",
+        "key": "div-1",
+        "member": "functions.md",
+        "origin": "gui",
+        "original": "627012e248b20aafca2a7395ed65793a5d78122d48c7794c2150a83d04cde563",
+        "title": "functions"
+      },
+      "not_carried": [],
+      "outline": {
+        "by": "headings",
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "sections": [
+          {
+            "blocks": 2,
+            "characters": 19,
+            "id": "s1",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Lamp",
+            "tree_blocks": 4,
+            "tree_characters": 55
+          },
+          {
+            "blocks": 2,
+            "characters": 36,
+            "id": "s2",
+            "kind": "heading",
+            "level": 2,
+            "page_first": null,
+            "page_last": null,
+            "parent": "s1",
+            "title": "Timing",
+            "tree_blocks": 2,
+            "tree_characters": 36
+          },
+          {
+            "blocks": 2,
+            "characters": 33,
+            "id": "s3",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Fan",
+            "tree_blocks": 2,
+            "tree_characters": 33
+          }
+        ],
+        "v": 1
+      }
+    },
     "import_document": {
       "complete": true,
       "created": true,
@@ -115,6 +318,103 @@
         "scope": "793bd9e4e38ba7d4204063ac7246cb36fc2acf1646d301108f0750b501f63776",
         "seq": 1,
         "state": "pending"
+      }
+    },
+    "read_division": {
+      "division": {
+        "bindings": [
+          {
+            "at": "2026-10-03T09:00:00Z",
+            "spec": "<divided-spec-1>",
+            "title": "Fan control"
+          },
+          {
+            "at": "2026-10-03T09:00:00Z",
+            "spec": "<divided-spec-2>",
+            "title": "Lamp control"
+          }
+        ],
+        "destinations": [
+          {
+            "blocks": 6,
+            "reason": "",
+            "spec": "<divided-spec-2>",
+            "spec_missing": false,
+            "to": {
+              "kind": "new",
+              "title": "Lamp control"
+            }
+          }
+        ],
+        "intake": {
+          "created_at": "2026-10-03T09:00:00Z",
+          "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+          "id": "<intake-id>",
+          "key": "div-1",
+          "member": "functions.md",
+          "origin": "gui",
+          "original": "627012e248b20aafca2a7395ed65793a5d78122d48c7794c2150a83d04cde563",
+          "title": "functions"
+        },
+        "ledger": {
+          "entry": {
+            "at": "2026-10-03T09:00:00Z",
+            "complete": true,
+            "digest": "00091411f4a2f6906d7e5c4ade441f568de6376d109af2bd8b00e2ec17b8a7a2",
+            "n": 3,
+            "parent": "c91863e94068029aaa860b260729f815f8799b370c2f1ad7d81915fb5a52bcb7",
+            "report": "1a93dd93ae1a51f2e35abadc06b737f2f209daa7329c930f0d4265902553e2c3"
+          },
+          "report": "{\"complete\": true, \"contradicting\": [], \"destinations\": [{\"blocks\": 6, \"to\": {\"kind\": \"new\", \"title\": \"Lamp control\"}, \"with_words\": 6}], \"empty\": [], \"extraction\": \"2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08\", \"in_specs\": 6, \"ledger\": \"00091411f4a2f6906d7e5c4ade441f568de6376d109af2bd8b00e2ec17b8a7a2\", \"left_out\": 0, \"shared\": [], \"unplaced\": [], \"words\": 6}",
+          "text": "{\"allotments\":[{\"blocks\":[\"b0001\",\"b0002\",\"b0003\",\"b0004\",\"b0005\",\"b0006\"],\"to\":{\"kind\":\"new\",\"title\":\"Lamp control\"}}],\"extraction\":\"2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08\",\"v\":1}"
+        }
+      },
+      "not_carried": [],
+      "outline": {
+        "by": "headings",
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "sections": [
+          {
+            "blocks": 2,
+            "characters": 19,
+            "id": "s1",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Lamp",
+            "tree_blocks": 4,
+            "tree_characters": 55
+          },
+          {
+            "blocks": 2,
+            "characters": 36,
+            "id": "s2",
+            "kind": "heading",
+            "level": 2,
+            "page_first": null,
+            "page_last": null,
+            "parent": "s1",
+            "title": "Timing",
+            "tree_blocks": 2,
+            "tree_characters": 36
+          },
+          {
+            "blocks": 2,
+            "characters": 33,
+            "id": "s3",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Fan",
+            "tree_blocks": 2,
+            "tree_characters": 33
+          }
+        ],
+        "v": 1
       }
     },
     "read_document": {

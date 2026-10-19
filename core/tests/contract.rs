@@ -1689,6 +1689,113 @@ fn replies() -> Value {
             json!({"id": original_id, "original": original}),
         ),
     );
+    // A document divided among specs (ADR 0040): kept beside the specs as an intake, with the owner's
+    // ledger of where each paragraph goes and SCE's count of it. The ledger and the count are what the
+    // authoring tools write; the store keeps them as given, so the cases write them as the tools do.
+    let intake_blocks: Vec<Value> = ["b1", "b2", "b3", "b4", "b5", "b6"]
+        .iter()
+        .map(|id| json!({"id": id}))
+        .collect();
+    let intake_extraction = json!({
+        "v": 1, "extractor": "plain", "extractor_version": "1", "member": "spec.md",
+        "blocks": intake_blocks,
+        "not_carried": [],
+    })
+    .to_string();
+    let started = answer(
+        &store,
+        "start_intake",
+        json!({
+            "key": "intake-1", "origin": "gui", "title": "Controller spec",
+            "members": [{"path": "spec.md", "role": "document", "data": "IyBEb29yIGxvY2sK"}],
+            "member": "spec.md", "extraction": intake_extraction,
+        }),
+    );
+    let intake_id = started["intake"]["id"].as_str().unwrap().to_string();
+    let intake_digest = started["intake"]["extraction"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    answers.insert("start_intake".into(), started);
+    // An intake made of a spec's own document is named after the spec too, so its id varies.
+    let from_spec = answer(
+        &store,
+        "start_intake_from_spec",
+        json!({
+            "id": original_id, "original": original, "extraction": extraction,
+            "key": "intake-2", "origin": "gui", "title": "Door lock, from a document",
+        }),
+    );
+    let from_spec_intake_id = from_spec["intake"]["id"].as_str().unwrap().to_string();
+    answers.insert("start_intake_from_spec".into(), from_spec);
+    answers.insert(
+        "read_intake_extraction".into(),
+        answer(&store, "read_intake_extraction", json!({"id": intake_id})),
+    );
+    answers.insert(
+        "list_intakes".into(),
+        answer(&store, "list_intakes", json!({})),
+    );
+    let division_spec = answer(&store, "create_spec", json!({"title": "Lamp"}));
+    let division_spec_id = division_spec["id"].as_str().unwrap().to_string();
+    let fan_spec = answer(&store, "create_spec", json!({"title": "Fan"}));
+    let fan_spec_id = fan_spec["id"].as_str().unwrap().to_string();
+    // Both destinations are specs to be made, so that the ledger, and its hash, name no spec id.
+    let ledger = json!({
+        "v": 1, "extraction": intake_digest,
+        "allotments": [
+            {"to": {"kind": "new", "title": "Lamp"}, "blocks": ["b1", "b2", "b3"]},
+            {"to": {"kind": "new", "title": "Fan"}, "blocks": ["b4", "b5", "b6"]},
+        ],
+    })
+    .to_string();
+    let count = json!({
+        "extraction": intake_digest, "ledger": sce_specs::Revision::of(ledger.as_bytes()).as_str(),
+        "complete": true, "unplaced": [],
+    })
+    .to_string();
+    answers.insert(
+        "save_ledger".into(),
+        answer(
+            &store,
+            "save_ledger",
+            json!({"id": intake_id, "ledger": ledger, "report": count}),
+        ),
+    );
+    answers.insert(
+        "bind_new_spec".into(),
+        answer(
+            &store,
+            "bind_new_spec",
+            json!({"id": intake_id, "title": "Fan", "spec": fan_spec_id}),
+        ),
+    );
+    answer(
+        &store,
+        "bind_new_spec",
+        json!({"id": intake_id, "title": "Lamp", "spec": division_spec_id}),
+    );
+    answers.insert(
+        "give_intake_to_spec".into(),
+        answer(
+            &store,
+            "give_intake_to_spec",
+            json!({"id": intake_id, "spec": division_spec_id}),
+        ),
+    );
+    answers.insert(
+        "read_intake".into(),
+        answer(&store, "read_intake", json!({"id": intake_id})),
+    );
+    refusals.insert(
+        "bad-ledger".into(),
+        refusal(
+            &store,
+            "save_ledger",
+            json!({"id": intake_id, "ledger": "{}", "report": count}),
+        ),
+    );
+
     refusals.insert(
         "bad-original".into(),
         refusal(
@@ -1925,6 +2032,10 @@ fn replies() -> Value {
     name_the_unstable(&mut document, &proposal_id, "<proposal-id>");
     name_the_unstable(&mut document, &moved_proposal_id, "<moved-proposal-id>");
     name_the_unstable(&mut document, &carried_id, "<carried-proposal-id>");
+    name_the_unstable(&mut document, &intake_id, "<intake-id>");
+    name_the_unstable(&mut document, &division_spec_id, "<division-spec-id>");
+    name_the_unstable(&mut document, &fan_spec_id, "<fan-spec-id>");
+    name_the_unstable(&mut document, &from_spec_intake_id, "<spec-intake-id>");
     // A revision stays the shape of one, so that the screen's guard reads the file as it
     // would read the core.
     name_the_unstable(&mut document, &bundle_revision, &"b".repeat(64));

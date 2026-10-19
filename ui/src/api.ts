@@ -33,6 +33,8 @@ import {
   parseProposalView,
   parseQueue,
   parseReadConnection,
+  parseConfirmedDivision,
+  parseDividedDocument,
   parseReadDocument,
   parseReadRevisionReport,
   parseRegisteredRequest,
@@ -72,6 +74,9 @@ import {
   type Listing,
   type Proposal,
   type ProposalAccepted,
+  type ConfirmedDivision,
+  type DividedDocument,
+  type PlannedAllotment,
   type ReadDocument,
   type ProposalDecision,
   type ProposalDocuments,
@@ -307,6 +312,25 @@ export interface Api {
     sections?: readonly string[],
     supersede?: boolean,
   ): Promise<ImportedDocument>;
+  /**
+   * Begin dividing a document a spec holds among specs (ADR 0040 of SCE): it is kept beside the specs as an
+   * intake, and the parts the owner can send are said. Nothing is made of it yet. The same `key` is the same
+   * intake.
+   */
+  divideDocument(id: string, document: ReadDocument, title: string, key: string): Promise<DividedDocument>;
+  /**
+   * Make the owner's plan the intake's ledger and have SCE count it. A plan that leaves a paragraph without
+   * a place is answered with the count and nothing is made (`complete: false`). One that leaves none walks
+   * the specs: makes the ones to be made and proposes each one's part, and each step says what became of it.
+   * Without a plan the ledger the intake is at is walked as it is, which finishes a walk that stopped.
+   * `supersede` replaces the proposal a spec is already waiting on. Refused as `bad-division` (the tools
+   * would not take the plan) or `no-division` (no plan, and no ledger yet).
+   */
+  confirmDivision(
+    intake: string,
+    destinations?: readonly PlannedAllotment[],
+    supersede?: boolean,
+  ): Promise<ConfirmedDivision>;
   /** The proposals of the spec, the newest first. */
   listProposals(id: string): Promise<Proposal[]>;
   /** One proposal with its decisions, what is still asked, and whether the text is where it was. */
@@ -521,6 +545,19 @@ export function apiOver(transport: Transport): Api {
         ...(supersede ? { supersede: true } : {}),
       };
       return parseImportedDocument(await transport.call("import_selection", args));
+    },
+    async divideDocument(id, document, title, key) {
+      const args = { id, original: document.original, extraction: document.extraction, title, key, origin: "gui" };
+      return parseDividedDocument(await transport.call("divide_document", args));
+    },
+    async confirmDivision(intake, destinations, supersede = false) {
+      const args = {
+        id: intake,
+        origin: "gui",
+        ...(destinations === undefined ? {} : { destinations }),
+        ...(supersede ? { supersede: true } : {}),
+      };
+      return parseConfirmedDivision(await transport.call("confirm_division", args));
     },
     async listProposals(id) {
       return parseProposalList(await transport.call("list_proposals", { id }));

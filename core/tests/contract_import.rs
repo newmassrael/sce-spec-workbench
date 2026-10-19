@@ -243,6 +243,62 @@ fn replies() -> Value {
         );
     }
 
+    // A document divided among specs: begun from the spec that holds it, a plan that leaves a part
+    // without a place (SCE's count is the answer), a plan that leaves none (the walk), and a plan after
+    // that, whose first spec already waits on a document (a step the walk could not take).
+    let source = ask("create_spec", json!({"title": "Divided source"}));
+    let source_id = source["id"].as_str().unwrap().to_string();
+    let held = ask(
+        "read_document",
+        json!({"id": source_id, "name": "functions.md", "data": base64(TWO_FUNCTIONS.as_bytes())}),
+    );
+    let divided = ask(
+        "divide_document",
+        json!({
+            "id": source_id, "original": held["original"], "extraction": held["extraction"],
+            "title": "functions", "key": "div-1", "origin": "gui",
+        }),
+    );
+    let intake_id = divided["intake"]["id"].as_str().unwrap().to_string();
+    let confirm = |plan: Value| json!({"id": intake_id, "destinations": plan, "origin": "gui"});
+    let lamp_and_fan = json!([
+        {"to": {"kind": "new", "title": "Lamp control"}, "sections": ["s1", "s2"]},
+        {"to": {"kind": "new", "title": "Fan control"}, "sections": ["s3"]},
+    ]);
+    answers.insert("divide_document".into(), divided);
+    answers.insert(
+        "confirm_division_unplaced".into(),
+        ask(
+            "confirm_division",
+            confirm(json!([{"to": {"kind": "new", "title": "Lamp control"}, "sections": ["s1"]}])),
+        ),
+    );
+    let walked = ask("confirm_division", confirm(lamp_and_fan));
+    // What the walk made has ids that vary between runs: the specs, and the proposals of each.
+    let made: Vec<(String, String)> = walked["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|step| {
+            (
+                step["spec"].as_str().unwrap().to_string(),
+                step["proposal"]["id"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    answers.insert("confirm_division".into(), walked);
+    answers.insert(
+        "confirm_division_step_refused".into(),
+        ask(
+            "confirm_division",
+            confirm(json!([{"to": {"kind": "new", "title": "Lamp control"}, "sections": ["s1", "s2", "s3"]}])),
+        ),
+    );
+    answers.insert(
+        "read_division".into(),
+        ask("read_division", json!({"id": intake_id})),
+    );
+
     for command in IMPORT_COMMANDS {
         assert!(
             answers.keys().any(|name| name == command),
@@ -257,6 +313,20 @@ fn replies() -> Value {
     });
     name_the_unstable(&mut document, &root.display().to_string(), "<root>");
     name_the_unstable(&mut document, &spec_id, "<spec-id>");
+    name_the_unstable(&mut document, &source_id, "<source-spec-id>");
+    name_the_unstable(&mut document, &intake_id, "<intake-id>");
+    for (number, (made_spec, made_proposal)) in made.iter().enumerate() {
+        name_the_unstable(
+            &mut document,
+            made_spec,
+            &format!("<divided-spec-{}>", number + 1),
+        );
+        name_the_unstable(
+            &mut document,
+            made_proposal,
+            &format!("<divided-proposal-{}>", number + 1),
+        );
+    }
     name_the_unstable(&mut document, &parts_id, "<parts-spec-id>");
     name_the_unstable(&mut document, &part_proposal, "<part-proposal-id>");
     name_the_unstable(&mut document, &proposal, "<proposal-id>");

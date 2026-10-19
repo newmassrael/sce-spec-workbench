@@ -42,6 +42,14 @@
       "digest": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73",
       "members": 2
     },
+    "bind_new_spec": {
+      "binding": {
+        "at": "2026-10-03T09:00:00Z",
+        "spec": "<fan-spec-id>",
+        "title": "Fan"
+      },
+      "created": true
+    },
     "bundle_history": {
       "entries": [
         {
@@ -160,8 +168,8 @@
       "deleted": "main"
     },
     "describe": {
-      "application_command_set_version": 5,
-      "command_set_version": 33,
+      "application_command_set_version": 6,
+      "command_set_version": 35,
       "commands": [
         "describe",
         "list_specs",
@@ -222,6 +230,14 @@
         "accept_proposal",
         "reject_proposal",
         "rebase_proposal",
+        "start_intake",
+        "start_intake_from_spec",
+        "read_intake",
+        "read_intake_extraction",
+        "list_intakes",
+        "save_ledger",
+        "bind_new_spec",
+        "give_intake_to_spec",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -235,6 +251,9 @@
         "import_document",
         "read_document",
         "import_selection",
+        "divide_document",
+        "read_division",
+        "confirm_division",
         "assemble_import",
         "accept_import"
       ],
@@ -245,8 +264,8 @@
       "writes_settings": false
     },
     "describe_desktop": {
-      "application_command_set_version": 5,
-      "command_set_version": 33,
+      "application_command_set_version": 6,
+      "command_set_version": 35,
       "commands": [
         "describe",
         "list_specs",
@@ -307,6 +326,14 @@
         "accept_proposal",
         "reject_proposal",
         "rebase_proposal",
+        "start_intake",
+        "start_intake_from_spec",
+        "read_intake",
+        "read_intake_extraction",
+        "list_intakes",
+        "save_ledger",
+        "bind_new_spec",
+        "give_intake_to_spec",
         "list_connections",
         "read_connection",
         "read_auth_policy",
@@ -320,6 +347,9 @@
         "import_document",
         "read_document",
         "import_selection",
+        "divide_document",
+        "read_division",
+        "confirm_division",
         "assemble_import",
         "accept_import"
       ],
@@ -410,6 +440,10 @@
       "claude": [],
       "codex": []
     },
+    "give_intake_to_spec": {
+      "extraction": "61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a",
+      "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd"
+    },
     "heartbeat_request": {
       "request": {
         "attempt": 1,
@@ -494,6 +528,30 @@
           "extractor_version": "1",
           "member": "spec.md",
           "original": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73"
+        }
+      ]
+    },
+    "list_intakes": {
+      "intakes": [
+        {
+          "created_at": "2026-10-03T09:00:00Z",
+          "extraction": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029",
+          "id": "<spec-intake-id>",
+          "key": "intake-2",
+          "member": "spec.md",
+          "origin": "gui",
+          "original": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73",
+          "title": "Door lock, from a document"
+        },
+        {
+          "created_at": "2026-10-03T09:00:00Z",
+          "extraction": "61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a",
+          "id": "<intake-id>",
+          "key": "intake-1",
+          "member": "spec.md",
+          "origin": "gui",
+          "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+          "title": "Controller spec"
         }
       ]
     },
@@ -1682,6 +1740,68 @@
       ],
       "unreadable": []
     },
+    "read_intake": {
+      "bindings": [
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "spec": "<fan-spec-id>",
+          "title": "Fan"
+        },
+        {
+          "at": "2026-10-03T09:00:00Z",
+          "spec": "<division-spec-id>",
+          "title": "Lamp"
+        }
+      ],
+      "destinations": [
+        {
+          "blocks": 3,
+          "reason": "",
+          "spec": "<division-spec-id>",
+          "spec_missing": false,
+          "to": {
+            "kind": "new",
+            "title": "Lamp"
+          }
+        },
+        {
+          "blocks": 3,
+          "reason": "",
+          "spec": "<fan-spec-id>",
+          "spec_missing": false,
+          "to": {
+            "kind": "new",
+            "title": "Fan"
+          }
+        }
+      ],
+      "intake": {
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a",
+        "id": "<intake-id>",
+        "key": "intake-1",
+        "member": "spec.md",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "title": "Controller spec"
+      },
+      "ledger": {
+        "entry": {
+          "at": "2026-10-03T09:00:00Z",
+          "complete": true,
+          "digest": "cd6bcc541016c6254139849a2cc3033aad4879c2202c62c25d4b96611dee354c",
+          "n": 1,
+          "parent": null,
+          "report": "61010694421c69d894f73da1ac825d8d81700fd75c4b3ad093bc1c7d15e43ba5"
+        },
+        "report": "{\"complete\":true,\"extraction\":\"61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a\",\"ledger\":\"cd6bcc541016c6254139849a2cc3033aad4879c2202c62c25d4b96611dee354c\",\"unplaced\":[]}",
+        "text": "{\"allotments\":[{\"blocks\":[\"b1\",\"b2\",\"b3\"],\"to\":{\"kind\":\"new\",\"title\":\"Lamp\"}},{\"blocks\":[\"b4\",\"b5\",\"b6\"],\"to\":{\"kind\":\"new\",\"title\":\"Fan\"}}],\"extraction\":\"61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a\",\"v\":1}"
+      }
+    },
+    "read_intake_extraction": {
+      "digest": "61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a",
+      "text": "{\"blocks\":[{\"id\":\"b1\"},{\"id\":\"b2\"},{\"id\":\"b3\"},{\"id\":\"b4\"},{\"id\":\"b5\"},{\"id\":\"b6\"}],\"extractor\":\"plain\",\"extractor_version\":\"1\",\"member\":\"spec.md\",\"not_carried\":[],\"v\":1}"
+    },
     "read_judgment_accepted": {
       "acceptance": {
         "said": {
@@ -2832,6 +2952,17 @@
       "created": true,
       "digest": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029"
     },
+    "save_ledger": {
+      "created": true,
+      "entry": {
+        "at": "2026-10-03T09:00:00Z",
+        "complete": true,
+        "digest": "cd6bcc541016c6254139849a2cc3033aad4879c2202c62c25d4b96611dee354c",
+        "n": 1,
+        "parent": null,
+        "report": "61010694421c69d894f73da1ac825d8d81700fd75c4b3ad093bc1c7d15e43ba5"
+      }
+    },
     "save_model_first": {
       "outcome": "saved",
       "parent": null,
@@ -2915,10 +3046,36 @@
     },
     "set_default_connection": {
       "default": "main"
+    },
+    "start_intake": {
+      "created": true,
+      "intake": {
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "61d3d0c4e7074d5c1e02688c831fbec29327bb79900a455d3c90d30f2a29807a",
+        "id": "<intake-id>",
+        "key": "intake-1",
+        "member": "spec.md",
+        "origin": "gui",
+        "original": "8cefddbc86549f06fea7fa277d7461df728d35e2c77beb4f0171963fb11786fd",
+        "title": "Controller spec"
+      }
+    },
+    "start_intake_from_spec": {
+      "created": true,
+      "intake": {
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "52245652228032189c5debcf968104bccd48ddaaf2ce53fe88413d8c2e762029",
+        "id": "<spec-intake-id>",
+        "key": "intake-2",
+        "member": "spec.md",
+        "origin": "gui",
+        "original": "a8b3e725d6bf8f88cc272f232bb53c266df2dffa6e2960359d459836eb464e73",
+        "title": "Door lock, from a document"
+      }
     }
   },
-  "application_command_set_version": 5,
-  "command_set_version": 33,
+  "application_command_set_version": 6,
+  "command_set_version": 35,
   "refusals": {
     "active-proposal": {
       "detail": {
@@ -2950,6 +3107,10 @@
       },
       "kind": "bad-lease",
       "message": "a lease of 5 seconds cannot be kept or is not worth holding: ask for 10 to 900"
+    },
+    "bad-ledger": {
+      "kind": "bad-ledger",
+      "message": "a ledger is of a version this core does not read"
     },
     "bad-original": {
       "detail": {
@@ -3274,7 +3435,7 @@
     },
     "unknown-command": {
       "kind": "unknown-command",
-      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, propose_import, read_proposal, list_proposals, read_proposal_documents, decide_block, accept_proposal, reject_proposal, rebase_proposal, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection, import_document, read_document, import_selection, assemble_import, accept_import"
+      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, propose_import, read_proposal, list_proposals, read_proposal_documents, decide_block, accept_proposal, reject_proposal, rebase_proposal, start_intake, start_intake_from_spec, read_intake, read_intake_extraction, list_intakes, save_ledger, bind_new_spec, give_intake_to_spec, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection, import_document, read_document, import_selection, divide_document, read_division, confirm_division, assemble_import, accept_import"
     },
     "wrong-connection": {
       "detail": {

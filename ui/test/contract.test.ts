@@ -66,6 +66,16 @@ import {
   parseReadAnswers,
   parseReadConnection,
   parseReadDocument,
+  parseBound,
+  parseConfirmedDivision,
+  parseDividedDocument,
+  parseDivision,
+  parseIntakeExtraction,
+  parseIntakeGiven,
+  parseIntakeList,
+  parseIntakeRead,
+  parseIntakeStarted,
+  parseLedgerSaved,
   parseReadModel,
   parseReadRequirements,
   parseReadSource,
@@ -109,6 +119,17 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   import_selection: parseImportedDocument,
   assemble_import: parseAssembledImport,
   accept_import: parseImportAccepted,
+  divide_document: parseDividedDocument,
+  read_division: parseDivision,
+  confirm_division: parseConfirmedDivision,
+  start_intake: (v) => parseIntakeStarted(v, "start_intake"),
+  start_intake_from_spec: (v) => parseIntakeStarted(v, "start_intake_from_spec"),
+  read_intake: parseIntakeRead,
+  read_intake_extraction: parseIntakeExtraction,
+  list_intakes: parseIntakeList,
+  save_ledger: parseLedgerSaved,
+  bind_new_spec: parseBound,
+  give_intake_to_spec: parseIntakeGiven,
   list_specs: parseListing,
   create_spec: (v) => parseSpec(v),
   read_spec: parseSpecAndHead,
@@ -711,6 +732,36 @@ describe("the replies the core gives", () => {
     for (const kind of ["nothing-chosen", "bad-section", "scope-refused"]) {
       expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
     }
+  });
+
+  it("say the parts of a document being divided, SCE's count of a plan and what became of each spec", () => {
+    const begun = parseDividedDocument(importReplies.answers["divide_document"]);
+    expect(begun.created).toBe(true);
+    expect(begun.outline.sections.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
+
+    // A plan that leaves a part without a place is the count and nothing walked.
+    const unplaced = parseConfirmedDivision(importReplies.answers["confirm_division_unplaced"]);
+    expect(unplaced).toMatchObject({ complete: false, proposed: 0, failed: 0, steps: [] });
+    expect(unplaced.report.unplaced.length).toBeGreaterThan(0);
+
+    // A plan that leaves none: a step for each spec, each with the proposal it made.
+    const walked = parseConfirmedDivision(importReplies.answers["confirm_division"]);
+    expect(walked).toMatchObject({ complete: true, proposed: 2, failed: 0 });
+    expect(walked.steps.map((s) => [s.to.kind, s.to.title, s.state])).toEqual([
+      ["new", "Fan control", "proposed"],
+      ["new", "Lamp control", "proposed"],
+    ]);
+    expect(walked.steps.every((s) => s.proposal?.state === "pending" && s.spec !== null)).toBe(true);
+
+    // A step the walk could not take says why in the core's kind, and the proposal that is in the way.
+    const refused = parseConfirmedDivision(importReplies.answers["confirm_division_step_refused"]);
+    expect(refused).toMatchObject({ complete: true, proposed: 0, failed: 1 });
+    expect(refused.steps[0]?.error?.kind).toBe("active-proposal");
+    expect(refused.steps[0]?.error?.detail["proposal"]).toBe("<divided-proposal-2>");
+
+    const read = parseDivision(importReplies.answers["read_division"]);
+    expect(read.division.ledger?.entry.complete).toBe(true);
+    expect(read.division.bindings.map((b) => b.title)).toEqual(["Fan control", "Lamp control"]);
   });
 
   it("refuse a document by the word the screen branches on, and carry what it needs to say it", () => {

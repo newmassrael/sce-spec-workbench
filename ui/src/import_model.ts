@@ -28,6 +28,11 @@ export type ImportStage =
    * is converted or checked yet, and nothing is sent to a model.
    */
   | { readonly kind: "parts"; readonly name: string; readonly spec: Spec; readonly doc: ReadDocument }
+  /**
+   * The owner is dividing the document among specs (ADR 0040 of SCE): the core kept it as an intake, and
+   * what has been placed is the division's (`divide_flow.ts`). `spec` is the one that holds the document.
+   */
+  | { readonly kind: "divide"; readonly name: string; readonly spec: Spec; readonly doc: ReadDocument }
   /** The core would not take it, and what the person can do. */
   | { readonly kind: "refused"; readonly name: string; readonly failure: ImportFailure }
   /** A proposal is waiting for the person: this is the review. */

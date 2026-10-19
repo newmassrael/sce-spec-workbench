@@ -331,6 +331,7 @@ export class App {
       finished: (spec, info) => void this.finishImport(spec, info),
       now: () => Date.now(),
       canLeave: () => this.listing !== null && this.listing.specs.length > 0,
+      specs: () => this.listing?.specs ?? [],
     });
   }
 

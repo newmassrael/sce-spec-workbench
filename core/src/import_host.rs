@@ -138,10 +138,10 @@ fn found_beside_or_on_path(name: &str) -> Option<PathBuf> {
 }
 
 /// A folder made for one run of the tools and removed when the run is done, whatever way it ends.
-struct Scratch(PathBuf);
+pub(crate) struct Scratch(PathBuf);
 
 impl Scratch {
-    fn new() -> Result<Self, CommandError> {
+    pub(crate) fn new() -> Result<Self, CommandError> {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -167,18 +167,18 @@ impl Scratch {
         Ok(Scratch(dir))
     }
 
-    fn path(&self, name: &str) -> PathBuf {
+    pub(crate) fn path(&self, name: &str) -> PathBuf {
         self.0.join(name)
     }
 
-    fn write(&self, name: &str, bytes: &[u8]) -> Result<PathBuf, CommandError> {
+    pub(crate) fn write(&self, name: &str, bytes: &[u8]) -> Result<PathBuf, CommandError> {
         let path = self.path(name);
         fs::write(&path, bytes)
             .map_err(|e| failed(format!("{} could not be written: {e}", path.display())))?;
         Ok(path)
     }
 
-    fn read(&self, name: &str) -> Result<String, CommandError> {
+    pub(crate) fn read(&self, name: &str) -> Result<String, CommandError> {
         let path = self.path(name);
         let bytes = fs::read(&path)
             .map_err(|e| failed(format!("the tool did not write {}: {e}", path.display())))?;
@@ -193,25 +193,39 @@ impl Drop for Scratch {
     }
 }
 
-fn refuse(kind: &'static str, message: impl Into<String>, detail: Value) -> CommandError {
+pub(crate) fn refuse(
+    kind: &'static str,
+    message: impl Into<String>,
+    detail: Value,
+) -> CommandError {
     CommandError::from(StoreError::refused(kind, message, detail))
 }
 
 /// A tool that could not be run, or gave an answer that is not one.
-fn failed(message: impl Into<String>) -> CommandError {
+pub(crate) fn failed(message: impl Into<String>) -> CommandError {
     refuse("import-tool-failed", message, Value::Null)
 }
 
 /// What a tool run produced.
-struct Ran {
-    code: i32,
-    stdout: String,
-    stderr: String,
+pub(crate) struct Ran {
+    pub(crate) code: i32,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
 }
 
 impl ImportTools {
+    /// How long a quick tool may take, and how long a reader of a document.
+    pub(crate) fn quick_limit(&self) -> Duration {
+        self.quick_timeout
+    }
+
     /// Run the tools with `args` in `dir`, to the end.
-    fn run(&self, dir: &Path, args: &[&str], timeout: Duration) -> Result<Ran, CommandError> {
+    pub(crate) fn run(
+        &self,
+        dir: &Path,
+        args: &[&str],
+        timeout: Duration,
+    ) -> Result<Ran, CommandError> {
         let mut command = std::process::Command::new(&self.program);
         command.args(args).current_dir(dir);
         let said = capture(command, timeout).map_err(|why| {
@@ -243,7 +257,7 @@ impl ImportTools {
     /// one it can take (`refused: <why>` on 2, and for `extract` also `unread [<kind>]: <why>` on
     /// 1): that is the document's refusal, said in the tool's words. Any other way of not
     /// succeeding is the tool's.
-    fn run_to_success(
+    pub(crate) fn run_to_success(
         &self,
         dir: &Path,
         args: &[&str],
@@ -286,7 +300,7 @@ fn document_refusal(stderr: &str) -> (String, Option<String>) {
 }
 
 /// What a tool said when it failed, shortened to what a person can read in a message.
-fn first_words(stderr: &str, stdout: &str) -> String {
+pub(crate) fn first_words(stderr: &str, stdout: &str) -> String {
     let said = if stderr.trim().is_empty() {
         stdout
     } else {
@@ -299,11 +313,17 @@ fn first_words(stderr: &str, stdout: &str) -> String {
     }
 }
 
-fn ask<C: Clock>(context: &Context<'_, C>, name: &str, args: Value) -> Result<Value, CommandError> {
+pub(crate) fn ask<C: Clock>(
+    context: &Context<'_, C>,
+    name: &str,
+    args: Value,
+) -> Result<Value, CommandError> {
     call_with(context.specs, context.product, &NoPins, name, args)
 }
 
-fn tools<'a, C: Clock>(context: &'a Context<'_, C>) -> Result<&'a ImportTools, CommandError> {
+pub(crate) fn tools<'a, C: Clock>(
+    context: &'a Context<'_, C>,
+) -> Result<&'a ImportTools, CommandError> {
     match context.import_tools {
         Some(Ok(tools)) => Ok(tools),
         Some(Err(why)) => Err(refuse("import-tool-missing", why.clone(), Value::Null)),
@@ -315,7 +335,7 @@ fn tools<'a, C: Clock>(context: &'a Context<'_, C>) -> Result<&'a ImportTools, C
     }
 }
 
-fn text_of(value: &Value, field: &str) -> Result<String, CommandError> {
+pub(crate) fn text_of(value: &Value, field: &str) -> Result<String, CommandError> {
     value
         .get(field)
         .and_then(Value::as_str)
@@ -578,7 +598,7 @@ pub(crate) fn import_document<C: Clock>(
     propose_part(context, tools, &proposing, &kept, None)
 }
 
-fn head_of<C: Clock>(context: &Context<'_, C>, id: &str) -> Result<Value, CommandError> {
+pub(crate) fn head_of<C: Clock>(context: &Context<'_, C>, id: &str) -> Result<Value, CommandError> {
     let heads = ask(context, "read_spec_heads", json!({ "id": id }))?;
     Ok(heads.get("source").cloned().unwrap_or(Value::Null))
 }

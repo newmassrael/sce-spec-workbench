@@ -13,6 +13,7 @@
 import type { Api } from "./api";
 import { CommandFailure } from "./ipc";
 import type { AssembledImport, DecisionKind, ReadDocument, Spec } from "./contract";
+import { DivideFlow } from "./divide_flow";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import {
@@ -64,6 +65,9 @@ export interface ImportHost {
     | "removeSpec"
     | "readDocument"
     | "importSelection"
+    | "divideDocument"
+    | "confirmDivision"
+    | "listSpecs"
     | "listProposals"
     | "readProposal"
     | "readProposalDocuments"
@@ -84,6 +88,8 @@ export interface ImportHost {
   readonly now: () => number;
   /** Whether there is a spec to go back to from the first screen: on the very first run there is none. */
   readonly canLeave: () => boolean;
+  /** The specs the screen knows, for the ones a document can be divided among. */
+  readonly specs: () => readonly Spec[];
 }
 
 /** What is read of a proposal once and kept, because it does not change while the proposal is open. */
@@ -128,7 +134,30 @@ export class ImportFlow {
   /** The proposal a spec is waiting on, as last asked; `null` when it waits on none. */
   private readonly pending = new Map<string, string | null>();
 
-  constructor(private readonly host: ImportHost) {}
+  /** The division of a document among specs, which the parts screen leads to. */
+  private readonly divide: DivideFlow;
+
+  constructor(private readonly host: ImportHost) {
+    this.divide = new DivideFlow({
+      api: host.api,
+      t: host.t,
+      redraw: host.redraw,
+      handled: host.handled,
+      explain: host.explain,
+      specs: host.specs,
+      focus: (key) => {
+        this.focusRequest = key;
+      },
+      openReview: (spec, proposal) => void this.reviewOf(spec, proposal),
+      committed: () => {
+        // The spec made for this file is a destination of a division now: it is not taken away with the choosing.
+        const stage = this.stage;
+        if (stage !== null && stage.kind === "divide") this.made.delete(stage.spec.id);
+      },
+      back: () => this.backFromDivide(),
+      leave: () => this.leaveDivision(),
+    });
+  }
 
   isOpen(): boolean {
     return this.stage !== null;
@@ -141,6 +170,7 @@ export class ImportFlow {
    */
   open(target: ImportTarget, opener?: string | null): void {
     this.ticket += 1;
+    this.divide.stop();
     this.target = target;
     if (opener !== undefined) this.opener = opener;
     this.enter({ kind: "choose" });
@@ -157,6 +187,7 @@ export class ImportFlow {
   close(returnFocus = false): void {
     if (this.stage === null) return;
     this.ticket += 1;
+    this.divide.stop();
     this.stage = null;
     if (returnFocus && this.opener !== null) this.focusRequest = this.opener;
     this.clearReview();
@@ -374,6 +405,69 @@ export class ImportFlow {
     this.host.redraw();
   }
 
+  /**
+   * The owner says the document is not for one spec: the core keeps it as an intake and says its parts, and
+   * the parts are placed among specs. The parts screen stays where it is while the core reads.
+   */
+  private async startDivision(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    const ticket = ++this.ticket;
+    this.press += 1;
+    try {
+      const divided = await this.host.api.divideDocument(
+        stage.spec.id,
+        stage.doc,
+        titleOf(stage.name, this.host.t("impNewSpecFallback")),
+        importKey(this.host.now(), this.press),
+      );
+      if (ticket !== this.ticket) return;
+      this.divide.start(stage.spec, stage.name, divided);
+      this.enter({ kind: "divide", name: stage.name, spec: stage.spec, doc: stage.doc });
+      this.host.redraw();
+    } catch (error) {
+      if (ticket !== this.ticket) return;
+      this.fail(error);
+    }
+  }
+
+  /** Back from dividing to choosing parts: what was placed is let go of, and the document stays kept. */
+  private backFromDivide(): void {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "divide") return;
+    this.ticket += 1;
+    this.divide.stop();
+    this.enter({ kind: "parts", name: stage.name, spec: stage.spec, doc: stage.doc });
+    this.host.redraw();
+  }
+
+  /** The division is over: the spec the document came from is shown, read again, since specs were made. */
+  private leaveDivision(): void {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "divide") return;
+    this.close(true);
+    this.host.finished(stage.spec, null);
+  }
+
+  /** Open the check of a proposal of a spec of the division, by the spec's id. */
+  private async reviewOf(specId: string, proposal: string): Promise<void> {
+    const ticket = this.ticket;
+    try {
+      const listing = await this.host.api.listSpecs();
+      const spec = listing.specs.find((s) => s.id === specId);
+      if (ticket !== this.ticket) return;
+      if (spec === undefined) {
+        this.notice = { tone: "error", text: this.host.t("dvSpecGone") };
+        this.host.redraw();
+        return;
+      }
+      await this.review(spec, proposal);
+    } catch (error) {
+      if (ticket !== this.ticket) return;
+      this.fail(error);
+    }
+  }
+
   private pressPart(id: string): void {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
@@ -544,8 +638,11 @@ export class ImportFlow {
                 },
                 onBring: () => void this.bringChosen(),
                 onBack: () => void this.backFromParts(),
+                onDivide: () => void this.startDivision(),
               })
-            : stage.kind === "refused"
+            : stage.kind === "divide"
+              ? this.divide.view()
+              : stage.kind === "refused"
             ? this.refusedView(stage.name, stage.failure)
             : this.reviewView(stage.spec);
     return h("section", { class: "imp" }, this.noticeBanner(stage.kind !== "review"), body);

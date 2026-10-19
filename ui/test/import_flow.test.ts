@@ -13,9 +13,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Api } from "../src/api";
 import type {
   AssembledImport,
+  ConfirmedDivision,
   DecisionKind,
+  DividedDocument,
+  DivisionStep,
   DocumentSection,
   ImportedDocument,
+  LedgerCount,
+  Listing,
+  PlannedAllotment,
   ReadDocument,
   Proposal,
   ProposalAccepted,
@@ -71,6 +77,11 @@ function section(id: string, title: string, parent: string | null = null): Docum
   };
 }
 
+/** SCE's count of a ledger that leaves nothing without a place. */
+function fullCount(): LedgerCount {
+  return { complete: true, words: 6, in_specs: 6, left_out: 0, unplaced: [], contradicting: [], shared: [], empty: [] };
+}
+
 /** The wire's gate: held back until the test lets it go. */
 function gate(): { opened: Promise<void>; open: () => void } {
   let open: () => void = () => undefined;
@@ -101,6 +112,20 @@ class FakeCore {
   readWith: (() => Promise<ReadDocument>) | null = null;
   /** The proposals made of part of a document. */
   readonly partial = new Set<string>();
+  /** What the next `confirm_division` answers instead of a proposal for each spec of the plan. */
+  confirmWith: ((plan: readonly PlannedAllotment[] | undefined) => ConfirmedDivision) | null = null;
+  /** The specs a division made, by the title they were made with. */
+  private readonly divided = new Map<string, Spec>();
+
+  /** The spec a division made for a title, made once. */
+  madeSpec(title: string): Spec {
+    const found = this.divided.get(title);
+    if (found !== undefined) return found;
+    const spec = { id: `spec-${this.listed.length + 1}`, title, created_at: "2026-10-19T00:00:00Z" };
+    this.listed.push(spec);
+    this.divided.set(title, spec);
+    return spec;
+  }
   /** The parts a document read now has. One part is a document with nothing to choose between. */
   sections: DocumentSection[] = [section("s1", "Door lock")];
   /** What the next `assemble_import` answers, besides the default. */
@@ -190,6 +215,53 @@ class FakeCore {
         not_carried: [],
         outline: { by: "headings", sections: this.sections },
       };
+    },
+    divideDocument: async (id, document, title, key): Promise<DividedDocument> => {
+      this.record("divide_document", id, title, key);
+      return {
+        intake: {
+          id: "intake-1",
+          title,
+          key,
+          origin: "gui",
+          created_at: "2026-10-19T00:00:00Z",
+          member: "functions.md",
+          original: document.original,
+          extraction: document.extraction,
+        },
+        created: true,
+        outline: document.outline,
+        not_carried: [],
+      };
+    },
+    confirmDivision: async (intake, destinations, supersede): Promise<ConfirmedDivision> => {
+      this.record("confirm_division", intake, destinations, supersede ?? false);
+      if (this.confirmWith !== null) return this.confirmWith(destinations);
+      const steps: DivisionStep[] = (destinations ?? []).flatMap((allotment) => {
+        if (allotment.to.kind === "left-out") return [];
+        const spec =
+          allotment.to.kind === "spec"
+            ? (this.listed.find((s) => s.id === (allotment.to as { spec: string }).spec) ?? this.listed[0])
+            : this.madeSpec((allotment.to as { title: string }).title);
+        if (spec === undefined) throw new Error("the fake core has no spec to divide into");
+        const stored = this.makeProposal(spec);
+        return [
+          {
+            to: allotment.to.kind === "spec"
+              ? { kind: "spec" as const, spec: spec.id, title: null }
+              : { kind: "new" as const, spec: null, title: (allotment.to as { title: string }).title },
+            spec: spec.id,
+            state: "proposed" as const,
+            proposal: { id: stored.proposal.id, state: "pending" },
+            error: null,
+          },
+        ];
+      });
+      return { complete: true, report: fullCount(), proposed: steps.length, failed: 0, steps };
+    },
+    listSpecs: async (): Promise<Listing> => {
+      this.record("list_specs");
+      return { specs: this.listed, unreadable: [] };
     },
     importSelection: async (id, _document, key, sections, supersede) => {
       this.record("import_selection", id, key, sections, supersede ?? false);
@@ -304,6 +376,9 @@ class FakeCore {
     | "removeSpec"
     | "readDocument"
     | "importSelection"
+    | "divideDocument"
+    | "confirmDivision"
+    | "listSpecs"
     | "listProposals"
     | "readProposal"
     | "readProposalDocuments"
@@ -351,6 +426,7 @@ function rig(): Rig {
     finished: (spec, info) => finished.push({ spec, info }),
     now: () => 1_000_000,
     canLeave: () => canLeave.value,
+    specs: () => core.listed,
   });
   return { flow, core, root, finished, handled };
 }
@@ -1253,6 +1329,286 @@ describe("a document with one part", () => {
     expect(r.root.textContent).not.toContain(say("impPartsLead"));
     expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
     expect(r.root.textContent).toContain(say("rvwSave"));
+  });
+});
+
+function dvBox(root: HTMLElement, id: string): HTMLInputElement {
+  const found = root.querySelector<HTMLInputElement>(`[data-focus="dvpart:${id}"]`);
+  if (found === null) throw new Error(`no box for part ${id} in: ${root.textContent}`);
+  return found;
+}
+
+/** The document is read, found to have parts, and the person says it is not for one spec. */
+async function toDivide(): Promise<void> {
+  r.core.sections = twoFunctions();
+  r.flow.open({ kind: "new" });
+  await chooseFile(r, file("functions.md", "# Lamp\n"));
+  button(r.root, say("impPartsDivide")).click();
+  await settle();
+}
+
+/** Tick parts and send them where `name` says, as a person does. */
+function place(ids: string[], name: string): void {
+  for (const id of ids) dvBox(r.root, id).click();
+  button(r.root, name).click();
+}
+
+function confirmButton(root: HTMLElement): HTMLButtonElement {
+  const found = root.querySelector<HTMLButtonElement>('[data-focus="dv:confirm"]');
+  if (found === null) throw new Error(`no confirm button in: ${root.textContent}`);
+  return found;
+}
+
+describe("dividing a document among specs", () => {
+  it("begins with every paragraph without a place, and says what is left to do beside a button that is off", async () => {
+    await toDivide();
+
+    expect(r.core.callsOf("divide_document")).toEqual([["spec-1", "functions", expect.any(String)]]);
+    expect(r.root.textContent).toContain(say("dvTitle", { name: "functions.md" }));
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
+    const confirm = confirmButton(r.root);
+    expect(confirm.getAttribute("aria-disabled")).toBe("true");
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyUnplaced", { n: "6" }));
+    expect(confirm.getAttribute("aria-describedby")).toBe("dv-why");
+    // A press on a button that is off asks nothing of the core.
+    confirm.click();
+    await settle();
+    expect(r.core.callsOf("confirm_division")).toEqual([]);
+  });
+
+  it("counts paragraphs as parts are sent, and turns the button on when none is left without a place", async () => {
+    await toDivide();
+
+    place(["s1"], "functions");
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "4" }));
+    place(["s2"], say("dvOut"));
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "2" }));
+    place(["s3"], "functions");
+
+    expect(r.root.textContent).toContain(say("dvCountDone"));
+    expect(confirmButton(r.root).getAttribute("aria-disabled")).toBeNull();
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyReady"));
+    expect(confirmButton(r.root).textContent).toContain(say("dvConfirm", { n: "1" }));
+  });
+
+  it("sends the plan, each spec with the parts it was given in the document's order and what is left out last", async () => {
+    await toDivide();
+    place(["s3"], "functions");
+    place(["s2"], say("dvOut"));
+    button(r.root, say("dvAddNew")).click();
+    place(["s1"], say("dvNewTitle", { n: "2" }));
+
+    confirmButton(r.root).click();
+    await settle();
+
+    const [intake, plan, supersede] = r.core.callsOf("confirm_division")[0] as [string, PlannedAllotment[], boolean];
+    expect(intake).toBe("intake-1");
+    expect(supersede).toBe(false);
+    expect(plan).toEqual([
+      { to: { kind: "spec", spec: "spec-1" }, sections: ["s3"] },
+      { to: { kind: "new", title: say("dvNewTitle", { n: "2" }) }, sections: ["s1"] },
+      { to: { kind: "left-out" }, reason: "", sections: ["s2"] },
+    ]);
+    // What became of each spec is said, and each check can be opened.
+    expect(r.root.textContent).toContain(say("dvDoneTitle", { name: "functions.md" }));
+    expect(r.root.textContent).toContain(say("dvStepProposed"));
+    expect(r.root.querySelectorAll(".dv-step")).toHaveLength(2);
+  });
+
+  it("opens the check of a spec's part from what became of it", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    confirmButton(r.root).click();
+    await settle();
+
+    button(r.root, say("dvStepOpen")).click();
+    await settle();
+
+    expect(r.core.callsOf("read_proposal").length).toBeGreaterThan(0);
+    expect(r.root.textContent).toContain(say("rvwSave"));
+  });
+
+  it("keeps a spec to be made as it was named, and the other buttons and the bar know the new name", async () => {
+    await toDivide();
+    place(["s1", "s2"], "functions");
+    button(r.root, say("dvAddNew")).click();
+    const field = r.root.querySelector<HTMLInputElement>("input.dv-name");
+    if (field === null) throw new Error("no name field");
+
+    field.value = "Fan control";
+    field.dispatchEvent(new Event("input"));
+
+    // The field is the one the person is typing in: nothing was drawn again around it.
+    expect(r.root.querySelector("input.dv-name")).toBe(field);
+    // The part is still ticked and sent to the name typed, and the bar says what is left.
+    dvBox(r.root, "s3").click();
+    expect(r.root.querySelector<HTMLInputElement>("input.dv-name")?.value).toBe("Fan control");
+    expect(button(r.root, "Fan control")).toBeDefined();
+    button(r.root, "Fan control").click();
+    confirmButton(r.root).click();
+    await settle();
+
+    const [, plan] = r.core.callsOf("confirm_division")[0] as [string, PlannedAllotment[]];
+    expect(plan).toContainEqual({ to: { kind: "new", title: "Fan control" }, sections: ["s3"] });
+  });
+
+  it("says why when two specs to be made have one name, a name is blank, or a spec is sent nothing", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    // A spec given nothing.
+    button(r.root, say("dvAddNew")).click();
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(
+      say("dvWhyEmpty", { name: say("dvNewTitle", { n: "2" }) }),
+    );
+    expect(confirmButton(r.root).getAttribute("aria-disabled")).toBe("true");
+
+    // Sent a part, but unnamed.
+    dvBox(r.root, "s3").click();
+    button(r.root, say("dvNewTitle", { n: "2" })).click();
+    const field = r.root.querySelector<HTMLInputElement>("input.dv-name");
+    if (field === null) throw new Error("no name field");
+    field.value = "   ";
+    field.dispatchEvent(new Event("input"));
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyBlank"));
+
+    // Two with one name.
+    button(r.root, say("dvAddNew")).click();
+    dvBox(r.root, "s2").click();
+    button(r.root, say("dvNewTitle", { n: "3" })).click();
+    const fields = [...r.root.querySelectorAll<HTMLInputElement>("input.dv-name")];
+    for (const each of fields) {
+      each.value = "Fan";
+      each.dispatchEvent(new Event("input"));
+    }
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyTwice", { name: "Fan" }));
+    expect(confirmButton(r.root).getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("lets a part be shared by several specs when the person asks, and not otherwise", async () => {
+    await toDivide();
+    button(r.root, say("dvAddNew")).click();
+    place(["s1"], "functions");
+    // Sent again without asking to share: it moves, and does not go to both.
+    place(["s1"], say("dvNewTitle", { n: "2" }));
+    expect(r.root.querySelectorAll(".dv-row")[0]?.textContent).not.toContain(say("dvShared"));
+
+    dvBox(r.root, "s1").click();
+    r.root.querySelector<HTMLInputElement>('[data-focus="dv:shared"]')?.click();
+    button(r.root, "functions").click();
+
+    expect(r.root.querySelectorAll(".dv-row")[0]?.textContent).toContain(say("dvShared"));
+  });
+
+  it("takes a spec away, and the parts that went only there are without a place again", async () => {
+    await toDivide();
+    button(r.root, say("dvAddNew")).click();
+    place(["s1", "s2", "s3"], say("dvNewTitle", { n: "2" }));
+    expect(r.root.textContent).toContain(say("dvCountDone"));
+
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dvremove:d1"]')?.click();
+
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
+  });
+
+  it("goes back to choosing parts, and leaves the document where it was", async () => {
+    await toDivide();
+
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:back"]')?.click();
+
+    expect(r.root.textContent).toContain(say("impPartsLead"));
+    expect(r.core.callsOf("confirm_division")).toEqual([]);
+  });
+
+  it("goes with SCE's count when it finds a paragraph the screen did not, and makes nothing", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    r.core.confirmWith = () => ({
+      complete: false,
+      report: { ...fullCount(), complete: false, unplaced: ["m0001", "m0002", "m0003"] },
+      proposed: 0,
+      failed: 0,
+      steps: [],
+    });
+
+    confirmButton(r.root).click();
+    await settle();
+
+    expect(r.root.querySelector(".banner-error")?.textContent).toBe(say("dvServerCount", { n: "3" }));
+    // Still the plan being made, and nothing is said to have been done.
+    expect(r.root.textContent).toContain(say("dvConfirm", { n: "1" }));
+    expect(r.root.querySelector(".dv-step")).toBeNull();
+  });
+
+  it("says a spec that could not take its part, with the document in the way, and finishes the rest when asked", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    r.core.confirmWith = () => ({
+      complete: true,
+      report: fullCount(),
+      proposed: 0,
+      failed: 1,
+      steps: [
+        {
+          to: { kind: "spec", spec: "spec-1", title: null },
+          spec: "spec-1",
+          state: "failed",
+          proposal: null,
+          error: {
+            kind: "active-proposal",
+            message: "the spec already has an open proposal (p-9); ask to replace it, or accept or reject it",
+            detail: { proposal: "p-9" },
+          },
+        },
+      ],
+    });
+
+    confirmButton(r.root).click();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("dvDoneSome", { n: "1" }));
+    expect(r.root.textContent).toContain(say("dvStepWaiting"));
+    expect(r.root.textContent).toContain(say("dvStepFailed"));
+    expect(hasButton(r.root, say("dvLeave"))).toBe(false);
+
+    r.core.confirmWith = null;
+    button(r.root, say("dvReplace")).click();
+    await settle();
+
+    // The ledger as it stands is walked again, with what waits replaced; no plan is sent.
+    expect(r.core.callsOf("confirm_division")[1]).toEqual(["intake-1", undefined, true]);
+  });
+
+  it("leaves for the spec the document came from when every spec has its part", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    confirmButton(r.root).click();
+    await settle();
+
+    button(r.root, say("dvLeave")).click();
+
+    expect(r.finished.map((f) => f.spec.id)).toEqual(["spec-1"]);
+  });
+
+  it("takes away the spec made only for the file when the person goes back without dividing", async () => {
+    await toDivide();
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:back"]')?.click();
+    button(r.root, say("impBack")).click();
+    await settle();
+    // Back from the choosing of parts takes away a spec made only for the document.
+    expect(r.core.callsOf("remove_spec")).toEqual([["spec-1"]]);
+  });
+
+  it("does not take away the spec made for the file once a division was confirmed", async () => {
+    await toDivide();
+    place(["s1", "s2", "s3"], "functions");
+    confirmButton(r.root).click();
+    await settle();
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:edit"]')?.click();
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:back"]')?.click();
+    button(r.root, say("impBack")).click();
+    await settle();
+
+    expect(r.core.callsOf("remove_spec")).toEqual([]);
   });
 });
 

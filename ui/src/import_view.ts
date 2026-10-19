@@ -182,10 +182,12 @@ export interface PartsOptions {
   readonly onNone: () => void;
   readonly onBring: () => void;
   readonly onBack: () => void;
+  /** Send the parts to several specs instead of bringing them into this one. */
+  readonly onDivide: () => void;
 }
 
 /** What a part is called when the document gave it no title: a place in it. */
-function partName(say: Say, section: DocumentSection): string {
+export function partName(say: Say, section: DocumentSection): string {
   if (section.title !== "") return section.title;
   switch (section.kind) {
     case "preamble":
@@ -201,7 +203,7 @@ function partName(say: Say, section: DocumentSection): string {
 }
 
 /** How deep a part sits, from 0: the number of parts above it. */
-function depthOf(sections: readonly DocumentSection[], section: DocumentSection): number {
+export function depthOf(sections: readonly DocumentSection[], section: DocumentSection): number {
   let depth = 0;
   let parent = section.parent;
   while (parent !== null) {
@@ -255,6 +257,7 @@ export function partsCard(options: PartsOptions): HTMLElement {
       { class: "parts-tools" },
       h("button", { type: "button", class: "mini", onclick: options.onAll }, say("impPartsAll")),
       h("button", { type: "button", class: "mini", onclick: options.onNone }, say("impPartsNone")),
+      h("button", { type: "button", class: "mini", "data-focus": "parts:divide", onclick: options.onDivide }, say("impPartsDivide")),
       h(
         "span",
         { class: "parts-totals", role: "status" },

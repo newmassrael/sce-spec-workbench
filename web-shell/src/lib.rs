@@ -129,7 +129,11 @@ fn status_of(kind: &str) -> u16 {
         | "undecided"
         | "decisions-moved"
         | "proposal-ended"
-        | "nothing-to-carry" => 409,
+        | "nothing-to-carry"
+        // A division the intake cannot take now: a spec to be made was made as another already, or
+        // there is no ledger yet to walk.
+        | "already-bound"
+        | "no-division" => 409,
         "too-large" => 413,
         // The request was understood and what it carries is refused on its content: a model, a
         // list, answers or a candidate that are not one, a reference to a text there is not, a
@@ -151,6 +155,10 @@ fn status_of(kind: &str) -> u16 {
         | "nothing-chosen"
         | "bad-section"
         | "scope-refused"
+        // A plan the tools would not make into a ledger, and a ledger or the count of it that do not
+        // name each other or the document they are of. Refused on their content.
+        | "bad-division"
+        | "bad-ledger"
         // A proposal whose parts do not name each other, a decision on a block nobody has, words
         // where a decision carries none.
         | "bad-proposal"
@@ -340,6 +348,10 @@ mod tests {
         ("nothing-chosen", 422),
         ("bad-section", 422),
         ("scope-refused", 422),
+        ("bad-division", 422),
+        ("bad-ledger", 422),
+        ("already-bound", 409),
+        ("no-division", 409),
         ("bundled-spec", 409),
         ("candidate-moved", 409),
         ("check-refused", 422),

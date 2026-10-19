@@ -22,6 +22,8 @@
 //!   clients and servers a person has.
 //! - [`import_host`] brings a document in and ends a review with SCE's authoring tools, run as
 //!   programs, and hands the specs folder what they made.
+//! - [`divide_host`] divides a document among specs, with the same tools, and walks the specs the
+//!   owner's ledger gives paragraphs to.
 //!
 //! Nothing in this crate knows what a specification is about.
 
@@ -39,6 +41,7 @@ pub mod commands;
 pub mod connection;
 pub mod connection_store;
 pub mod directory;
+pub mod divide_host;
 pub mod host;
 pub mod http_client;
 pub mod import_host;
