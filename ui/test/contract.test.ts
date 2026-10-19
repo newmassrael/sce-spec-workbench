@@ -65,6 +65,7 @@ import {
   parseReadRevisionReport,
   parseReadAnswers,
   parseReadConnection,
+  parseReadDocument,
   parseReadModel,
   parseReadRequirements,
   parseReadSource,
@@ -104,6 +105,8 @@ const importReplies = JSON.parse(
 const parsers: Record<string, (value: unknown) => unknown> = {
   describe: parseDescribed,
   import_document: parseImportedDocument,
+  read_document: parseReadDocument,
+  import_selection: parseImportedDocument,
   assemble_import: parseAssembledImport,
   accept_import: parseImportAccepted,
   list_specs: parseListing,
@@ -690,6 +693,24 @@ describe("the replies the core gives", () => {
     const accepted = parseImportAccepted(importReplies.answers["accept_import"]);
     expect(accepted.proposal.state).toBe("accepted");
     expect(accepted.saved).toBe(assembled.report.revision);
+  });
+
+  it("say the parts of a document that was read, and keep the part chosen as the proposal's scope", () => {
+    const read = parseReadDocument(importReplies.answers["read_document"]);
+    expect(read.outline.by).toBe("headings");
+    expect(read.outline.sections.map((s) => [s.id, s.title, s.parent])).toEqual([
+      ["s1", "Lamp", null],
+      ["s2", "Timing", "s1"],
+      ["s3", "Fan", null],
+    ]);
+    const chosen = parseImportedDocument(importReplies.answers["import_selection"]);
+    expect(chosen).toMatchObject({ created: true, complete: true });
+    // The proposal of a part names the scope it was made under; the one of a whole document does not.
+    expect(chosen.proposal.scope).toMatch(/^[0-9a-f]{64}$/);
+    expect(parseImportedDocument(importReplies.answers["import_document"]).proposal.scope).toBeNull();
+    for (const kind of ["nothing-chosen", "bad-section", "scope-refused"]) {
+      expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
+    }
   });
 
   it("refuse a document by the word the screen branches on, and carry what it needs to say it", () => {

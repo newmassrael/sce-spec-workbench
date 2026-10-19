@@ -507,3 +507,218 @@ fn a_name_that_is_not_a_file_is_refused_and_not_replaced_by_another() {
     assert!(why.contains("SCE_AUTHOR"), "{why}");
     assert!(why.contains("nowhere"), "{why}");
 }
+
+// ------------------------------------------------------------------- a part of a document
+
+const TWO_FUNCTIONS: &str = "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 30 seconds.\n\n# Fan\n\nThe fan runs above 40 degrees.\n";
+const FAN: &str = "# Fan\n\nThe fan runs above 40 degrees.\n";
+
+impl Rig {
+    fn read(&self, spec: &str, name: &str, document: &str) -> Value {
+        self.ask(
+            "read_document",
+            json!({"id": spec, "name": name, "data": base64(document.as_bytes())}),
+        )
+    }
+
+    fn select(
+        &self,
+        spec: &str,
+        read: &Value,
+        sections: Option<Value>,
+        key: &str,
+    ) -> Result<Value, CommandError> {
+        let mut args = json!({
+            "id": spec, "original": read["original"], "extraction": read["extraction"],
+            "key": key, "origin": "gui",
+        });
+        if let Some(sections) = sections {
+            args["sections"] = sections;
+        }
+        self.try_ask("import_selection", args)
+    }
+}
+
+#[test]
+fn a_document_is_read_and_its_parts_are_said_before_anything_is_proposed() {
+    let rig = Rig::real("part-read");
+    let spec = rig.spec();
+
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+
+    let sections = read["outline"]["sections"].as_array().unwrap();
+    assert_eq!(read["outline"]["by"], "headings");
+    assert_eq!(
+        sections
+            .iter()
+            .map(|s| (s["id"].as_str().unwrap(), s["title"].as_str().unwrap()))
+            .collect::<Vec<_>>(),
+        [("s1", "Lamp"), ("s2", "Timing"), ("s3", "Fan")]
+    );
+    assert_eq!(sections[1]["parent"], "s1");
+    assert_eq!(read["not_carried"], json!([]));
+    // Reading is not importing: the document is kept and nothing is proposed.
+    let proposals = rig.ask("list_proposals", json!({"id": spec}));
+    assert_eq!(proposals["proposals"], json!([]));
+    let kept = rig.ask("list_originals", json!({"id": spec}));
+    assert_eq!(kept["originals"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn only_the_part_chosen_is_proposed_checked_and_accepted() {
+    let rig = Rig::real("part-chosen");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+
+    let imported = rig
+        .select(&spec, &read, Some(json!(["s3"])), "press-1")
+        .unwrap();
+    let proposal = proposal_id(&imported);
+    let documents = rig.ask(
+        "read_proposal_documents",
+        json!({"id": spec, "proposal": proposal}),
+    );
+    let report: Value = serde_json::from_str(documents["report"].as_str().unwrap()).unwrap();
+    let preview = rig.ask("assemble_import", json!({"id": spec, "proposal": proposal}));
+    let accepted = rig.ask("accept_import", json!({"id": spec, "proposal": proposal}));
+
+    // What is outside the part is not a question: the check is complete, and says how much it left.
+    assert_eq!(imported["complete"], true);
+    assert_eq!(imported["proposal"]["asks"], json!([]));
+    assert_eq!(report["out_of_scope"], 4);
+    assert_eq!(report["missing"], json!([]));
+    assert!(documents["scope"].is_string());
+    assert_eq!(imported["proposal"]["scope"], report["scope"]);
+    assert_eq!(preview["text"], FAN);
+    assert_eq!(accepted["proposal"]["state"], "accepted");
+    assert_eq!(rig.text(&spec).as_deref(), Some(FAN));
+}
+
+#[test]
+fn a_part_with_parts_under_it_brings_them_and_a_part_under_it_brings_only_itself() {
+    let rig = Rig::real("part-nested");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+
+    let under = rig
+        .select(&spec, &read, Some(json!(["s2"])), "press-under")
+        .unwrap();
+    let under_text = rig.ask(
+        "assemble_import",
+        json!({"id": spec, "proposal": proposal_id(&under)}),
+    )["text"]
+        .clone();
+    let whole_lamp = rig
+        .try_ask(
+            "import_selection",
+            json!({
+                "id": spec, "original": read["original"], "extraction": read["extraction"],
+                "sections": ["s1"], "key": "press-lamp", "origin": "gui", "supersede": true,
+            }),
+        )
+        .unwrap();
+    let lamp_text = rig.ask(
+        "assemble_import",
+        json!({"id": spec, "proposal": proposal_id(&whole_lamp)}),
+    )["text"]
+        .clone();
+
+    assert_eq!(under_text, "## Timing\n\nIt turns off after 30 seconds.\n");
+    assert_eq!(
+        lamp_text,
+        "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 30 seconds.\n"
+    );
+}
+
+#[test]
+fn every_part_chosen_is_the_whole_document_and_keeps_no_scope() {
+    let rig = Rig::real("part-all");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+
+    let everything = rig
+        .select(&spec, &read, Some(json!(["s1", "s3"])), "press-1")
+        .unwrap();
+    let preview = rig.ask(
+        "assemble_import",
+        json!({"id": spec, "proposal": proposal_id(&everything)}),
+    );
+    let documents = rig.ask(
+        "read_proposal_documents",
+        json!({"id": spec, "proposal": proposal_id(&everything)}),
+    );
+
+    assert!(everything["proposal"].get("scope").is_none());
+    assert!(documents.get("scope").is_none());
+    assert_eq!(preview["text"], TWO_FUNCTIONS);
+    // None named is the same: all of it.
+    let again = rig.select(&spec, &read, None, "press-1").unwrap();
+    assert_eq!(again["created"], false);
+    assert_eq!(proposal_id(&again), proposal_id(&everything));
+}
+
+#[test]
+fn a_choice_that_is_nothing_or_not_a_part_is_refused_and_a_part_is_not() {
+    let rig = Rig::real("part-refused");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+
+    for (name, sections, kind) in [
+        ("nothing", json!([]), "nothing-chosen"),
+        ("a flag", json!(["--out"]), "bad-section"),
+        ("a part nobody listed", json!(["s9"]), "scope-refused"),
+    ] {
+        let refused = rig
+            .select(&spec, &read, Some(sections), name)
+            .expect_err(name);
+        assert_eq!(refused.kind, kind, "{name}");
+    }
+    assert_eq!(
+        rig.ask("list_proposals", json!({"id": spec}))["proposals"],
+        json!([])
+    );
+    rig.select(&spec, &read, Some(json!(["s3"])), "good")
+        .unwrap();
+}
+
+#[test]
+fn the_same_press_with_another_part_is_another_input() {
+    let rig = Rig::real("part-key");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
+    let first = rig
+        .select(&spec, &read, Some(json!(["s3"])), "press-1")
+        .unwrap();
+
+    let again = rig
+        .select(&spec, &read, Some(json!(["s3"])), "press-1")
+        .unwrap();
+    let other = rig
+        .select(&spec, &read, Some(json!(["s1"])), "press-1")
+        .unwrap_err();
+
+    assert_eq!(again["created"], false);
+    assert_eq!(proposal_id(&again), proposal_id(&first));
+    assert_eq!(other.kind, "key-reused");
+}
+
+#[test]
+fn the_new_commands_refuse_what_nothing_reads_and_both_entrances_may_run_them() {
+    let rig = Rig::real("part-args");
+    let spec = rig.spec();
+
+    let extra = rig.refused(
+        "read_document",
+        json!({"id": spec, "name": "a.md", "data": base64(b"# A\n"), "colour": "red"}),
+    );
+    let bare = rig.refused("import_selection", json!({"id": spec}));
+    let browser = call_in(
+        &rig.context(Entrance::Browser),
+        "read_document",
+        json!({"id": spec, "name": "a.md", "data": base64(b"# A\n\nWords.\n")}),
+    );
+
+    assert_eq!(extra.kind, "bad-request");
+    assert_eq!(bare.kind, "bad-request");
+    assert!(browser.is_ok(), "{browser:?}");
+}

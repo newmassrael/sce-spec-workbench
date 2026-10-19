@@ -28,6 +28,7 @@ function proposal(asks: Array<[string, string]>, state: Proposal["state"] = "pen
     extraction: REV,
     conversion: REV,
     report: REV,
+    scope: null,
     converter: { kind: "model", name: "a-model", version: "1" },
     against: null,
     asks: asks.map(([why, id]) => ({ why, id })),

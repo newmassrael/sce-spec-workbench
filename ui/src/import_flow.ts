@@ -12,13 +12,17 @@
 
 import type { Api } from "./api";
 import { CommandFailure } from "./ipc";
-import type { AssembledImport, DecisionKind, Spec } from "./contract";
+import type { AssembledImport, DecisionKind, ReadDocument, Spec } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import {
+  allSections,
   base64Of,
   failureOf,
   importKey,
+  isChoosable,
+  pressSection,
+  sectionsToSend,
   titleOf,
   type ImportFailure,
   type ImportStage,
@@ -29,6 +33,7 @@ import {
   dropTarget,
   firstTextGrid,
   notCarriedList,
+  partsCard,
   refusedCard,
   reviewBar,
   rowsGrid,
@@ -54,7 +59,8 @@ export interface ImportHost {
     Api,
     | "createSpec"
     | "removeSpec"
-    | "importDocument"
+    | "readDocument"
+    | "importSelection"
     | "listProposals"
     | "readProposal"
     | "readProposalDocuments"
@@ -99,6 +105,10 @@ export class ImportFlow {
   private held: File | null = null;
   /** Specs this flow made for a file, so that the one that is not kept does not stay behind empty. */
   private readonly made = new Set<string>();
+  /** The parts of the document that are chosen while the person is choosing, by the outline's ids. */
+  private chosen = new Set<string>();
+  /** Whether the document being brought in replaces the open proposal of the spec. */
+  private replacing = false;
   private panel: ReviewPanel | null = null;
   private parts: Parts | null = null;
   private busy: Busy | null = null;
@@ -273,7 +283,11 @@ export class ImportFlow {
     }
   }
 
-  /** Make the spec the document is for, when it is a new one, and send the document. */
+  /**
+   * Make the spec the document is for, when it is a new one, and have the core keep and read the
+   * document. A document with parts to choose between is shown for the choosing; one without is brought
+   * in whole at once, as it always was.
+   */
   private async bring(name: string, data: string, supersede: boolean, ticket: number): Promise<void> {
     let spec: Spec;
     if (this.target.kind === "new") {
@@ -283,19 +297,83 @@ export class ImportFlow {
       spec = this.target.spec;
     }
     try {
-      this.press += 1;
-      const imported = await this.host.api.importDocument(
-        spec.id,
-        name,
-        data,
-        importKey(this.host.now(), this.press),
-        supersede,
-      );
+      const doc = await this.host.api.readDocument(spec.id, name, data);
       if (ticket !== this.ticket) return;
-      await this.review(spec, imported.proposal.id);
+      if (!isChoosable(doc)) {
+        await this.bringParts(spec, name, doc, undefined, supersede, ticket);
+        return;
+      }
+      this.chosen = allSections(doc);
+      this.replacing = supersede;
+      this.enter({ kind: "parts", name, spec, doc });
+      this.host.redraw();
     } catch (error) {
       throw new Refusal(error, spec);
     }
+  }
+
+  /** Convert, check and propose the parts of a kept document that are chosen, and open the review. */
+  private async bringParts(
+    spec: Spec,
+    name: string,
+    doc: ReadDocument,
+    sections: readonly string[] | undefined,
+    supersede: boolean,
+    ticket: number,
+  ): Promise<void> {
+    this.enter({ kind: "working", name, converting: true });
+    this.host.redraw();
+    this.press += 1;
+    const imported = await this.host.api.importSelection(
+      spec.id,
+      doc,
+      importKey(this.host.now(), this.press),
+      sections,
+      supersede,
+    );
+    if (ticket !== this.ticket) return;
+    await this.review(spec, imported.proposal.id);
+  }
+
+  /** The person pressed "bring in" on the parts they chose. */
+  private async bringChosen(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    const sections = sectionsToSend(this.chosen, stage.doc);
+    if (sections !== undefined && sections.length === 0) return;
+    const ticket = ++this.ticket;
+    try {
+      await this.bringParts(stage.spec, stage.name, stage.doc, sections, this.replacing, ticket);
+    } catch (error) {
+      await this.refuse(stage.name, new Refusal(error, stage.spec), ticket);
+    }
+  }
+
+  /** Back from choosing: the document stays in the spec's originals, and a spec made only for it does not stay. */
+  private async backFromParts(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    const ticket = ++this.ticket;
+    if (this.made.has(stage.spec.id)) {
+      try {
+        await this.host.api.removeSpec(stage.spec.id);
+      } catch {
+        // It stays in the list, empty; leaving is the thing the person asked for.
+      }
+      this.made.delete(stage.spec.id);
+    }
+    if (ticket !== this.ticket) return;
+    this.enter({ kind: "choose" });
+    this.host.redraw();
+  }
+
+  private pressPart(id: string): void {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    this.chosen = pressSection(this.chosen, stage.doc.outline.sections, id);
+    // The screen is drawn again and the box that was pressed is a new one: the keyboard goes back to it.
+    this.focusRequest = `part:${id}`;
+    this.host.redraw();
   }
 
   /**
@@ -441,8 +519,26 @@ export class ImportFlow {
       stage.kind === "choose"
         ? this.chooseView()
         : stage.kind === "working"
-          ? workingCard(say, stage.name)
-          : stage.kind === "refused"
+          ? workingCard(say, stage.name, stage.converting === true)
+          : stage.kind === "parts"
+            ? partsCard({
+                say,
+                name: stage.name,
+                doc: stage.doc,
+                chosen: this.chosen,
+                onPress: (id) => this.pressPart(id),
+                onAll: () => {
+                  this.chosen = allSections(stage.doc);
+                  this.host.redraw();
+                },
+                onNone: () => {
+                  this.chosen = new Set();
+                  this.host.redraw();
+                },
+                onBring: () => void this.bringChosen(),
+                onBack: () => void this.backFromParts(),
+              })
+            : stage.kind === "refused"
             ? this.refusedView(stage.name, stage.failure)
             : this.reviewView(stage.spec);
     return h("section", { class: "imp" }, this.noticeBanner(stage.kind !== "review"), body);

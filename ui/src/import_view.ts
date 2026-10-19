@@ -9,10 +9,10 @@
 // Nothing here keeps state or asks the core: each function is given what to draw and what to call when
 // a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
 
-import type { DecisionKind } from "./contract";
+import type { DecisionKind, DocumentSection, ReadDocument } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
-import type { ImportFailure } from "./import_model";
+import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
 import { wordDiff, type ChangeRow, type ReviewRow } from "./review_model";
 
 export type Say = (key: Key, values?: Record<string, string>) => string;
@@ -128,8 +128,11 @@ export function dropTarget(options: DropTargetOptions): HTMLElement {
   );
 }
 
-/** A file is with the core: kept as it is, then read. */
-export function workingCard(say: Say, name: string): HTMLElement {
+/**
+ * A file is with the core: kept as it is, then read; or, once the person has chosen its parts, converted
+ * and checked.
+ */
+export function workingCard(say: Say, name: string, converting = false): HTMLElement {
   return h(
     "div",
     { class: "imp-stage" },
@@ -143,10 +146,134 @@ export function workingCard(say: Say, name: string): HTMLElement {
         h(
           "div",
           { class: "file-words" },
-          h("div", { class: "file-name", tabindex: "-1", "data-focus": "stage" }, say("impWorking", { name })),
-          h("div", { class: "file-sub" }, say("impWorkingNote")),
+          h(
+            "div",
+            { class: "file-name", tabindex: "-1", "data-focus": "stage" },
+            say(converting ? "impConverting" : "impWorking", { name }),
+          ),
+          h("div", { class: "file-sub" }, say(converting ? "impConvertingNote" : "impWorkingNote")),
         ),
       ),
+    ),
+  );
+}
+
+export interface PartsOptions {
+  readonly say: Say;
+  readonly name: string;
+  readonly doc: ReadDocument;
+  readonly chosen: ReadonlySet<string>;
+  readonly onPress: (id: string) => void;
+  readonly onAll: () => void;
+  readonly onNone: () => void;
+  readonly onBring: () => void;
+  readonly onBack: () => void;
+}
+
+/** What a part is called when the document gave it no title: a place in it. */
+function partName(say: Say, section: DocumentSection): string {
+  if (section.title !== "") return section.title;
+  switch (section.kind) {
+    case "preamble":
+      return say("impPartsPreamble");
+    case "whole":
+      return say("impPartsWhole");
+    default:
+      if (section.page_first === null) return say("impPartsWhole");
+      return section.page_last === null || section.page_last === section.page_first
+        ? say("impPartsPage", { n: String(section.page_first) })
+        : say("impPartsPages", { first: String(section.page_first), last: String(section.page_last) });
+  }
+}
+
+/** How deep a part sits, from 0: the number of parts above it. */
+function depthOf(sections: readonly DocumentSection[], section: DocumentSection): number {
+  let depth = 0;
+  let parent = section.parent;
+  while (parent !== null) {
+    depth += 1;
+    parent = sections.find((s) => s.id === parent)?.parent ?? null;
+  }
+  return depth;
+}
+
+/**
+ * The second step of bringing a document in: which of its parts. Every part is chosen to begin with, a
+ * part and the parts under it are chosen together, and the numbers beside the button say what will be
+ * read, since a part left out is read by nothing.
+ */
+export function partsCard(options: PartsOptions): HTMLElement {
+  const { say, doc, chosen } = options;
+  const sections = doc.outline.sections;
+  const totals = chosenTotals(chosen, doc);
+  const none = totals.parts === 0;
+  const rows = sections.map((section) => {
+    const state = chosenState(chosen, sections, section.id);
+    const box = h("input", {
+      type: "checkbox",
+      id: `part-${section.id}`,
+      class: "part-box",
+      "data-focus": `part:${section.id}`,
+      checked: state === "all",
+      onchange: () => options.onPress(section.id),
+    });
+    box.indeterminate = state === "some";
+    const meta = say("impPartsMeta", { blocks: String(section.blocks), characters: String(section.characters) });
+    return h(
+      "li",
+      { class: "part", style: `--depth:${depthOf(sections, section)}` },
+      h(
+        "label",
+        { for: `part-${section.id}`, class: "part-label" },
+        box,
+        h("span", { class: "part-name" }, partName(say, section)),
+        h("span", { class: "part-meta" }, meta),
+      ),
+    );
+  });
+  return h(
+    "div",
+    { class: "imp-stage" },
+    h("h2", { class: "imp-title", tabindex: "-1", "data-focus": "stage" }, say("impPartsTitle", { name: options.name })),
+    h("p", { class: "imp-lead" }, say("impPartsLead")),
+    h(
+      "div",
+      { class: "parts-tools" },
+      h("button", { type: "button", class: "mini", onclick: options.onAll }, say("impPartsAll")),
+      h("button", { type: "button", class: "mini", onclick: options.onNone }, say("impPartsNone")),
+      h(
+        "span",
+        { class: "parts-totals", role: "status" },
+        say("impPartsTotals", {
+          parts: String(totals.parts),
+          of: String(totals.of),
+          characters: String(totals.characters),
+        }),
+      ),
+    ),
+    h("ul", { class: "parts", "aria-label": say("impPartsTitle", { name: options.name }) }, ...rows),
+    h(
+      "div",
+      { class: "imp-actions" },
+      h("button", { type: "button", class: "btn quiet", "data-focus": "parts:back", onclick: options.onBack }, icon("back"), say("impBack")),
+      h(
+        "button",
+        {
+          type: "button",
+          class: "btn",
+          id: "parts-bring",
+          "data-focus": "parts:bring",
+          // Off says why in words, and keeps the keyboard where it is (`aria-disabled`, as the review's save).
+          "aria-disabled": none ? "true" : undefined,
+          "aria-describedby": none ? "parts-nothing" : undefined,
+          onclick: () => {
+            if (!none) options.onBring();
+          },
+        },
+        icon("check"),
+        say("impPartsImport", { parts: String(totals.parts) }),
+      ),
+      none ? h("span", { class: "note quiet", id: "parts-nothing" }, say("impPartsNothing")) : null,
     ),
   );
 }

@@ -9,7 +9,7 @@
 // refuses an accept that would write over something. This only says what the core said in the words
 // the design chose, and picks which of the few things a person can do next is offered.
 
-import { ContractError, type Spec } from "./contract";
+import { ContractError, type DocumentSection, type ReadDocument, type Spec } from "./contract";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED } from "./ipc";
 
 /** Where a document is going. A new spec is named after the file; a spec that is kept is replaced. */
@@ -22,7 +22,12 @@ export type ImportStage =
   /** Nothing chosen: the drop target. */
   | { readonly kind: "choose" }
   /** The file is with the core, which keeps it, reads it, converts it by rule and checks the conversion. */
-  | { readonly kind: "working"; readonly name: string }
+  | { readonly kind: "working"; readonly name: string; readonly converting?: boolean }
+  /**
+   * The document is kept and read, and the person chooses which of its parts are brought in. Nothing
+   * is converted or checked yet, and nothing is sent to a model.
+   */
+  | { readonly kind: "parts"; readonly name: string; readonly spec: Spec; readonly doc: ReadDocument }
   /** The core would not take it, and what the person can do. */
   | { readonly kind: "refused"; readonly name: string; readonly failure: ImportFailure }
   /** A proposal is waiting for the person: this is the review. */
@@ -125,4 +130,90 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function importKey(now: number, press: number): string {
   return `ui-${now.toString(36)}-${press.toString(36)}`;
+}
+
+// ---- choosing the parts of a document ------------------------------------------------------------
+
+/**
+ * Whether a document is asked about at all. A document with one part has nothing to choose between,
+ * and asking would be a step that decides nothing: it is brought in whole, as it always was.
+ */
+export function isChoosable(doc: ReadDocument): boolean {
+  return doc.outline.sections.length > 1;
+}
+
+/** The ids of every part of the document. */
+export function allSections(doc: ReadDocument): Set<string> {
+  return new Set(doc.outline.sections.map((s) => s.id));
+}
+
+/** A part and the parts under it, as ids. A part holds only its own blocks; the tree is the screen's. */
+export function subtree(sections: readonly DocumentSection[], id: string): string[] {
+  const found = [id];
+  for (const section of sections) {
+    if (section.parent !== null && found.includes(section.parent) && !found.includes(section.id)) {
+      found.push(section.id);
+    }
+  }
+  return found;
+}
+
+/** Whether none, some or all of a part and the parts under it are chosen. */
+export type Chosen = "none" | "some" | "all";
+
+export function chosenState(
+  chosen: ReadonlySet<string>,
+  sections: readonly DocumentSection[],
+  id: string,
+): Chosen {
+  const ids = subtree(sections, id);
+  const held = ids.filter((i) => chosen.has(i)).length;
+  return held === 0 ? "none" : held === ids.length ? "all" : "some";
+}
+
+/**
+ * Press a part: when all of it is chosen, it and what is under it are left out; otherwise it and what is
+ * under it are chosen. A part half chosen becomes all chosen, since the one thing a press cannot mean is
+ * to do nothing.
+ */
+export function pressSection(
+  chosen: ReadonlySet<string>,
+  sections: readonly DocumentSection[],
+  id: string,
+): Set<string> {
+  const next = new Set(chosen);
+  const leave = chosenState(chosen, sections, id) === "all";
+  for (const part of subtree(sections, id)) {
+    if (leave) next.delete(part);
+    else next.add(part);
+  }
+  return next;
+}
+
+/** What is chosen, in the numbers a person weighs it by. */
+export interface ChosenTotals {
+  readonly parts: number;
+  readonly of: number;
+  readonly blocks: number;
+  readonly characters: number;
+}
+
+export function chosenTotals(chosen: ReadonlySet<string>, doc: ReadDocument): ChosenTotals {
+  const sections = doc.outline.sections;
+  const held = sections.filter((s) => chosen.has(s.id));
+  return {
+    parts: held.length,
+    of: sections.length,
+    blocks: held.reduce((sum, s) => sum + s.blocks, 0),
+    characters: held.reduce((sum, s) => sum + s.characters, 0),
+  };
+}
+
+/**
+ * The ids to send: the chosen parts in the document's order, or `undefined` for all of them, which is
+ * what the core takes as the whole document and keeps no scope for.
+ */
+export function sectionsToSend(chosen: ReadonlySet<string>, doc: ReadDocument): string[] | undefined {
+  const ids = doc.outline.sections.map((s) => s.id).filter((id) => chosen.has(id));
+  return ids.length === doc.outline.sections.length ? undefined : ids;
 }

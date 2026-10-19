@@ -146,6 +146,11 @@ fn status_of(kind: &str) -> u16 {
         // with no words in it), and decisions the assembly could not apply: refused on their content.
         | "unreadable-original"
         | "assembly-refused"
+        // The parts of a document chosen for an import: none, one nobody listed, or a choice the
+        // tools would not make into a scope. Refused on their content.
+        | "nothing-chosen"
+        | "bad-section"
+        | "scope-refused"
         // A proposal whose parts do not name each other, a decision on a block nobody has, words
         // where a decision carries none.
         | "bad-proposal"
@@ -332,6 +337,9 @@ mod tests {
         ("bad-server-address", 400),
         ("busy", 503),
         ("assembly-refused", 422),
+        ("nothing-chosen", 422),
+        ("bad-section", 422),
+        ("scope-refused", 422),
         ("bundled-spec", 409),
         ("candidate-moved", 409),
         ("check-refused", 422),

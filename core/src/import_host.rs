@@ -348,19 +348,22 @@ pub(crate) struct ImportDocument {
     supersede: bool,
 }
 
-/// Bring a document in: an original, its extraction, its conversion by rule, the check of it, and a
-/// proposal made of them against the text the spec has now.
-pub(crate) fn import_document<C: Clock>(
-    context: &Context<'_, C>,
-    args: ImportDocument,
-) -> Result<Value, CommandError> {
-    let tools = tools(context)?;
-    let spec = SpecId::parse(&args.id)?;
-    // Read before the tools run: a text typed while they read the document is a text the proposal was
-    // not made against, and the store refuses it as `moved`, which is the truth.
-    let heads = ask(context, "read_spec_heads", json!({ "id": args.id }))?;
-    let expect = heads.get("source").cloned().unwrap_or(Value::Null);
+/// A document the specs folder keeps: its original, and the extraction read out of it.
+struct Kept {
+    original: String,
+    /// The extraction's digest, and its text as the specs folder holds it.
+    extraction: String,
+    extraction_text: String,
+}
 
+/// Keep a document as an original and read it into an extraction, which is kept too. Nothing is
+/// converted: what is imported of it is chosen after it is read (ADR 0039 of SCE).
+fn keep_document<C: Clock>(
+    context: &Context<'_, C>,
+    tools: &ImportTools,
+    args: &ImportDocument,
+) -> Result<Kept, CommandError> {
+    let spec = SpecId::parse(&args.id)?;
     // A name the original cannot hold (empty, or one that climbs out) is refused by the store as
     // `bad-original` before anything is run.
     let member = json!({ "path": args.name, "role": "document", "data": args.data });
@@ -388,7 +391,6 @@ pub(crate) fn import_document<C: Clock>(
     fs::create_dir(scratch.path("in"))
         .map_err(|e| failed(format!("a folder to work in could not be made: {e}")))?;
     scratch.write(&format!("in/{file}"), &bytes)?;
-    let dir = scratch.path(".");
     tools.run_to_success(
         &scratch.path("in"),
         &["extract", &file, "--out", "../e.json"],
@@ -402,31 +404,116 @@ pub(crate) fn import_document<C: Clock>(
         "save_extraction",
         json!({ "id": args.id, "original": original, "member": name, "text": extraction_text }),
     )?;
-    let extraction_digest = text_of(&extraction, "digest")?;
+    Ok(Kept {
+        original,
+        extraction: text_of(&extraction, "digest")?,
+        extraction_text,
+    })
+}
+
+/// What is asked to be proposed, apart from the document.
+struct Proposing<'a> {
+    id: &'a str,
+    key: &'a str,
+    origin: &'a str,
+    supersede: bool,
+    /// The text head read before the tools ran.
+    expect: Value,
+}
+
+/// The ids of the parts of a document, as `outline` gave them: a letter and a number, so that one
+/// can never be taken by the tools for a flag.
+fn valid_section(id: &str) -> bool {
+    id.strip_prefix('s').is_some_and(|rest| {
+        (1..=6).contains(&rest.len()) && rest.bytes().all(|b| b.is_ascii_digit())
+    })
+}
+
+/// Convert the part of a kept document the owner chose (all of it when none is named), check the
+/// conversion against that part, and register a proposal made of them.
+fn propose_part<C: Clock>(
+    context: &Context<'_, C>,
+    tools: &ImportTools,
+    args: &Proposing<'_>,
+    kept: &Kept,
+    sections: Option<&[String]>,
+) -> Result<Value, CommandError> {
+    let original = &kept.original;
+    let extraction_digest = &kept.extraction;
+    let extraction_text = &kept.extraction_text;
+    let scratch = Scratch::new()?;
+    scratch.write("e.json", extraction_text.as_bytes())?;
+    let dir = scratch.path(".");
+
+    // A choice of every part is no scope: the specs folder refuses one, and the tools say when a
+    // choice is that, so that this does not work the rule out. It is then an import of the whole.
+    let mut scope_text: Option<String> = None;
+    if let Some(chosen) = sections {
+        if chosen.is_empty() {
+            return Err(refuse(
+                "nothing-chosen",
+                "nothing is chosen: an import of nothing is not an import",
+                Value::Null,
+            ));
+        }
+        if let Some(stranger) = chosen.iter().find(|id| !valid_section(id)) {
+            return Err(refuse(
+                "bad-section",
+                format!("`{stranger}` is not the id of a part of the document"),
+                json!({ "section": stranger }),
+            ));
+        }
+        let mut run = vec![
+            "make-scope",
+            "--extraction",
+            "e.json",
+            "--out",
+            "scope.json",
+            "--json",
+        ];
+        for id in chosen {
+            run.extend(["--section", id.as_str()]);
+        }
+        let made = tools.run_to_success(&dir, &run, tools.quick_timeout, "scope-refused", &[2])?;
+        let said: Value = serde_json::from_str(made.stdout.trim())
+            .map_err(|e| failed(format!("`make-scope` did not say what it made: {e}")))?;
+        let whole = said
+            .get("whole")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| failed("`make-scope` did not say whether the choice is everything"))?;
+        if !whole {
+            scope_text = Some(scratch.read("scope.json")?);
+        }
+    }
+    let scope_flags: &[&str] = if scope_text.is_some() {
+        &["--scope", "scope.json"]
+    } else {
+        &[]
+    };
 
     // `convert` counts what it made with the check and exits 1 when that is not complete: a
     // conversion by rule its own check does not find complete is the converter's defect, said as the
     // tool's failure and not registered.
+    let mut convert = vec!["convert", "--extraction", "e.json", "--out", "c.json"];
+    convert.extend(scope_flags);
     tools.run_to_success(
         &dir,
-        &["convert", "--extraction", "e.json", "--out", "c.json"],
+        &convert,
         tools.quick_timeout,
         "unreadable-original",
         &[2],
     )?;
     let conversion_text = scratch.read("c.json")?;
-    let checked = tools.run(
-        &dir,
-        &[
-            "check-conversion",
-            "--extraction",
-            "e.json",
-            "--conversion",
-            "c.json",
-            "--json",
-        ],
-        tools.quick_timeout,
-    )?;
+    let mut check = vec![
+        "check-conversion",
+        "--extraction",
+        "e.json",
+        "--conversion",
+        "c.json",
+        "--json",
+    ];
+    check.extend(scope_flags);
+    let checked = tools.run(&dir, &check, tools.quick_timeout)?;
     // 0 is a conversion the check finds complete and 1 one that has questions; both print the report.
     if !matches!(checked.code, 0 | 1) {
         return Err(failed(format!(
@@ -442,32 +529,157 @@ pub(crate) fn import_document<C: Clock>(
         .get("complete")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    let not_carried = serde_json::from_str::<Value>(&extraction_text)
+    let not_carried = serde_json::from_str::<Value>(extraction_text)
         .ok()
         .and_then(|e| e.get("not_carried").cloned())
         .unwrap_or_else(|| json!([]));
 
-    let registered = ask(
-        context,
-        "propose_import",
-        json!({
-            "id": args.id,
-            "key": args.key,
-            "origin": args.origin,
-            "original": original,
-            "extraction": extraction_digest,
-            "conversion": conversion_text,
-            "report": report_text,
-            "expect": expect,
-            "supersede": args.supersede,
-        }),
-    )?;
+    let mut proposing = json!({
+        "id": args.id,
+        "key": args.key,
+        "origin": args.origin,
+        "original": original,
+        "extraction": extraction_digest,
+        "conversion": conversion_text,
+        "report": report_text,
+        "expect": args.expect,
+        "supersede": args.supersede,
+    });
+    if let Some(scope) = &scope_text {
+        proposing["scope"] = json!(scope);
+    }
+    let registered = ask(context, "propose_import", proposing)?;
     Ok(json!({
         "proposal": registered["proposal"],
         "created": registered["created"],
         "complete": complete,
         "not_carried": not_carried,
     }))
+}
+
+/// Bring a document in whole: an original, its extraction, its conversion by rule, the check of it,
+/// and a proposal made of them against the text the spec has now.
+pub(crate) fn import_document<C: Clock>(
+    context: &Context<'_, C>,
+    args: ImportDocument,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    // Read before the tools run: a text typed while they read the document is a text the proposal was
+    // not made against, and the store refuses it as `moved`, which is the truth.
+    let expect = head_of(context, &args.id)?;
+    let kept = keep_document(context, tools, &args)?;
+    let proposing = Proposing {
+        id: &args.id,
+        key: &args.key,
+        origin: &args.origin,
+        supersede: args.supersede,
+        expect,
+    };
+    propose_part(context, tools, &proposing, &kept, None)
+}
+
+fn head_of<C: Clock>(context: &Context<'_, C>, id: &str) -> Result<Value, CommandError> {
+    let heads = ask(context, "read_spec_heads", json!({ "id": id }))?;
+    Ok(heads.get("source").cloned().unwrap_or(Value::Null))
+}
+
+/// What `read_document` is given: a document, and nothing about what is made of it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadDocument {
+    id: String,
+    name: String,
+    data: String,
+    #[serde(default)]
+    label: Option<String>,
+}
+
+/// Read a document without importing any of it: keep it as an original, read it into an extraction,
+/// and say the parts the owner can choose between. The first step of an import of a part (ADR 0039 of
+/// SCE); `import_selection` is the second.
+pub(crate) fn read_document<C: Clock>(
+    context: &Context<'_, C>,
+    args: ReadDocument,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    let kept = keep_document(
+        context,
+        tools,
+        &ImportDocument {
+            id: args.id,
+            name: args.name,
+            data: args.data,
+            label: args.label,
+            key: String::new(),
+            origin: String::new(),
+            supersede: false,
+        },
+    )?;
+    let scratch = Scratch::new()?;
+    scratch.write("e.json", kept.extraction_text.as_bytes())?;
+    let ran = tools.run_to_success(
+        &scratch.path("."),
+        &["outline", "--extraction", "e.json", "--json"],
+        tools.quick_timeout,
+        "unreadable-original",
+        &[2],
+    )?;
+    let outline: Value = serde_json::from_str(ran.stdout.trim())
+        .map_err(|e| failed(format!("`outline` did not print an outline: {e}")))?;
+    let not_carried = serde_json::from_str::<Value>(&kept.extraction_text)
+        .ok()
+        .and_then(|e| e.get("not_carried").cloned())
+        .unwrap_or_else(|| json!([]));
+    Ok(json!({
+        "original": kept.original,
+        "extraction": kept.extraction,
+        "not_carried": not_carried,
+        "outline": outline,
+    }))
+}
+
+/// What `import_selection` is given: a document `read_document` kept, and the parts chosen of it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ImportSelection {
+    id: String,
+    original: String,
+    extraction: String,
+    /// The ids of the parts `read_document` listed; absent for all of them.
+    #[serde(default)]
+    sections: Option<Vec<String>>,
+    key: String,
+    origin: String,
+    #[serde(default)]
+    supersede: bool,
+}
+
+/// Import the parts of a document the owner chose: the conversion and its check are of those parts
+/// alone, and what is outside them is never given to anything.
+pub(crate) fn import_selection<C: Clock>(
+    context: &Context<'_, C>,
+    args: ImportSelection,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    let spec = SpecId::parse(&args.id)?;
+    let expect = head_of(context, &args.id)?;
+    let extraction = revision_of(&args.extraction)?;
+    // The extraction is the specs folder's, and the proposal is refused there when it is not one saved
+    // for the original named.
+    let extraction_text = context.specs.read_extraction(&spec, &extraction)?;
+    let kept = Kept {
+        original: args.original,
+        extraction: args.extraction,
+        extraction_text,
+    };
+    let proposing = Proposing {
+        id: &args.id,
+        key: &args.key,
+        origin: &args.origin,
+        supersede: args.supersede,
+        expect,
+    };
+    propose_part(context, tools, &proposing, &kept, args.sections.as_deref())
 }
 
 /// What `assemble_import` and `accept_import` are given.

@@ -49,6 +49,8 @@ pub const COMMANDS: &[&str] = &[
     "delete_connection",
     "set_default_connection",
     "import_document",
+    "read_document",
+    "import_selection",
     "assemble_import",
     "accept_import",
 ];
@@ -76,7 +78,13 @@ pub const COMMANDS: &[&str] = &[
 /// bring a document in and to end a review (ADR 0037 of SCE) and hand the specs folder what they made.
 /// They are added, so no caller of 3 misreads one; the version moves because a screen that offers an
 /// import is held to a core that answers it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 4;
+///
+/// 5: `read_document` and `import_selection`, an import of the part of a document the owner chose
+/// (ADR 0039 of SCE): the first keeps and reads a document and says the parts it has, the second
+/// converts, checks and proposes the parts named. `import_document` is the same as choosing every
+/// part. They are added, so no caller of 4 misreads one; the version moves because a screen that offers
+/// a choice of parts is held to a core that answers it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 5;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -113,7 +121,13 @@ const SETTINGS_WRITE: &[&str] = &[
 /// The commands that run the authoring tools to bring a document in or to end a review. Both
 /// entrances may: the program is the installation's own and never one a caller names, and what a
 /// caller can send it is a document, which the same caller may already keep in the specs folder.
-pub const IMPORT_COMMANDS: &[&str] = &["import_document", "assemble_import", "accept_import"];
+pub const IMPORT_COMMANDS: &[&str] = &[
+    "import_document",
+    "read_document",
+    "import_selection",
+    "assemble_import",
+    "accept_import",
+];
 
 /// Which door a command came in by. Who is asking decides what may be changed, so it is said
 /// where the command is run and not left to each shell to check.
@@ -480,6 +494,8 @@ fn call_import<C: Clock>(
 ) -> Result<Value, CommandError> {
     match name {
         "import_document" => import_host::import_document(context, arguments(args)?),
+        "read_document" => import_host::read_document(context, arguments(args)?),
+        "import_selection" => import_host::import_selection(context, arguments(args)?),
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),
         other => Err(unknown_command(other, &all_commands())),

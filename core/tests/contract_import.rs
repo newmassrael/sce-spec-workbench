@@ -33,6 +33,8 @@ const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/contract/import_replies
 const DOCUMENT: &str =
     "# Door lock\n\nThe lock opens when the code matches.\n\nThree misses lock it.\n";
 
+const TWO_FUNCTIONS: &str = "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 30 seconds.\n\n# Fan\n\nThe fan runs above 40 degrees.\n";
+
 fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
@@ -209,6 +211,38 @@ fn replies() -> Value {
         ),
     );
 
+    // A part of a document: read first, which says the parts, then the parts chosen.
+    let parts = ask("create_spec", json!({"title": "Two functions"}));
+    let parts_id = parts["id"].as_str().unwrap().to_string();
+    let read = ask(
+        "read_document",
+        json!({"id": parts_id, "name": "functions.md", "data": base64(TWO_FUNCTIONS.as_bytes())}),
+    );
+    let select = |key: &str, sections: Value| {
+        json!({
+            "id": parts_id, "original": read["original"], "extraction": read["extraction"],
+            "sections": sections, "key": key, "origin": "gui",
+        })
+    };
+    let chosen = ask("import_selection", select("press-7", json!(["s3"])));
+    let part_proposal = chosen["proposal"]["id"].as_str().unwrap().to_string();
+    answers.insert("read_document".into(), read.clone());
+    answers.insert("import_selection".into(), chosen);
+    for (kind, sections) in [
+        ("nothing-chosen", json!([])),
+        ("bad-section", json!(["--out"])),
+        ("scope-refused", json!(["s9"])),
+    ] {
+        refusals.insert(
+            kind.into(),
+            refused(
+                Some(&tools),
+                "import_selection",
+                select(&format!("press-{kind}"), sections),
+            ),
+        );
+    }
+
     for command in IMPORT_COMMANDS {
         assert!(
             answers.keys().any(|name| name == command),
@@ -223,6 +257,8 @@ fn replies() -> Value {
     });
     name_the_unstable(&mut document, &root.display().to_string(), "<root>");
     name_the_unstable(&mut document, &spec_id, "<spec-id>");
+    name_the_unstable(&mut document, &parts_id, "<parts-spec-id>");
+    name_the_unstable(&mut document, &part_proposal, "<part-proposal-id>");
     name_the_unstable(&mut document, &proposal, "<proposal-id>");
     name_the_unstable(&mut document, &second_id, "<second-proposal-id>");
     let _ = std::fs::remove_dir_all(&root);

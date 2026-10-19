@@ -19,7 +19,7 @@
         "key": "press-1",
         "origin": "gui",
         "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
-        "report": "34f60e820d36f38973b724311d0b608d56a93f8610a4d4ab0b2f7126fe45becb",
+        "report": "798bd8e1afb548bf22140ba362b416186ccdd44096fe192d59808b40c3ff427c",
         "saved": "446def139b8f6469dff0684ab896b0f579cbf22883f9fe4816644bb7552d5835",
         "seq": 1,
         "state": "accepted"
@@ -87,9 +87,79 @@
         "key": "press-1",
         "origin": "gui",
         "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
-        "report": "34f60e820d36f38973b724311d0b608d56a93f8610a4d4ab0b2f7126fe45becb",
+        "report": "798bd8e1afb548bf22140ba362b416186ccdd44096fe192d59808b40c3ff427c",
         "seq": 1,
         "state": "pending"
+      }
+    },
+    "import_selection": {
+      "complete": true,
+      "created": true,
+      "not_carried": [],
+      "proposal": {
+        "against": null,
+        "asks": [],
+        "conversion": "5a824726be07502e04f57a0d025c427034fbe328c59583537bf90b970ced4be2",
+        "converter": {
+          "kind": "rules",
+          "name": "blocks-to-markdown",
+          "version": "1"
+        },
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "id": "<part-proposal-id>",
+        "key": "press-7",
+        "origin": "gui",
+        "original": "627012e248b20aafca2a7395ed65793a5d78122d48c7794c2150a83d04cde563",
+        "report": "9e0352a04b6ea8e3a9342a1bc06d1632fab40fc985cd1c02e596f3bfdb1af260",
+        "scope": "793bd9e4e38ba7d4204063ac7246cb36fc2acf1646d301108f0750b501f63776",
+        "seq": 1,
+        "state": "pending"
+      }
+    },
+    "read_document": {
+      "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+      "not_carried": [],
+      "original": "627012e248b20aafca2a7395ed65793a5d78122d48c7794c2150a83d04cde563",
+      "outline": {
+        "by": "headings",
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "sections": [
+          {
+            "blocks": 4,
+            "characters": 55,
+            "id": "s1",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Lamp"
+          },
+          {
+            "blocks": 2,
+            "characters": 36,
+            "id": "s2",
+            "kind": "heading",
+            "level": 2,
+            "page_first": null,
+            "page_last": null,
+            "parent": "s1",
+            "title": "Timing"
+          },
+          {
+            "blocks": 2,
+            "characters": 33,
+            "id": "s3",
+            "kind": "heading",
+            "level": 1,
+            "page_first": null,
+            "page_last": null,
+            "parent": null,
+            "title": "Fan"
+          }
+        ],
+        "v": 1
       }
     }
   },
@@ -101,6 +171,13 @@
       },
       "kind": "assembly-refused",
       "message": "an assembly would leave nothing: every block of the conversion was dropped"
+    },
+    "bad-section": {
+      "detail": {
+        "section": "--out"
+      },
+      "kind": "bad-section",
+      "message": "`--out` is not the id of a part of the document"
     },
     "import-tool-failed": {
       "kind": "import-tool-failed",
@@ -117,6 +194,18 @@
       },
       "kind": "import-tool-timeout",
       "message": "the authoring tools did not finish `extract` in time: it did not answer within 1 seconds"
+    },
+    "nothing-chosen": {
+      "kind": "nothing-chosen",
+      "message": "nothing is chosen: an import of nothing is not an import"
+    },
+    "scope-refused": {
+      "detail": {
+        "kind": null,
+        "tool": "make-scope"
+      },
+      "kind": "scope-refused",
+      "message": "the extraction has no section s9"
     },
     "unreadable-original": {
       "detail": {

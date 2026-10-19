@@ -33,6 +33,7 @@ import {
   parseProposalView,
   parseQueue,
   parseReadConnection,
+  parseReadDocument,
   parseReadRevisionReport,
   parseRegisteredRequest,
   parseRequestCandidateTexts,
@@ -71,6 +72,7 @@ import {
   type Listing,
   type Proposal,
   type ProposalAccepted,
+  type ReadDocument,
   type ProposalDecision,
   type ProposalDocuments,
   type ProposalRegistered,
@@ -286,6 +288,25 @@ export interface Api {
     key: string,
     supersede?: boolean,
   ): Promise<ImportedDocument>;
+  /**
+   * The first step of bringing in a part of a document: keep it as an original and read it into an
+   * extraction, and say the parts it has (`outline`). Nothing is converted, checked or proposed, and
+   * nothing is sent to a model. Refused as `import-document` is for a file the tools will not take.
+   */
+  readDocument(id: string, name: string, data: string): Promise<ReadDocument>;
+  /**
+   * The second step: convert, check and propose the parts chosen of a document `readDocument` kept.
+   * `sections` are ids of its outline; absent, all of them. What is outside them is never given to
+   * anything and is not asked about. Refused as `nothing-chosen`, `bad-section` or `scope-refused`,
+   * and as `key-reused` when the same `key` was used for another choice.
+   */
+  importSelection(
+    id: string,
+    document: ReadDocument,
+    key: string,
+    sections?: readonly string[],
+    supersede?: boolean,
+  ): Promise<ImportedDocument>;
   /** The proposals of the spec, the newest first. */
   listProposals(id: string): Promise<Proposal[]>;
   /** One proposal with its decisions, what is still asked, and whether the text is where it was. */
@@ -485,6 +506,21 @@ export function apiOver(transport: Transport): Api {
     async importDocument(id, name, data, key, supersede = false) {
       const args = { id, name, data, key, origin: "gui", ...(supersede ? { supersede: true } : {}) };
       return parseImportedDocument(await transport.call("import_document", args));
+    },
+    async readDocument(id, name, data) {
+      return parseReadDocument(await transport.call("read_document", { id, name, data }));
+    },
+    async importSelection(id, document, key, sections, supersede = false) {
+      const args = {
+        id,
+        original: document.original,
+        extraction: document.extraction,
+        key,
+        origin: "gui",
+        ...(sections === undefined ? {} : { sections }),
+        ...(supersede ? { supersede: true } : {}),
+      };
+      return parseImportedDocument(await transport.call("import_selection", args));
     },
     async listProposals(id) {
       return parseProposalList(await transport.call("list_proposals", { id }));

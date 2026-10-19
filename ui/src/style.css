@@ -1239,6 +1239,91 @@ textarea:focus-visible {
   margin-top: 2px;
 }
 
+/* Choosing the parts of a document. Every part is a row with its own box, indented by how deep it sits. */
+.imp .parts-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.imp .parts-totals {
+  margin-left: auto;
+  color: var(--ink-2);
+  font: 400 14px/22px var(--font);
+}
+
+.imp .parts {
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  text-align: left;
+  /* A long document has many parts: the list scrolls and the two buttons stay in sight. */
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.imp .part {
+  padding-left: calc(var(--depth, 0) * 24px);
+}
+
+.imp .part-label {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 12px;
+  align-items: start;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.imp .part-label:hover {
+  background: var(--hover);
+}
+
+.imp .part-box {
+  grid-row: 1 / span 2;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.imp .part-box:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.imp .part-name {
+  font: 500 15px/24px var(--font);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.imp .part-meta {
+  font: 400 13px/20px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .imp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.imp .imp-actions .note {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
 .imp .note.quiet {
   background: var(--chip-hover);
   color: var(--ink-2);

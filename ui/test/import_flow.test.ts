@@ -14,7 +14,9 @@ import type { Api } from "../src/api";
 import type {
   AssembledImport,
   DecisionKind,
+  DocumentSection,
   ImportedDocument,
+  ReadDocument,
   Proposal,
   ProposalAccepted,
   ProposalDecision,
@@ -52,6 +54,21 @@ const CONVERSION_TEXT = {
   ],
 };
 
+/** A part of a document as `read_document` lists it. */
+function section(id: string, title: string, parent: string | null = null): DocumentSection {
+  return {
+    id,
+    kind: "heading",
+    title,
+    level: parent === null ? 1 : 2,
+    parent,
+    blocks: 2,
+    characters: 40,
+    page_first: null,
+    page_last: null,
+  };
+}
+
 /** The wire's gate: held back until the test lets it go. */
 function gate(): { opened: Promise<void>; open: () => void } {
   let open: () => void = () => undefined;
@@ -76,8 +93,12 @@ class FakeCore {
   readonly specs = new Map<string, Stored[]>();
   readonly listed: Spec[] = [];
   private next = 1;
-  /** What the next `import_document` does: an answer, or a refusal. */
+  /** What the next `import_selection` does: an answer, or a refusal. */
   importWith: (() => Promise<ImportedDocument>) | null = null;
+  /** What the next `read_document` does, when it is not the default one-part document. */
+  readWith: (() => Promise<ReadDocument>) | null = null;
+  /** The parts a document read now has. One part is a document with nothing to choose between. */
+  sections: DocumentSection[] = [section("s1", "Door lock")];
   /** What the next `assemble_import` answers, besides the default. */
   assembleRefusal: CommandFailure | null = null;
   /** The questions a proposal made now will ask. */
@@ -122,6 +143,7 @@ class FakeCore {
         extraction: hex(2),
         conversion: hex(3),
         report: hex(4),
+        scope: null,
         converter: { kind: "rules", name: "blocks-to-markdown", version: "1" },
         against: null,
         asks: this.asks.map(([why, block]) => ({ why, id: block })),
@@ -155,8 +177,18 @@ class FakeCore {
       const [gone] = at < 0 ? [] : this.listed.splice(at, 1);
       return gone ?? { id, title: "", created_at: "" };
     },
-    importDocument: async (id, name, data, key, supersede) => {
-      this.record("import_document", id, name, data, key, supersede ?? false);
+    readDocument: async (id, name, data): Promise<ReadDocument> => {
+      this.record("read_document", id, name, data);
+      if (this.readWith !== null) return this.readWith();
+      return {
+        original: hex(1),
+        extraction: hex(2),
+        not_carried: [],
+        outline: { by: "headings", sections: this.sections },
+      };
+    },
+    importSelection: async (id, _document, key, sections, supersede) => {
+      this.record("import_selection", id, key, sections, supersede ?? false);
       if (this.importWith !== null) return this.importWith();
       const spec = this.listed.find((s) => s.id === id) ?? { id, title: id, created_at: "" };
       const open = (this.specs.get(id) ?? []).find((s) => (s.ended ?? s.proposal.state) === "pending");
@@ -178,7 +210,7 @@ class FakeCore {
     readProposalDocuments: async (id, proposal): Promise<ProposalDocuments> => {
       this.record("read_proposal_documents", id, proposal);
       this.find(id, proposal);
-      return { conversion: JSON.stringify(CONVERSION_TEXT), report: "{}" };
+      return { conversion: JSON.stringify(CONVERSION_TEXT), report: "{}", scope: null };
     },
     readExtraction: async (id, digest) => {
       this.record("read_extraction", id, digest);
@@ -262,7 +294,8 @@ class FakeCore {
     Api,
     | "createSpec"
     | "removeSpec"
-    | "importDocument"
+    | "readDocument"
+    | "importSelection"
     | "listProposals"
     | "readProposal"
     | "readProposalDocuments"
@@ -400,7 +433,7 @@ describe("the first screen", () => {
     (r.root.querySelector(".drop") as HTMLElement).dispatchEvent(drop);
     await settle();
 
-    expect(r.core.callsOf("import_document")).toHaveLength(1);
+    expect(r.core.callsOf("read_document")).toHaveLength(1);
   });
 });
 
@@ -411,7 +444,7 @@ describe("a document that is read", () => {
     await chooseFile(r, file("door lock.md", "# Door lock\n"));
 
     expect(r.core.callsOf("create_spec")).toEqual([["door lock"]]);
-    const [id, name, data] = r.core.callsOf("import_document")[0] as [string, string, string];
+    const [id, name, data] = r.core.callsOf("read_document")[0] as [string, string, string];
     expect([id, name]).toEqual(["spec-1", "door lock.md"]);
     expect(atob(data)).toBe("# Door lock\n");
     expect(r.root.textContent).toContain("Door lock");
@@ -431,7 +464,7 @@ describe("a document that is read", () => {
     r.core.listed.push(spec);
     const old = r.core.makeProposal(spec);
     old.ended = "rejected";
-    r.core.api.importDocument = async () => {
+    r.core.api.importSelection = async () => {
       const stored = r.core.makeProposal(spec);
       stored.text = "The lock opens at once.";
       return { proposal: stored.proposal, created: true, complete: true, not_carried: [] };
@@ -458,7 +491,7 @@ describe("a document that is read", () => {
 
   it("says it is reading while the core works, and the file's name", async () => {
     const wait = gate();
-    r.core.importWith = async () => {
+    r.core.readWith = async () => {
       await wait.opened;
       throw new CommandFailure("unreadable-original", "x");
     };
@@ -612,15 +645,15 @@ describe("a spec that is already waiting on a document", () => {
 
   it("replaces it only when told to, sending the same file again", async () => {
     const first = await waiting();
-    expect(r.core.callsOf("import_document")[0]?.[4]).toBe(false);
+    expect(r.core.callsOf("import_selection")[0]?.[3]).toBe(false);
 
     button(r.root, say("impOpenReplace")).click();
     await settle();
 
-    const sent = r.core.callsOf("import_document");
+    const sent = r.core.callsOf("import_selection");
     expect(sent).toHaveLength(2);
-    expect(sent[1]?.[4]).toBe(true);
-    expect(sent[1]?.[1]).toBe("again.md");
+    expect(sent[1]?.[3]).toBe(true);
+    expect(r.core.callsOf("read_document")[1]?.[1]).toBe("again.md");
     expect(r.core.specs.get("kept")?.find((s) => s.proposal.id === first)?.ended).toBe("superseded");
   });
 });
@@ -982,6 +1015,206 @@ describe("a spec that has a document waiting", () => {
     await r.flow.noteSpec("kept");
 
     expect(r.flow.pendingFor("kept")).toBeNull();
+  });
+});
+
+/** A document of two functions, the first with a part under it: what a mixed specification looks like. */
+function twoFunctions(): DocumentSection[] {
+  return [section("s1", "Lamp"), section("s2", "Timing", "s1"), section("s3", "Fan")];
+}
+
+function box(root: HTMLElement, id: string): HTMLInputElement {
+  const found = root.querySelector<HTMLInputElement>(`#part-${id}`);
+  if (found === null) throw new Error(`no box for ${id} in: ${root.textContent}`);
+  return found;
+}
+
+describe("a document with parts to choose between", () => {
+  beforeEach(() => {
+    r.core.sections = twoFunctions();
+    r.flow.open({ kind: "new" });
+  });
+
+  it("is shown for the choosing before anything is converted, with every part chosen", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    expect(r.root.textContent).toContain(say("impPartsTitle", { name: "functions.md" }));
+    expect(["s1", "s2", "s3"].map((id) => box(r.root, id).checked)).toEqual([true, true, true]);
+    // Reading is not importing: nothing was converted, and no proposal exists.
+    expect(r.core.callsOf("read_document")).toHaveLength(1);
+    expect(r.core.callsOf("import_selection")).toEqual([]);
+    expect(r.root.textContent).toContain(say("impPartsTotals", { parts: "3", of: "3", characters: "120" }));
+    expect(r.root.textContent).toContain(say("impPartsLead"));
+  });
+
+  it("shows a part under another one set in from it, and names parts without a title by their place", async () => {
+    r.core.sections = [
+      { ...section("s1", ""), kind: "preamble" },
+      { ...section("s2", ""), kind: "page", page_first: 3, page_last: 4 },
+    ];
+
+    await chooseFile(r, file("scan.pdf", "x"));
+
+    expect(r.root.textContent).toContain(say("impPartsPreamble"));
+    expect(r.root.textContent).toContain(say("impPartsPages", { first: "3", last: "4" }));
+    r.core.sections = twoFunctions();
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("functions.md", "x"));
+    const depth = (id: string): string => (box(r.root, id).closest("li") as HTMLElement).style.getPropertyValue("--depth");
+    expect([depth("s1"), depth("s2"), depth("s3")]).toEqual(["0", "1", "0"]);
+  });
+
+  it("brings in only the parts chosen, in the document's order, and says nothing of the others", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    box(r.root, "s1").click();
+    await settle();
+    expect(["s1", "s2", "s3"].map((id) => box(r.root, id).checked)).toEqual([false, false, true]);
+    button(r.root, say("impPartsImport", { parts: "1" })).click();
+    await settle();
+
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), ["s3"], false]]);
+    expect(r.root.textContent).toContain(say("rvwSave"));
+  });
+
+  it("takes a part with the parts under it, and a part under it alone; one half chosen becomes all chosen", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    box(r.root, "s2").click();
+    await settle();
+    // The parent is half chosen, which a person sees as neither ticked nor empty.
+    expect(["s1", "s2", "s3"].map((id) => box(r.root, id).checked)).toEqual([false, false, true]);
+    expect(box(r.root, "s1").indeterminate).toBe(true);
+
+    box(r.root, "s1").click();
+    await settle();
+    expect(["s1", "s2", "s3"].map((id) => box(r.root, id).checked)).toEqual([true, true, true]);
+    expect(box(r.root, "s1").indeterminate).toBe(false);
+
+    box(r.root, "s1").click();
+    await settle();
+    expect(["s1", "s2", "s3"].map((id) => box(r.root, id).checked)).toEqual([false, false, true]);
+  });
+
+  it("sends no ids when every part is chosen, which the core takes as the whole document", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
+  });
+
+  it("cannot bring in nothing, and says why in words, and keeps the keyboard where it is", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsNone")).click();
+    await settle();
+
+    const bring = r.root.querySelector<HTMLButtonElement>("#parts-bring") as HTMLButtonElement;
+    expect(bring.getAttribute("aria-disabled")).toBe("true");
+    expect(bring.getAttribute("aria-describedby")).toBe("parts-nothing");
+    expect(r.root.querySelector("#parts-nothing")?.textContent).toBe(say("impPartsNothing"));
+    bring.click();
+    await settle();
+    expect(r.core.callsOf("import_selection")).toEqual([]);
+
+    button(r.root, say("impPartsAll")).click();
+    await settle();
+    expect((r.root.querySelector("#parts-bring") as HTMLElement).getAttribute("aria-disabled")).toBeNull();
+    expect(r.root.querySelector("#parts-nothing")).toBeNull();
+  });
+
+  it("gives the keyboard back to the box that was pressed, since the screen is drawn again", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+    r.flow.takeFocusRequest();
+
+    box(r.root, "s3").click();
+
+    expect(r.flow.takeFocusRequest()).toBe("part:s3");
+    expect(r.root.querySelector('[data-focus="part:s3"]')).not.toBeNull();
+  });
+
+  it("goes back without a document, and a spec made for it does not stay behind empty", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impBack")).click();
+    await settle();
+
+    expect(r.core.callsOf("remove_spec")).toEqual([["spec-1"]]);
+    expect(r.core.callsOf("import_selection")).toEqual([]);
+    expect(r.root.textContent).toContain(say("impDrop"));
+  });
+
+  it("does not take away a spec that was kept before, when it goes back", async () => {
+    r.flow.open({ kind: "spec", spec: { id: "kept", title: "Kept", created_at: "" } });
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impBack")).click();
+    await settle();
+
+    expect(r.core.callsOf("remove_spec")).toEqual([]);
+  });
+
+  it("says it is converting, not reading, once the parts are chosen", async () => {
+    const wait = gate();
+    r.core.importWith = async () => {
+      await wait.opened;
+      throw new CommandFailure("unreadable-original", "x");
+    };
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("impConverting", { name: "functions.md" }));
+    wait.open();
+    await settle();
+  });
+
+  it("says a refusal of the choice as a refusal, and a spec made for it does not stay behind empty", async () => {
+    r.core.importWith = async () => {
+      throw new CommandFailure("scope-refused", "a scope holds no block");
+    };
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("impRefusedTitle"));
+    expect(r.core.callsOf("remove_spec")).toEqual([["spec-1"]]);
+  });
+
+  it("replaces the open proposal only when the person said so, and keeps saying it through the choosing", async () => {
+    const spec: Spec = { id: "kept", title: "Kept", created_at: "" };
+    r.core.listed.push(spec);
+    r.core.makeProposal(spec);
+    r.flow.open({ kind: "spec", spec });
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+    expect(r.root.textContent).toContain(say("impOpenTitle"));
+
+    button(r.root, say("impOpenReplace")).click();
+    await settle();
+    expect(r.core.callsOf("read_document")).toHaveLength(2);
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.core.callsOf("import_selection").map((c) => c[3])).toEqual([false, true]);
+  });
+});
+
+describe("a document with one part", () => {
+  it("is brought in at once, as it always was: there is nothing to choose between", async () => {
+    r.flow.open({ kind: "new" });
+
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+
+    expect(r.root.textContent).not.toContain(say("impPartsLead"));
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
+    expect(r.root.textContent).toContain(say("rvwSave"));
   });
 });
 

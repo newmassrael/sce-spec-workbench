@@ -11,13 +11,13 @@
 // later core may add some); missing or mistyped ones are not.
 
 /** The specs' command set this screen was written for (`COMMAND_SET_VERSION` in `sce-specs`). */
-export const SUPPORTED_COMMAND_SET_VERSION = 32;
+export const SUPPORTED_COMMAND_SET_VERSION = 33;
 
 /**
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 4;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 5;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -1927,6 +1927,8 @@ export interface Proposal {
   extraction: Revision;
   conversion: Revision;
   report: Revision;
+  /** The part of the document the owner chose (named by hash); `null` when it is the whole. */
+  scope: Revision | null;
   converter: { kind: string; name: string; version: string };
   /** The text head it was made against; `null` for a spec that had no text. */
   against: Revision | null;
@@ -1971,6 +1973,8 @@ export interface ProposalView {
 export interface ProposalDocuments {
   conversion: string;
   report: string;
+  /** The scope the import was made under, as text; `null` when it is of the whole document. */
+  scope: string | null;
 }
 
 /** `accept_proposal`: `created` is `false` for the same accept said again. */
@@ -2001,6 +2005,7 @@ function parseProposal(value: unknown, where: string): Proposal {
     extraction: revision(r["extraction"], `${where}.extraction`),
     conversion: revision(r["conversion"], `${where}.conversion`),
     report: revision(r["report"], `${where}.report`),
+    scope: optionalRevision("scope"),
     converter: {
       kind: text(converter, "kind", `${where}.converter`),
       name: text(converter, "name", `${where}.converter`),
@@ -2058,7 +2063,12 @@ export function parseProposalList(value: unknown): Proposal[] {
 export function parseProposalDocuments(value: unknown): ProposalDocuments {
   const where = "read_proposal_documents";
   const r = record(value, where);
-  return { conversion: text(r, "conversion", where), report: text(r, "report", where) };
+  return {
+    conversion: text(r, "conversion", where),
+    report: text(r, "report", where),
+    // The core leaves it out for a document imported whole, and the screen reads that as no scope.
+    scope: r["scope"] === undefined ? null : nullableText(r, "scope", where),
+  };
 }
 
 /** `decide_block`. */
@@ -2158,6 +2168,79 @@ export function parseImportedDocument(value: unknown): ImportedDocument {
     created: created(r, where),
     complete: r["complete"],
     not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
+const SECTION_KINDS = ["preamble", "heading", "page", "whole"] as const;
+const OUTLINE_WAYS = ["headings", "pages", "whole"] as const;
+
+/** One part of a document the owner can choose, with what a person needs to see to choose it. */
+export interface DocumentSection {
+  /** `s1`, `s2`, ...: what `import_selection` is given. */
+  id: string;
+  kind: (typeof SECTION_KINDS)[number];
+  /** The heading's words; empty for what comes before the first heading, a page, or the whole. */
+  title: string;
+  /** The heading's level, from 1. */
+  level: number;
+  /** The part this one is under, when it is under one. */
+  parent: string | null;
+  /** How many blocks with words it holds, the parts under it included. */
+  blocks: number;
+  characters: number;
+  page_first: number | null;
+  page_last: number | null;
+}
+
+/** How a document is divided into parts the owner can choose between. */
+export interface DocumentOutline {
+  by: (typeof OUTLINE_WAYS)[number];
+  sections: DocumentSection[];
+}
+
+/** `read_document`: a document kept and read, and the parts it has. Nothing is proposed yet. */
+export interface ReadDocument {
+  original: Revision;
+  extraction: Revision;
+  not_carried: NotCarried[];
+  outline: DocumentOutline;
+}
+
+function optionalCount(r: Obj, name: string, where: string): number | null {
+  return r[name] === null || r[name] === undefined ? null : count(r, name, where);
+}
+
+function parseDocumentSection(value: unknown, where: string): DocumentSection {
+  const r = record(value, where);
+  const parent = r["parent"];
+  return {
+    id: text(r, "id", where),
+    kind: oneOf(r, "kind", where, SECTION_KINDS),
+    title: text(r, "title", where),
+    level: count(r, "level", where),
+    parent: parent === null || parent === undefined ? null : text(r, "parent", where),
+    blocks: count(r, "blocks", where),
+    characters: count(r, "characters", where),
+    page_first: optionalCount(r, "page_first", where),
+    page_last: optionalCount(r, "page_last", where),
+  };
+}
+
+/** `read_document`. */
+export function parseReadDocument(value: unknown): ReadDocument {
+  const where = "read_document";
+  const r = record(value, where);
+  const outline = record(r["outline"], `${where}.outline`);
+  return {
+    original: revision(r["original"], `${where}.original`),
+    extraction: revision(r["extraction"], `${where}.extraction`),
+    not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+    outline: {
+      by: oneOf(outline, "by", `${where}.outline`, OUTLINE_WAYS),
+      sections: list(outline, "sections", `${where}.outline`).map((s, i) =>
+        parseDocumentSection(s, `${where}.outline.sections[${i}]`),
+      ),
+    },
   };
 }
 
