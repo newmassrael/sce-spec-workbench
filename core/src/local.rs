@@ -494,7 +494,9 @@ impl ToolWords {
 #[derive(Debug, Clone)]
 pub struct Local {
     endpoint: Endpoint,
-    author: AuthorServer,
+    /// The authoring server the tools of a run are reached through. None for a server that is asked one
+    /// question and offered no tool ([`Local::asking`]).
+    author: Option<AuthorServer>,
     config: LocalConfig,
     /// The key the server wants, when it wants one.
     bearer: Option<String>,
@@ -507,7 +509,20 @@ impl Local {
     pub fn new(endpoint: Endpoint, author: AuthorServer, config: LocalConfig) -> Self {
         Local {
             endpoint,
-            author,
+            author: Some(author),
+            config,
+            bearer: None,
+            trace: Trace::default(),
+        }
+    }
+
+    /// A server that is asked one question and offered nothing to call: the text of a task in, the
+    /// model's words out ([`Local::complete`]). It needs no authoring server, and a run of a model
+    /// (`generate`) is refused for it, since a run is made of tools.
+    pub fn asking(endpoint: Endpoint, config: LocalConfig) -> Self {
+        Local {
+            endpoint,
+            author: None,
             config,
             bearer: None,
             trace: Trace::default(),
@@ -653,16 +668,20 @@ impl Local {
     fn ask(
         &self,
         messages: &[Value],
-        tools: &Value,
+        tools: Option<&Value>,
         deadline: Instant,
         cancel: &Cancel,
     ) -> Result<Turn, GenerateError> {
         let mut body = json!({
             "model": self.config.model,
             "messages": messages,
-            "tools": tools,
             "stream": false,
         });
+        // A question with no tools to offer says none: a server told of an empty list may take the model
+        // for one that is to call something.
+        if let Some(tools) = tools {
+            body["tools"] = tools.clone();
+        }
         // Said only when the connection names one: a server told nothing uses its own default.
         if let Some(effort) = &self.config.effort {
             body["reasoning_effort"] = json!(effort);
@@ -816,6 +835,42 @@ impl Generator for Local {
 }
 
 impl Local {
+    /// One question: `prompt` to the model as a user's message, and its words back. No tool is offered, no
+    /// authoring server is started and nothing is repaired: what the model said is what is returned, and
+    /// whether it is an answer is for the one who asked. The time is the connection's and the word to stop is
+    /// `cancel`; a server that is down, a key it refuses, a context too long for it, and a model that said
+    /// nothing (or only its reasoning, or was cut at its limit) are each a failure with the cause they have.
+    pub fn complete(&self, prompt: &str, cancel: &Cancel) -> Result<String, GenerateError> {
+        let deadline = Instant::now() + self.config.timeout;
+        let messages = [json!({"role": "user", "content": prompt})];
+        match self.ask(&messages, None, deadline, cancel)? {
+            Turn::Message { message, ended, .. } => {
+                let said = content_of(&message);
+                if said.trim().is_empty() {
+                    let why = ended
+                        .explains(&said)
+                        .unwrap_or_else(|| "the server gave no words".to_string());
+                    return Err(GenerateError::Failed(
+                        Trouble::new(
+                            FailureKind::Model,
+                            format!("the model gave no answer: {why}"),
+                        )
+                        .because(ended.cause(&said)),
+                    ));
+                }
+                Ok(said)
+            }
+            // Nothing was offered to call, so a server that says it could not read a call is not what it
+            // claims to be: its words are all there is to say.
+            Turn::Unreadable { said, .. } => {
+                Err(GenerateError::connection(said).because(cause::BAD_ANSWER))
+            }
+            Turn::ContextFull { said } => {
+                Err(GenerateError::size(said).because(cause::CONTEXT_FULL))
+            }
+        }
+    }
+
     /// A run of the model. `held` is the last design the run sent to be checked, kept up to date as
     /// the run goes, so that whatever ends the run (a time, a message that is not a design, a server
     /// that went away) leaves what the run had made to the one that called it, which keeps it with
@@ -835,7 +890,13 @@ impl Local {
             GenerateError::installation(format!("a folder for the run: {e}"))
                 .because(cause::WORK_FOLDER)
         })?;
-        let author = scoped_to(&self.author, job.spec.as_str());
+        let Some(author) = &self.author else {
+            return Err(GenerateError::installation(
+                "this server is set up to be asked one question and has no tools to write a model with",
+            )
+            .because(cause::AUTHORING_SERVER));
+        };
+        let author = scoped_to(author, job.spec.as_str());
         let mut mcp = McpClient::start(&author, scratch.path(), deadline, cancel)
             .map_err(|e| self.mcp_failure(e))?;
         let tools = self.offered(&mut mcp, deadline, cancel)?;
@@ -880,7 +941,7 @@ impl Local {
                 turn,
                 messages: messages.len(),
             });
-            let (message, ended) = match self.ask(&messages, &offered, deadline, cancel)? {
+            let (message, ended) = match self.ask(&messages, Some(&offered), deadline, cancel)? {
                 Turn::Message {
                     message,
                     prompt_tokens: reported,

@@ -56,6 +56,11 @@ export interface EditorOptions {
   readonly onRename: (key: string, title: string) => void;
   readonly onRemove: (key: string) => void;
   readonly onConfirm: () => void;
+  /** A model's draft: whether one is being asked for, whether the draft has parts the owner has not touched, and
+   * what was said of the last. */
+  readonly ai: { readonly working: boolean; readonly marked: boolean; readonly note: string | null };
+  readonly onDraft: () => void;
+  readonly onClearDraft: () => void;
 }
 
 /** What stops the plan from being confirmed, said where the person is looking. */
@@ -153,15 +158,19 @@ function partRow(options: EditorOptions, section: DocumentSection): HTMLElement 
     .join(" · ");
   const pills: Child[] = none
     ? [h("span", { class: "dv-pill none" }, say("dvNone"))]
-    : keys.map((key) => {
-        const dest = draft.dests.find((d) => d.key === key);
-        // A pill of a destination is renamed in place while its name is typed (`data-dest`).
-        return h(
-          "span",
-          { class: pillClass(draft, key), "data-dest": key === OUT || dest === undefined ? undefined : key },
-          key === OUT || dest === undefined ? say("dvOut") : nameOf(dest),
-        );
-      });
+    : [
+        // Where a model put a part is its suggestion until the owner moves or confirms it.
+        ...(draft.ai.has(section.id) ? [h("span", { class: "dv-pill ai" }, say("dvAiMark"))] : []),
+        ...keys.map((key) => {
+          const dest = draft.dests.find((d) => d.key === key);
+          // A pill of a destination is renamed in place while its name is typed (`data-dest`).
+          return h(
+            "span",
+            { class: pillClass(draft, key), "data-dest": key === OUT || dest === undefined ? undefined : key },
+            key === OUT || dest === undefined ? say("dvOut") : nameOf(dest),
+          );
+        }),
+      ];
   return h(
     "li",
     {},
@@ -350,7 +359,27 @@ export function divideEditor(options: EditorOptions, bar: HTMLElement): HTMLElem
               say("dvAll"),
             ),
             h("span", {}, say("dvHead", { parts: String(sections.length), total: String(counts.total) })),
+            h(
+              "button",
+              {
+                type: "button",
+                class: "mini",
+                "data-focus": "dv:ai",
+                // Working says so and is not pressed again; the keyboard stays where it is (`aria-disabled`).
+                "aria-disabled": options.ai.working ? "true" : undefined,
+                onclick: () => {
+                  if (options.ai.working) return;
+                  if (options.ai.marked) options.onClearDraft();
+                  else options.onDraft();
+                },
+              },
+              icon("pair"),
+              options.ai.working ? say("dvAiWorking") : options.ai.marked ? say("dvAiClear") : say("dvAiAsk"),
+            ),
           ),
+          options.ai.note === null
+            ? null
+            : h("div", { class: "dv-ainote", role: "status" }, icon("pair"), h("span", {}, options.ai.note)),
           bulk(options, pickedParts, counts.picked),
           h("ul", { class: "dv-parts" }, ...sections.map((section) => partRow(options, section))),
         ),

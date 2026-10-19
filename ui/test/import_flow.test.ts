@@ -17,6 +17,7 @@ import type {
   DecisionKind,
   DividedDocument,
   DivisionStep,
+  DraftedDivision,
   DocumentSection,
   ImportedDocument,
   Intake,
@@ -190,6 +191,8 @@ class FakeCore {
   readWith: (() => Promise<ReadDocument>) | null = null;
   /** The proposals made of part of a document. */
   readonly partial = new Set<string>();
+  /** What the next `draft_division` answers; with none it is refused as a screen with no AI connection is. */
+  draftWith: (() => Promise<DraftedDivision>) | null = null;
   /** The documents that were divided, which a document read now may be a new version of. */
   intakes: Intake[] = [];
   /** The ledger each of them saved, as text; an intake with none has not been placed. */
@@ -348,6 +351,11 @@ class FakeCore {
       });
       return { complete: true, report: fullCount(), proposed: steps.length, failed: 0, steps };
     },
+    draftDivision: async (intake, destinations): Promise<DraftedDivision> => {
+      this.record("draft_division", intake, destinations);
+      if (this.draftWith !== null) return this.draftWith();
+      throw new CommandFailure("no-connection", "no AI connection is chosen");
+    },
     listIntakes: async (): Promise<Intake[]> => {
       this.record("list_intakes");
       return this.intakes;
@@ -499,6 +507,7 @@ class FakeCore {
     | "importSelection"
     | "divideDocument"
     | "confirmDivision"
+    | "draftDivision"
     | "listIntakes"
     | "readIntake"
     | "readIntakeExtraction"
@@ -1480,6 +1489,188 @@ describe("a document with one part", () => {
 
     expect(r.root.textContent).not.toContain(say("impPartsLead"));
     expect(r.core.callsOf("import_selection")).toHaveLength(1);
+  });
+});
+
+/** What a model server answers when asked to draw a division: its suggestions, by part id. */
+function drafted(
+  suggestions: Array<{ part: string; key?: string; title?: string }>,
+  over: Partial<DraftedDivision["draft"]> = {},
+): DraftedDivision {
+  return {
+    connection: { id: "pc2", name: "pc2 (tunnel)", model: "qwen-test" },
+    seconds: 12.3,
+    parts: 3,
+    draft: {
+      suggestions: suggestions.map((s) => ({ part: s.part, key: s.key ?? null, title: s.title ?? null })),
+      refused: [],
+      unplaced: [],
+      unreadable: null,
+      ...over,
+    },
+  };
+}
+
+function aiButton(root: HTMLElement): HTMLButtonElement {
+  const found = root.querySelector<HTMLButtonElement>('[data-focus="dv:ai"]');
+  if (found === null) throw new Error(`no AI button in: ${root.textContent}`);
+  return found;
+}
+
+describe("a model's draft of a division", () => {
+  it("is asked for with the destinations the owner has, and places nothing on its own", async () => {
+    await toDivide();
+    r.core.draftWith = async () => drafted([]);
+
+    aiButton(r.root).click();
+    await settle();
+
+    expect(r.core.callsOf("draft_division")).toEqual([
+      ["intake-1", [{ key: "d0", kind: "spec", title: "functions" }]],
+    ]);
+    expect(r.root.querySelector(".dv-ainote")?.textContent).toContain(say("dvAiNothing", { name: "pc2 (tunnel)" }));
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
+  });
+
+  it("puts what it suggests into the parts not placed, marked as the model's, with a new destination it named", async () => {
+    await toDivide();
+    r.core.draftWith = async () =>
+      drafted([{ part: "s1", key: "d0" }, { part: "s2", key: "d0" }, { part: "s3", title: "Fan control" }]);
+
+    aiButton(r.root).click();
+    await settle();
+
+    expect([...r.root.querySelectorAll(".dv-pill.ai")]).toHaveLength(3);
+    expect(r.root.textContent).toContain(say("dvCountDone"));
+    // Asked with the one spec the document came with, so the note also says to name the others first.
+    expect(r.root.querySelector(".dv-ainote")?.textContent).toBe(
+      `${say("dvAiNoteAll", { name: "pc2 (tunnel)", placed: "3" })} ${say("dvAiHintAlone")}`,
+    );
+    // The destination the model proposed is one of the owner's to rename and to send to, like any new one.
+    expect(r.root.querySelector<HTMLInputElement>("input.dv-name")?.value).toBe("Fan control");
+    expect(aiButton(r.root).textContent).toContain(say("dvAiClear"));
+  });
+
+  it("says to name the other specs first when there is only one to place parts in, and not otherwise", async () => {
+    await toDivide();
+    r.core.draftWith = async () => drafted([{ part: "s1", key: "d0" }]);
+    aiButton(r.root).click();
+    await settle();
+    expect(r.root.querySelector(".dv-ainote")?.textContent).toContain(say("dvAiHintAlone"));
+
+    // With a second spec the owner has named, the model is asked with both and the hint is not said.
+    aiButton(r.root).click();
+    button(r.root, say("dvAddNew")).click();
+    aiButton(r.root).click();
+    await settle();
+    expect(r.core.callsOf("draft_division").at(-1)?.[1]).toHaveLength(2);
+    expect(r.root.querySelector(".dv-ainote")?.textContent).not.toContain(say("dvAiHintAlone"));
+  });
+
+  it("leaves a part the owner placed while the model worked where the owner put it", async () => {
+    await toDivide();
+    const held = gate();
+    r.core.draftWith = async () => {
+      await held.opened;
+      return drafted([{ part: "s1", key: "d0" }, { part: "s3", key: "d0" }]);
+    };
+
+    aiButton(r.root).click();
+    await settle();
+    expect(aiButton(r.root).textContent).toContain(say("dvAiWorking"));
+    // The owner leaves s1 out while it works.
+    place(["s1"], say("dvOut"));
+    held.open();
+    await settle();
+
+    // The model's s1 is not taken, and s3 is.
+    expect([...r.root.querySelectorAll(".dv-pill.ai")]).toHaveLength(1);
+    const rows = [...r.root.querySelectorAll(".dv-row")].map((row) => row.textContent ?? "");
+    expect(rows[0]).toContain(say("dvOut"));
+    expect(rows[0]).not.toContain(say("dvAiMark"));
+    expect(rows[2]).toContain(say("dvAiMark"));
+  });
+
+  it("makes a part the owner's when it is moved, and clearing takes away only what is still the model's", async () => {
+    await toDivide();
+    r.core.draftWith = async () => drafted([{ part: "s1", key: "d0" }, { part: "s2", key: "d0" }, { part: "s3", title: "Fan" }]);
+    aiButton(r.root).click();
+    await settle();
+
+    place(["s1"], say("dvOut"));
+    expect([...r.root.querySelectorAll(".dv-pill.ai")]).toHaveLength(2);
+    aiButton(r.root).click();
+
+    // s1 was moved by the owner and stays; s2 and s3 were the model's and are not placed again; the destination
+    // the model proposed is gone with them.
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "4" }));
+    expect(r.root.querySelector(".dv-ainote")).toBeNull();
+    expect(r.root.querySelector("input.dv-name")).toBeNull();
+    expect(aiButton(r.root).textContent).toContain(say("dvAiAsk"));
+  });
+
+  it("says why when it could not be asked, in the words the kind of refusal chooses", async () => {
+    await toDivide();
+    const refusals: Array<[string, string, string]> = [
+      ["no-connection", "none", say("dvAiNoConnection")],
+      ["too-many-parts", "many", say("dvAiTooMany")],
+      ["draft-unavailable", "`pc2` is not a model server", say("dvAiFailed", { detail: "`pc2` is not a model server" })],
+      ["draft-failed", "the server could not be reached", say("dvAiFailed", { detail: "the server could not be reached" })],
+    ];
+    for (const [kind, message, expected] of refusals) {
+      r.core.draftWith = async () => {
+        throw new CommandFailure(kind, message);
+      };
+      aiButton(r.root).click();
+      await settle();
+      expect(r.root.querySelector(".banner-error")?.textContent, kind).toBe(expected);
+    }
+    // Nothing was placed by any of them, and the button is there to ask again.
+    expect(r.root.textContent).toContain(say("dvCountTodo", { n: "6" }));
+    expect(aiButton(r.root).textContent).toContain(say("dvAiAsk"));
+  });
+
+  it("says that an answer that could not be read is an answer, and what was not taken of one that could", async () => {
+    await toDivide();
+    r.core.draftWith = async () =>
+      drafted([], { unreadable: { item: 0, code: "not-json", why: "the answer holds no JSON array" } });
+    aiButton(r.root).click();
+    await settle();
+    expect(r.root.querySelector(".dv-ainote")?.textContent).toBe(say("dvAiUnreadable", { name: "pc2 (tunnel)" }));
+
+    r.core.draftWith = async () =>
+      drafted([{ part: "s1", key: "d0" }], {
+        refused: [{ item: 2, code: "left-out", why: "leaving a part out is the owner's to decide" }],
+      });
+    aiButton(r.root).click();
+    await settle();
+    expect(r.root.querySelector(".dv-ainote")?.textContent).toContain(say("dvAiRefused", { n: "1" }));
+  });
+
+  it("is dropped when the owner leaves before it comes back", async () => {
+    await toDivide();
+    let release: () => void = () => undefined;
+    r.core.draftWith = async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return drafted([{ part: "s1", key: "d0" }]);
+    };
+    aiButton(r.root).click();
+    await settle();
+
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:back"]')?.click();
+    release();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("impPartsLead"));
+    expect(r.root.querySelector(".dv-pill.ai")).toBeNull();
+  });
+
+  it("is not offered for a revised document, whose paragraphs are asked about one by one", async () => {
+    await toCarry();
+
+    expect(r.root.querySelector('[data-focus="dv:ai"]')).toBeNull();
   });
 });
 

@@ -11,6 +11,8 @@
 //! - [`divide_document`] starts the division of a document a spec already holds (the person has read it for
 //!   one spec and found it holds several), and says the parts the owner can send to specs.
 //! - [`read_division`] says the same of an intake that is already there, and where each spec has come.
+//! - [`draft_division`] asks a model server the person runs to draw a division, and reads its answer as
+//!   suggestions the owner moves or confirms; nothing is placed by it.
 //! - [`revise_division`] carries a division to a revised document: what is word for word the same goes where it
 //!   went, and what changed, is new or is gone is named, for the owner to place.
 //! - [`confirm_division`] saves the owner's plan as the ledger (when one is given), has SCE count it, and
@@ -32,10 +34,14 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use sce_specs::{Clock, CommandError, Revision};
+use sce_specs::{Clock, CommandError, ConnectionId, Revision};
 
 use crate::commands::Context;
+use crate::connection::AdapterKind;
+use crate::directory::{local_target, run_of};
 use crate::import_host::{ask, failed, first_words, head_of, refuse, text_of, tools, Scratch};
+use crate::local::Local;
+use crate::runner::{Cancel, GenerateError};
 
 /// What `divide_document` is given.
 #[derive(Deserialize)]
@@ -284,6 +290,198 @@ pub(crate) fn revise_division<C: Clock>(
         "saved": saved,
         "not_carried": not_carried(&new_extraction),
     }))
+}
+
+/// A destination the owner has, as the model is told of it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DraftDestination {
+    /// What the model answers by: the screen's own key for it.
+    key: String,
+    /// `spec` for one that exists, `new` for one to be made.
+    kind: String,
+    title: String,
+}
+
+/// What `draft_division` is given.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DraftDivision {
+    /// The intake of the document being divided.
+    intake: String,
+    /// The destinations the owner has so far, which the parts may go to.
+    destinations: Vec<DraftDestination>,
+    /// The connection to ask: one the person saved. Absent, the default connection.
+    #[serde(default)]
+    connection: Option<String>,
+}
+
+/// Ask a model to draw a division of the intake's document among the destinations the owner has, and read
+/// what it answered as suggestions (ADR 0040).
+///
+/// **Nothing is placed.** What comes back is suggestions by part id, the items of the answer that were not
+/// taken and the parts the model left unplaced; the owner moves or confirms each part, and what is saved is the
+/// plan they confirm. The model is asked through the connection the person saved (their own, by its id: a
+/// caller names no address), so a caller that can ask for a model's draft can ask for no more than a caller that
+/// can request a generation. Only a model server the person runs is asked one question so far: a client that
+/// brings its own tool loop (Claude Code, Codex) has not been tried at this, and says so rather than being
+/// started with a prompt nobody has seen it answer.
+pub(crate) fn draft_division<C: Clock>(
+    context: &Context<'_, C>,
+    args: DraftDivision,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    let view = ask(
+        context,
+        "read_intake_extraction",
+        json!({ "id": args.intake }),
+    )?;
+    let extraction_text = text_of(&view, "text")?;
+
+    // The connection first: a screen that has none is told so before a document is read for nothing.
+    let connections = context.connections.ok_or_else(|| {
+        refuse(
+            "no-connection",
+            "this application keeps no AI connection to ask",
+            Value::Null,
+        )
+    })?;
+    let id = match args.connection.as_deref() {
+        Some(text) => ConnectionId::parse(text)?,
+        None => connections.default_connection()?.ok_or_else(|| {
+            refuse(
+                "no-connection",
+                "no AI connection is chosen: choose one under AI connection, then ask again",
+                Value::Null,
+            )
+        })?,
+    };
+    let stored = connections.read(&id, None)?.ok_or_else(|| {
+        refuse(
+            "no-connection",
+            format!("the AI connection `{id}` is not kept on this computer"),
+            Value::Null,
+        )
+    })?;
+    let called = stored
+        .connection
+        .display_name
+        .clone()
+        .unwrap_or_else(|| id.to_string());
+    let adapter = stored.connection.adapter;
+    if adapter != AdapterKind::Local {
+        return Err(refuse(
+            "draft-unavailable",
+            format!(
+                "`{called}` is not a model server, and only a model server can draw a division yet: \
+                 choose one under AI connection, or place the parts by hand"
+            ),
+            json!({ "adapter": adapter.word() }),
+        ));
+    }
+    let pin = stored.connection.pin(stored.revision.clone());
+    let run = run_of(&pin).map_err(unrunnable)?;
+    let (endpoint, config) = local_target(context.policy, &stored, &run).map_err(unrunnable)?;
+    let model = config.model.clone();
+    let server = Local::asking(endpoint, config);
+
+    // What the model is told: made by the tools from the document's own outline and the owner's destinations.
+    let scratch = Scratch::new()?;
+    let dir = scratch.path(".");
+    scratch.write("e.json", extraction_text.as_bytes())?;
+    let listed: Vec<Value> = args
+        .destinations
+        .iter()
+        .map(|d| json!({ "key": d.key, "kind": d.kind, "title": d.title }))
+        .collect();
+    scratch.write(
+        "destinations.json",
+        json!({ "v": 1, "destinations": listed })
+            .to_string()
+            .as_bytes(),
+    )?;
+    let prepared = tools.run(
+        &dir,
+        &[
+            "prepare-division",
+            "--extraction",
+            "e.json",
+            "--destinations",
+            "destinations.json",
+            "--out-dir",
+            "division",
+        ],
+        tools.quick_limit(),
+    )?;
+    if prepared.code != 0 {
+        let said = first_words(&prepared.stderr, &prepared.stdout);
+        let said = said.trim_start_matches("refused:").trim().to_string();
+        // A document with more parts than one prompt holds is its own answer: the screen says to place by hand.
+        let kind = if said.contains("[too-many-parts]") {
+            "too-many-parts"
+        } else if prepared.code == 2 {
+            "bad-division"
+        } else {
+            return Err(failed(format!(
+                "`prepare-division` ended with {}: {said}",
+                prepared.code
+            )));
+        };
+        return Err(refuse(kind, said, Value::Null));
+    }
+    let counts: Value = serde_json::from_str(prepared.stdout.trim())
+        .map_err(|e| failed(format!("`prepare-division` did not say what it wrote: {e}")))?;
+    let prompt = scratch.read("division/prompt.txt")?;
+
+    // The question, put to the person's server and bounded by the connection's time.
+    let began = std::time::Instant::now();
+    let answer = server
+        .complete(&prompt, &Cancel::new())
+        .map_err(|error| match error {
+            GenerateError::Cancelled => {
+                refuse("draft-failed", "the question was stopped", Value::Null)
+            }
+            GenerateError::Failed(trouble) | GenerateError::Unusable(trouble) => refuse(
+                "draft-failed",
+                trouble.words.clone(),
+                json!({ "failure": trouble.failure.kind, "cause": trouble.failure.cause }),
+            ),
+        })?;
+    let seconds = began.elapsed().as_secs_f64();
+    scratch.write("division/answer.txt", answer.as_bytes())?;
+
+    // What it answered, read by the tools: an answer that cannot be read at all is still an answer, said.
+    let finished = tools.run(
+        &dir,
+        &[
+            "finish-division",
+            "--extraction",
+            "e.json",
+            "--dir",
+            "division",
+        ],
+        tools.quick_limit(),
+    )?;
+    if !matches!(finished.code, 0 | 1) {
+        return Err(failed(format!(
+            "`finish-division` ended with {}: {}",
+            finished.code,
+            first_words(&finished.stderr, &finished.stdout)
+        )));
+    }
+    let draft: Value = serde_json::from_str(finished.stdout.trim())
+        .map_err(|e| failed(format!("`finish-division` did not print a draft: {e}")))?;
+    Ok(json!({
+        "connection": { "id": id, "name": called, "model": model },
+        "seconds": (seconds * 10.0).round() / 10.0,
+        "prompt": counts,
+        "draft": draft,
+    }))
+}
+
+/// A connection that cannot be asked, said in the words that name it by what the person called it.
+fn unrunnable(why: crate::runner::Unrunnable) -> CommandError {
+    refuse("draft-unavailable", why.reason, Value::Null)
 }
 
 /// What `confirm_division` is given.

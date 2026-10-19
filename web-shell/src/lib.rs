@@ -133,7 +133,9 @@ fn status_of(kind: &str) -> u16 {
         // A division the intake cannot take now: a spec to be made was made as another already, or
         // there is no ledger yet to walk.
         | "already-bound"
-        | "no-division" => 409,
+        | "no-division"
+        // A draft of a division asked of a model, with none chosen to ask.
+        | "no-connection" => 409,
         "too-large" => 413,
         // The request was understood and what it carries is refused on its content: a model, a
         // list, answers or a candidate that are not one, a reference to a text there is not, a
@@ -159,6 +161,8 @@ fn status_of(kind: &str) -> u16 {
         // name each other or the document they are of. Refused on their content.
         | "bad-division"
         | "bad-ledger"
+        // A document with more parts than one prompt holds: it cannot be drafted, and is placed by hand.
+        | "too-many-parts"
         // A proposal whose parts do not name each other, a decision on a block nobody has, words
         // where a decision carries none.
         | "bad-proposal"
@@ -171,9 +175,12 @@ fn status_of(kind: &str) -> u16 {
         | "sce-refused" => 422,
         // The authoring tools are not installed, did not finish in time, or failed: the shell's, and
         // not the document's.
-        "busy" | "sce-unavailable" | "import-tool-missing" => 503,
+        // A connection that cannot be asked a question yet (not a model server, or one this build cannot
+        // reach) is the installation's, as a missing tool is.
+        "busy" | "sce-unavailable" | "import-tool-missing" | "draft-unavailable" => 503,
         "sce-timeout" | "import-tool-timeout" => 504,
-        "sce-failed" | "import-tool-failed" => 502,
+        // The model server the person runs answered with a failure of its own, or could not be reached.
+        "sce-failed" | "import-tool-failed" | "draft-failed" => 502,
         // `corrupt` and `io` are the server's own; a kind nobody mapped is one too.
         _ => 500,
     }
@@ -349,6 +356,10 @@ mod tests {
         ("bad-section", 422),
         ("scope-refused", 422),
         ("bad-division", 422),
+        ("too-many-parts", 422),
+        ("no-connection", 409),
+        ("draft-unavailable", 503),
+        ("draft-failed", 502),
         ("bad-ledger", 422),
         ("already-bound", 409),
         ("no-division", 409),

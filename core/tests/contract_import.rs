@@ -22,10 +22,13 @@ mod common;
 use std::time::Duration;
 
 use sce_spec_workbench_core::commands::IMPORT_COMMANDS;
+use sce_spec_workbench_core::connection::{AdapterKind, AuthSource, Connection, Limits};
+use sce_spec_workbench_core::connection_store::ConnectionStore;
 use sce_spec_workbench_core::{call_in, Context, Entrance, ImportTools, Policy};
-use sce_specs::{CommandError, FixedClock, SpecStore};
+use sce_specs::{CommandError, ConnectionId, FixedClock, SpecStore};
 use serde_json::{json, Map, Value};
 
+use common::model_server::{chat_server, says, Script};
 use common::{scratch, write_program, FakeRenderer};
 
 const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/contract/import_replies.json");
@@ -94,29 +97,62 @@ fn real_tools() -> ImportTools {
 
 fn call(
     store: &SpecStore<FixedClock>,
+    settings: &ConnectionStore,
     tools: Option<&Result<ImportTools, String>>,
     name: &str,
     args: Value,
 ) -> Result<Value, CommandError> {
     let policy = Policy::shipped();
     call_in(
-        &Context::new(store, &FakeRenderer, &policy, Entrance::Browser).with_import_tools(tools),
+        &Context::new(store, &FakeRenderer, &policy, Entrance::Browser)
+            .with_import_tools(tools)
+            .with_connections(Some(settings)),
         name,
         args,
     )
 }
 
+/// A connection the person saved, and chose as the default.
+fn save_default(settings: &ConnectionStore, adapter: AdapterKind, address: Option<&str>) {
+    let id = ConnectionId::parse("pc2").unwrap();
+    let connection = Connection {
+        id: id.clone(),
+        adapter,
+        display_name: Some("pc2 (tunnel)".to_string()),
+        executable: None,
+        model: Some("qwen-test".to_string()),
+        effort: None,
+        auth: if adapter == AdapterKind::Local {
+            AuthSource::NoAuth
+        } else {
+            AuthSource::OfficialLogin
+        },
+        server_url: address.map(str::to_string),
+        limits: Limits {
+            seconds: Some(20),
+            ..Limits::default()
+        },
+    };
+    // A connection saved again says which it replaces, as a save of a text does.
+    let current = settings.read(&id, None).unwrap().map(|s| s.revision);
+    settings.save(&connection, current.as_ref()).unwrap();
+    if settings.default_connection().unwrap().is_none() {
+        settings.set_default(Some(&id), None).unwrap();
+    }
+}
+
 fn replies() -> Value {
     let root = scratch("contract-import");
     let store = SpecStore::with_clock(&root, FixedClock("2026-10-03T09:00:00Z".to_string()));
+    let settings = ConnectionStore::at(scratch("contract-import-settings"));
     let tools = Ok(real_tools());
     let ask = |name: &str, args: Value| {
-        call(&store, Some(&tools), name, args)
+        call(&store, &settings, Some(&tools), name, args)
             .unwrap_or_else(|e| panic!("{name} was refused: {e:?}"))
     };
     let refused = |tools: Option<&Result<ImportTools, String>>, name: &str, args: Value| {
         serde_json::to_value(
-            call(&store, tools, name, args).expect_err("the command should be refused"),
+            call(&store, &settings, tools, name, args).expect_err("the command should be refused"),
         )
         .unwrap()
     };
@@ -340,6 +376,43 @@ fn replies() -> Value {
     );
     let revised_id = revised["intake"]["id"].as_str().unwrap().to_string();
     answers.insert("revise_division".into(), revised);
+
+    // A model's draft of a division: asked of the model server the person saved and chose. Before any is saved
+    // there is none to ask; a client that brings its own tool loop is not asked; a server that refuses is said.
+    let drafting = json!({
+        "intake": begun_id,
+        "destinations": [
+            {"key": "d0", "kind": "spec", "title": "Revised source"},
+            {"key": "d1", "kind": "new", "title": "Fan control"},
+        ],
+    });
+    refusals.insert(
+        "no-connection".into(),
+        refused(Some(&tools), "draft_division", drafting.clone()),
+    );
+    save_default(&settings, AdapterKind::ClaudeCode, None);
+    refusals.insert(
+        "draft-unavailable".into(),
+        refused(Some(&tools), "draft_division", drafting.clone()),
+    );
+    let model = chat_server(vec![
+        says(
+            r#"[{"part": "s1", "spec": "d0"}, {"part": "s3", "new": "Fan control"}, {"part": "s2", "spec": "out"}]"#,
+        ),
+        Script::Reply(
+            400,
+            r#"{"error":{"message":"the request exceeds the available context size"}}"#.to_string(),
+        ),
+    ]);
+    save_default(&settings, AdapterKind::Local, Some(&model.address));
+    let mut drafted = ask("draft_division", drafting.clone());
+    // How long the model took is the one thing of the answer that differs from run to run.
+    drafted["seconds"] = json!(0.0);
+    answers.insert("draft_division".into(), drafted);
+    refusals.insert(
+        "draft-failed".into(),
+        refused(Some(&tools), "draft_division", drafting),
+    );
 
     for command in IMPORT_COMMANDS {
         assert!(

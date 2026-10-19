@@ -70,6 +70,7 @@ export interface ImportHost {
     | "importSelection"
     | "divideDocument"
     | "confirmDivision"
+    | "draftDivision"
     | "listIntakes"
     | "readIntake"
     | "readIntakeExtraction"

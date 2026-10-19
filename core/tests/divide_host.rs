@@ -16,10 +16,15 @@
 
 mod common;
 
+use std::net::TcpListener;
+
+use sce_spec_workbench_core::connection::{AdapterKind, AuthSource, Connection, Limits};
+use sce_spec_workbench_core::connection_store::ConnectionStore;
 use sce_spec_workbench_core::{call_in, Context, Entrance, ImportTools, Policy};
-use sce_specs::{CommandError, SpecStore, SystemClock};
+use sce_specs::{CommandError, ConnectionId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
+use common::model_server::{chat_server, says, Script};
 use common::{scratch, FakeRenderer};
 
 const DOCUMENT: &str = "# Lamp\n\nThe lamp turns on when the switch is pressed.\n\n# Fan\n\nThe fan runs when the room is warm.\n\n# Glossary\n\nA switch is a push button.\n";
@@ -63,6 +68,8 @@ struct Rig {
     specs: SpecStore,
     policy: Policy,
     tools: Result<ImportTools, String>,
+    /// The person's own settings: the connections a model is asked through.
+    settings: ConnectionStore,
 }
 
 /// A spec that holds the document, read, and the division of it begun.
@@ -80,12 +87,14 @@ impl Rig {
             specs: SpecStore::at(scratch(label)),
             policy: Policy::shipped(),
             tools: Ok(real_tools()),
+            settings: ConnectionStore::at(scratch(&format!("{label}-settings"))),
         }
     }
 
     fn context(&self) -> Context<'_, SystemClock> {
         Context::new(&self.specs, &FakeRenderer, &self.policy, Entrance::Desktop)
             .with_import_tools(Some(&self.tools))
+            .with_connections(Some(&self.settings))
     }
 
     fn try_ask(&self, name: &str, args: Value) -> Result<Value, CommandError> {
@@ -535,4 +544,287 @@ fn a_division_of_an_intake_that_is_not_there_is_refused() {
     let rig = Rig::real("divide-unknown");
     let error = rig.refused("read_division", json!({"id": "nope"}));
     assert!(!error.kind.is_empty());
+}
+
+// --------------------------------------------------------------------------------- a model's draft
+
+impl Rig {
+    /// A connection the person saved, and chose as the default.
+    fn connect(&self, adapter: AdapterKind, address: Option<&str>) {
+        let id = ConnectionId::parse("pc2").unwrap();
+        let connection = Connection {
+            id: id.clone(),
+            adapter,
+            display_name: Some("pc2 (tunnel)".to_string()),
+            executable: None,
+            model: Some("qwen-test".to_string()),
+            effort: None,
+            auth: if adapter == AdapterKind::Local {
+                AuthSource::NoAuth
+            } else {
+                AuthSource::OfficialLogin
+            },
+            server_url: address.map(str::to_string),
+            limits: Limits {
+                seconds: Some(20),
+                ..Limits::default()
+            },
+        };
+        self.settings.save(&connection, None).unwrap();
+        self.settings.set_default(Some(&id), None).unwrap();
+    }
+
+    /// The destinations the owner has when the draft is asked for: the spec that holds the document.
+    fn draft(&self, begun: &Begun) -> Result<Value, CommandError> {
+        self.try_ask(
+            "draft_division",
+            json!({
+                "intake": begun.intake,
+                "destinations": [
+                    {"key": "d0", "kind": "spec", "title": "Room control"},
+                    {"key": "d1", "kind": "new", "title": "Fan control"},
+                ],
+            }),
+        )
+    }
+}
+
+#[test]
+fn a_model_servers_answer_is_read_as_suggestions_and_nothing_is_placed() {
+    let rig = Rig::real("draft-asks");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![says(&format!(
+        "Here you go:\n```json\n[{{\"part\": \"{}\", \"spec\": \"d0\"}}, {{\"part\": \"{}\", \"spec\": \"d1\"}}]\n```",
+        begun.lamp, begun.fan
+    ))]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let drafted = rig.draft(&begun).expect("the draft is asked for");
+
+    assert_eq!(drafted["connection"]["name"], "pc2 (tunnel)");
+    assert_eq!(drafted["connection"]["model"], "qwen-test");
+    let draft = &drafted["draft"];
+    assert!(draft["unreadable"].is_null(), "{draft}");
+    let placed: Vec<(&str, &str)> = draft["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| (s["part"].as_str().unwrap(), s["key"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        placed,
+        [(begun.lamp.as_str(), "d0"), (begun.fan.as_str(), "d1")]
+    );
+    let unplaced: Vec<&str> = draft["unplaced"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p.as_str().unwrap())
+        .collect();
+    assert_eq!(unplaced, [begun.glossary.as_str()]);
+
+    // What the model was asked: one user message made by the tools, the destinations by key, the parts by id and
+    // first words, and no tool to call.
+    let asked = server.requests();
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0].body.get("tools").is_none(), "{}", asked[0].body);
+    assert_eq!(asked[0].body["model"], "qwen-test");
+    let prompt = asked[0].body["messages"][0]["content"].as_str().unwrap();
+    assert!(
+        prompt.contains("[d1] Fan control (a specification to be made)"),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("The fan runs when the room is warm."),
+        "{prompt}"
+    );
+    // Nothing was placed: the intake has no ledger because of a draft.
+    let read = rig.ask("read_division", json!({"id": begun.intake}));
+    assert!(read["division"].get("ledger").is_none() || read["division"]["ledger"].is_null());
+}
+
+#[test]
+fn leaving_a_part_out_is_not_a_place_a_draft_may_give_and_is_said_as_refused() {
+    let rig = Rig::real("draft-out");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![says(&format!(
+        "[{{\"part\": \"{}\", \"spec\": \"d0\"}}, {{\"part\": \"{}\", \"new\": \"Skip\"}}, {{\"part\": \"s99\", \"spec\": \"d0\"}}]",
+        begun.lamp, begun.glossary
+    ))]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let draft = rig.draft(&begun).unwrap()["draft"].clone();
+
+    let codes: Vec<&str> = draft["refused"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["code"].as_str().unwrap())
+        .collect();
+    assert_eq!(codes, ["left-out", "unknown-part"]);
+    assert_eq!(draft["suggestions"].as_array().unwrap().len(), 1);
+    assert!(draft["unplaced"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|p| *p == json!(begun.glossary)));
+}
+
+#[test]
+fn a_model_that_answers_in_words_is_an_answer_that_cannot_be_read_and_is_said_so() {
+    let rig = Rig::real("draft-words");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![says("I would put the lamp first, then the fan.")]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let drafted = rig.draft(&begun).unwrap();
+
+    assert_eq!(drafted["draft"]["unreadable"]["code"], "not-json");
+    assert!(drafted["draft"]["suggestions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn a_model_that_gives_no_words_is_a_failure_with_the_cause_it_has() {
+    let rig = Rig::real("draft-silent");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![Script::Reply(
+        200,
+        json!({"choices": [{"message": {"role": "assistant", "content": "", "reasoning_content": "thinking"}, "finish_reason": "length"}]})
+            .to_string(),
+    )]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let error = rig.draft(&begun).unwrap_err();
+
+    assert_eq!(error.kind, "draft-failed");
+    assert_eq!(error.detail["failure"], "model");
+    assert_eq!(error.detail["cause"], "output-limit");
+}
+
+#[test]
+fn a_server_that_refuses_the_document_for_its_size_is_a_size_failure_in_the_servers_words() {
+    let rig = Rig::real("draft-size");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![Script::Reply(
+        400,
+        r#"{"error":{"message":"the request exceeds the available context size"}}"#.to_string(),
+    )]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let error = rig.draft(&begun).unwrap_err();
+
+    assert_eq!(error.kind, "draft-failed");
+    assert_eq!(error.detail["failure"], "size");
+    assert!(
+        error.message.contains("exceeds the available context"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn a_server_that_is_not_there_is_said_so_as_a_connection_failure() {
+    let rig = Rig::real("draft-nobody");
+    let begun = rig.begin("press-1");
+    // An address nobody listens at: the port of a listener that has been dropped.
+    let address = {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        format!("http://{}/v1", listener.local_addr().unwrap())
+    };
+    rig.connect(AdapterKind::Local, Some(&address));
+
+    let error = rig.draft(&begun).unwrap_err();
+
+    assert_eq!(error.kind, "draft-failed");
+    assert_eq!(error.detail["failure"], "connection");
+    assert_eq!(error.detail["cause"], "unreachable");
+}
+
+#[test]
+fn a_client_that_brings_its_own_tool_loop_is_not_asked_and_says_which_it_is() {
+    let rig = Rig::real("draft-claude");
+    let begun = rig.begin("press-1");
+    rig.connect(AdapterKind::ClaudeCode, None);
+
+    let error = rig.draft(&begun).unwrap_err();
+
+    assert_eq!(error.kind, "draft-unavailable");
+    assert_eq!(error.detail["adapter"], "claude-code");
+    assert!(error.message.contains("pc2 (tunnel)"), "{}", error.message);
+}
+
+#[test]
+fn no_connection_is_said_before_anything_is_read_for_nothing() {
+    let rig = Rig::real("draft-none");
+    let begun = rig.begin("press-1");
+
+    let error = rig.draft(&begun).unwrap_err();
+    assert_eq!(error.kind, "no-connection");
+
+    // The nearest that is a connection: one saved and chosen is asked.
+    let server = chat_server(vec![says("[]")]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+    assert_eq!(
+        rig.draft(&begun).unwrap()["draft"]["unreadable"]["code"],
+        "empty"
+    );
+}
+
+#[test]
+fn a_document_with_more_parts_than_one_prompt_holds_is_answered_by_the_tools_and_the_server_is_not_asked(
+) {
+    let rig = Rig::real("draft-too-many");
+    let spec = rig.ask("create_spec", json!({"title": "Big"}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut text = String::new();
+    for n in 1..=2000 {
+        text.push_str(&format!(
+            "# Part number {n} of the document\n\nSome words to say what this part is about, at length.\n\n"
+        ));
+    }
+    let read = rig.ask(
+        "read_document",
+        json!({"id": spec, "name": "big.md", "data": base64(text.as_bytes())}),
+    );
+    let divided = rig.ask(
+        "divide_document",
+        json!({"id": spec, "original": read["original"], "extraction": read["extraction"],
+               "title": "big", "key": "press-1", "origin": "gui"}),
+    );
+    let server = chat_server(vec![says("[]")]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let error = rig
+        .try_ask(
+            "draft_division",
+            json!({"intake": divided["intake"]["id"], "destinations": [{"key": "d0", "kind": "spec", "title": "Big"}]}),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, "too-many-parts");
+    assert!(server.requests().is_empty());
+}
+
+#[test]
+fn a_draft_asked_for_two_destinations_with_one_key_is_refused_by_the_tools() {
+    let rig = Rig::real("draft-keys");
+    let begun = rig.begin("press-1");
+    let server = chat_server(vec![says("[]")]);
+    rig.connect(AdapterKind::Local, Some(&server.address));
+
+    let error = rig
+        .try_ask(
+            "draft_division",
+            json!({"intake": begun.intake, "destinations": [
+                {"key": "d0", "kind": "spec", "title": "A"}, {"key": "d0", "kind": "new", "title": "B"}]}),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, "bad-division");
+    assert!(server.requests().is_empty());
 }

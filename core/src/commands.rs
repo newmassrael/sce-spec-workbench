@@ -55,6 +55,7 @@ pub const COMMANDS: &[&str] = &[
     "divide_document",
     "read_division",
     "revise_division",
+    "draft_division",
     "confirm_division",
     "assemble_import",
     "accept_import",
@@ -103,7 +104,12 @@ pub const COMMANDS: &[&str] = &[
 /// destination of `confirm_division` may also give paragraphs by id (`blocks`), which is how a revision is
 /// divided. They are added, so no caller of 6 misreads one; the version moves because a screen that carries a
 /// division is held to a core that answers it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 7;
+///
+/// 8: `draft_division`, which asks a model server the person runs to draw a division of the intake's document
+/// among the destinations the owner has and reads what it answered as suggestions by part id, the items it
+/// did not take and the parts it left unplaced (ADR 0040). Nothing is placed by it. It is added, so no caller
+/// of 7 misreads it; the version moves because a screen that offers a draft is held to a core that answers it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 8;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -147,6 +153,7 @@ pub const IMPORT_COMMANDS: &[&str] = &[
     "divide_document",
     "read_division",
     "revise_division",
+    "draft_division",
     "confirm_division",
     "assemble_import",
     "accept_import",
@@ -522,6 +529,7 @@ fn call_import<C: Clock>(
         "divide_document" => divide_host::divide_document(context, arguments(args)?),
         "read_division" => divide_host::read_division(context, arguments(args)?),
         "revise_division" => divide_host::revise_division(context, arguments(args)?),
+        "draft_division" => divide_host::draft_division(context, arguments(args)?),
         "confirm_division" => divide_host::confirm_division(context, arguments(args)?),
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),

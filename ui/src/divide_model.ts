@@ -15,7 +15,9 @@ import type {
   ConfirmedDivision,
   DivisionStep,
   DocumentSection,
+  DraftDestination,
   GoneParagraph,
+  Suggestion,
   PlannedAllotment,
   RevisedDivision,
   Spec,
@@ -45,11 +47,30 @@ export interface Draft {
   readonly shared: boolean;
   /** How many destinations were ever made, so that a key is never used twice. */
   readonly made: number;
+  /** The parts whose place is a model's suggestion, until the owner moves or confirms them (`placeOne`, `send`). */
+  readonly ai: ReadonlySet<string>;
+  /** The destinations a model proposed and the owner did not make: taken away with the draft that made them. */
+  readonly aiDests: ReadonlySet<string>;
 }
 
 /** The spec that holds the document is the first destination, and nothing is placed. */
 export function startDraft(spec: Spec): Draft {
-  return { dests: [{ key: "d0", kind: "spec", spec }], to: {}, picked: new Set(), shared: false, made: 1 };
+  return {
+    dests: [{ key: "d0", kind: "spec", spec }],
+    to: {},
+    picked: new Set(),
+    shared: false,
+    made: 1,
+    ai: new Set(),
+    aiDests: new Set(),
+  };
+}
+
+/** A set without `ids`. */
+function without(set: ReadonlySet<string>, ids: Iterable<string>): ReadonlySet<string> {
+  const next = new Set(set);
+  for (const id of ids) next.delete(id);
+  return next;
 }
 
 function placed(draft: Draft, id: string): readonly string[] {
@@ -84,7 +105,8 @@ export function send(draft: Draft, key: string): Draft {
     else if (draft.shared && had.length > 0 && !had.includes(key)) to[id] = [...had, key];
     else to[id] = [key];
   }
-  return { ...draft, to, picked: new Set() };
+  // A part the owner sends is the owner's, whatever put it where it was.
+  return { ...draft, to, picked: new Set(), ai: without(draft.ai, draft.picked) };
 }
 
 /** Another spec to be made, with a title that no other destination to be made has. */
@@ -110,8 +132,85 @@ export function renameNew(draft: Draft, key: string, title: string): Draft {
 /** Take a destination away: what went only there is not placed any more. */
 export function removeDest(draft: Draft, key: string): Draft {
   const to: Record<string, readonly string[]> = {};
-  for (const [id, keys] of Object.entries(draft.to)) to[id] = keys.filter((k) => k !== key);
-  return { ...draft, dests: draft.dests.filter((d) => d.key !== key), to };
+  const emptied: string[] = [];
+  for (const [id, keys] of Object.entries(draft.to)) {
+    to[id] = keys.filter((k) => k !== key);
+    if (to[id]?.length === 0) emptied.push(id);
+  }
+  return {
+    ...draft,
+    dests: draft.dests.filter((d) => d.key !== key),
+    to,
+    ai: without(draft.ai, emptied),
+    aiDests: without(draft.aiDests, [key]),
+  };
+}
+
+/** The destinations as a model is told of them: by key, kind and title. A new one with no title is not offered. */
+export function destinationsOf(draft: Draft): DraftDestination[] {
+  return draft.dests.flatMap((d): DraftDestination[] => {
+    const title = nameOf(d).trim();
+    return title === "" ? [] : [{ key: d.key, kind: d.kind, title }];
+  });
+}
+
+/**
+ * Put a model's draft into the draft the owner has. Only the parts that are not placed are filled: what the
+ * owner placed is theirs, and a suggestion for it is not taken. A suggestion at a destination that is not there
+ * (the owner took it away while the model worked) is not taken either. A new title that is a destination's own,
+ * in any case, is that destination; otherwise it is a new destination, shared by every part that names it.
+ * Everything placed is marked as the model's until the owner moves it. What is left unplaced, and every item
+ * of the answer that was refused, stays as it was.
+ */
+export function applyDraft(draft: Draft, suggestions: readonly Suggestion[]): { draft: Draft; placed: number } {
+  let next = draft;
+  const to: Record<string, readonly string[]> = { ...draft.to };
+  const ai = new Set(draft.ai);
+  const aiDests = new Set(draft.aiDests);
+  let dests = [...draft.dests];
+  let made = draft.made;
+  const keyOfTitle = (title: string): string => {
+    const folded = title.trim().toLowerCase();
+    const found = dests.find((d) => nameOf(d).trim().toLowerCase() === folded);
+    if (found !== undefined) return found.key;
+    const key = `d${made}`;
+    made += 1;
+    dests = [...dests, { key, kind: "new", title: title.trim() }];
+    aiDests.add(key);
+    return key;
+  };
+  let count = 0;
+  for (const suggestion of suggestions) {
+    if ((draft.to[suggestion.part] ?? []).length > 0) continue;
+    let key: string;
+    if (suggestion.key !== null) {
+      if (!draft.dests.some((d) => d.key === suggestion.key)) continue;
+      key = suggestion.key;
+    } else if (suggestion.title !== null && suggestion.title.trim() !== "") {
+      key = keyOfTitle(suggestion.title);
+    } else continue;
+    to[suggestion.part] = [key];
+    ai.add(suggestion.part);
+    count += 1;
+  }
+  next = { ...draft, dests, to, ai, aiDests, made };
+  return { draft: next, placed: count };
+}
+
+/** Take the model's draft away: what it placed and the owner did not touch is unplaced again, and the destinations it proposed are gone. */
+export function clearDraft(draft: Draft): Draft {
+  const to: Record<string, readonly string[]> = { ...draft.to };
+  for (const id of draft.ai) to[id] = [];
+  return {
+    ...draft,
+    to,
+    ai: new Set(),
+    aiDests: new Set(),
+    // A destination the model proposed stays when the owner has sent something there themselves.
+    dests: draft.dests.filter(
+      (d) => !draft.aiDests.has(d.key) || Object.values(to).some((keys) => keys.includes(d.key)),
+    ),
+  };
 }
 
 /** What a destination is called. */
@@ -281,7 +380,7 @@ export function restoreDraft(
   }
   // A part that several specs share is shared on purpose, so that sending again adds to it as the owner left it.
   const shared = Object.values(to).some((placed) => placed.filter((k) => k !== OUT).length > 1);
-  return { dests, to, picked: new Set(), shared, made: dests.length };
+  return { dests, to, picked: new Set(), shared, made: dests.length, ai: new Set(), aiDests: new Set() };
 }
 
 // ---- a revised document ----------------------------------------------------------------------------
@@ -393,7 +492,15 @@ export function startRevision(
     under.set(block.id, heading);
   }
   const oldWords = new Map(oldBlocks.map((b) => [b.id, b.text] as const));
-  const draft: Draft = { dests, to, picked: new Set(), shared: false, made: dests.length };
+  const draft: Draft = {
+    dests,
+    to,
+    picked: new Set(),
+    shared: false,
+    made: dests.length,
+    ai: new Set(),
+    aiDests: new Set(),
+  };
   return {
     draft,
     revision: {
@@ -413,7 +520,7 @@ export function startRevision(
 
 /** Place one paragraph at one destination, or leave it out: what the owner decides for a paragraph asked about. */
 export function placeOne(draft: Draft, id: string, key: string): Draft {
-  return { ...draft, to: { ...draft.to, [id]: [key] } };
+  return { ...draft, to: { ...draft.to, [id]: [key] }, ai: without(draft.ai, [id]) };
 }
 
 /** The destination key an old paragraph had been at, when it is still one of the destinations. */

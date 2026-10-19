@@ -35,6 +35,7 @@ import {
   parseReadConnection,
   parseConfirmedDivision,
   parseDividedDocument,
+  parseDraftedDivision,
   parseIntakeExtraction,
   parseIntakeList,
   parseIntakeRead,
@@ -80,6 +81,8 @@ import {
   type ProposalAccepted,
   type ConfirmedDivision,
   type DividedDocument,
+  type DraftDestination,
+  type DraftedDivision,
   type Intake,
   type IntakeExtraction,
   type IntakeView,
@@ -353,6 +356,16 @@ export interface Api {
     destinations?: readonly PlannedAllotment[],
     supersede?: boolean,
   ): Promise<ConfirmedDivision>;
+  /**
+   * Ask a model server the person runs to draw a division of the intake's document among `destinations` (the
+   * ones the owner has so far, each by the key the model answers by). Nothing is placed: what comes back is
+   * suggestions by part id, the items of the answer that were not taken and the parts left unplaced. It can take
+   * minutes, bounded by the connection's time. Refused as `no-connection` (none saved or chosen),
+   * `draft-unavailable` (the connection is not one a division can be asked of yet, or cannot be asked),
+   * `too-many-parts` (more parts than one prompt holds: place by hand), `bad-division` or `draft-failed`
+   * (the server's own failure, with its kind and cause in `detail`).
+   */
+  draftDivision(intake: string, destinations: readonly DraftDestination[]): Promise<DraftedDivision>;
   /** The proposals of the spec, the newest first. */
   listProposals(id: string): Promise<Proposal[]>;
   /** One proposal with its decisions, what is still asked, and whether the text is where it was. */
@@ -584,6 +597,9 @@ export function apiOver(transport: Transport): Api {
     async reviseDivision(intake, id, document, title, key) {
       const args = { intake, id, original: document.original, extraction: document.extraction, title, key, origin: "gui" };
       return parseRevisedDivision(await transport.call("revise_division", args));
+    },
+    async draftDivision(intake, destinations) {
+      return parseDraftedDivision(await transport.call("draft_division", { intake, destinations }));
     },
     async confirmDivision(intake, destinations, supersede = false) {
       const args = {

@@ -321,75 +321,9 @@ impl Connections {
             return Err(wrong_adapter(AdapterKind::Local, run.adapter));
         }
         let stored = self.stored_for(pin, run)?;
-        let connection = &stored.connection;
-        let called = connection
-            .display_name
-            .clone()
-            .unwrap_or_else(|| connection.id.to_string());
-        // A key is kept by the operating system's store, which this build does not reach yet: a
-        // connection that asks for one waits, and says why, and is not run without it as though the
-        // server wanted none.
-        if connection.auth != AuthSource::NoAuth {
-            return Err(Unrunnable::new(format!(
-                "the server `{called}` wants a key, and this build has no place to keep one yet: \
-                 choose a server that wants none, or reach this one through a proxy of your own \
-                 that does not"
-            )));
-        }
-        let Some(route) = Route::of(AdapterKind::Local, connection.auth, None) else {
-            return Err(Unrunnable::new(format!(
-                "the server `{called}` is reached in a way this build does not know"
-            )));
-        };
-        if let Decision::Refuse { reason, .. } = self.policy.decide(route) {
-            return Err(Unrunnable::new(refusal_words(
-                AdapterKind::Local,
-                route,
-                reason,
-            )));
-        }
-        let Some(model) = run.model.clone() else {
-            return Err(Unrunnable::new(format!(
-                "no model is chosen for the server `{called}`: choose one under AI connection, then \
-                 ask again"
-            )));
-        };
+        let (endpoint, config) = local_target(&self.policy, &stored, run)?;
         let Some(author) = self.launches.author() else {
             return Err(author_not_found());
-        };
-        // `validate` holds a local connection to an address, so this only reads it.
-        let endpoint = connection
-            .server_url
-            .as_deref()
-            .ok_or_else(|| {
-                Unrunnable::new(format!("the server `{called}` has no address, so it is not run"))
-            })
-            .and_then(|address| {
-                Endpoint::parse(address).map_err(|why| {
-                    Unrunnable::new(format!(
-                        "the address of the server `{called}` is not one this build can reach: {why}"
-                    ))
-                })
-            })?;
-        let defaults = LocalConfig::for_model(model);
-        let config = LocalConfig {
-            effort: run.effort.clone(),
-            max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
-            timeout: run
-                .limits
-                .seconds
-                .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
-            // What a person who knows the model says of its context: how many times to begin
-            // again, how big the context is, and how full it may be. Nothing is assumed of a
-            // model that was not described.
-            handoffs: run.limits.handoffs.unwrap_or(defaults.handoffs),
-            context_tokens: run.limits.context_tokens,
-            handoff_percent: run
-                .limits
-                .handoff_percent
-                .unwrap_or(defaults.handoff_percent),
-            places: run.limits.places.map_or(defaults.places, |p| p as usize),
-            ..defaults
         };
         Ok(Local::new(endpoint, author, config))
     }
@@ -490,7 +424,88 @@ impl Directory for Connections {
 
 /// What `pin` asks of its run, or why this build does not read it, in a sentence of ours: a reason
 /// is kept in the specs folder, which is shared.
-fn run_of(pin: &Pin) -> Result<PinnedRun, Unrunnable> {
+/// Where a model server of the person's is and how a run of it is bounded, from the connection that names it
+/// and what the request pinned of it, or why it cannot be asked. The rules of whether a server may be asked
+/// at all are one set, kept here, for a run of a model (which also needs the authoring server) and for one
+/// question put to it ([`Local::asking`]).
+pub(crate) fn local_target(
+    policy: &Policy,
+    stored: &StoredConnection,
+    run: &PinnedRun,
+) -> Result<(Endpoint, LocalConfig), Unrunnable> {
+    let connection = &stored.connection;
+    let called = connection
+        .display_name
+        .clone()
+        .unwrap_or_else(|| connection.id.to_string());
+    // A key is kept by the operating system's store, which this build does not reach yet: a
+    // connection that asks for one waits, and says why, and is not run without it as though the
+    // server wanted none.
+    if connection.auth != AuthSource::NoAuth {
+        return Err(Unrunnable::new(format!(
+            "the server `{called}` wants a key, and this build has no place to keep one yet: \
+             choose a server that wants none, or reach this one through a proxy of your own \
+             that does not"
+        )));
+    }
+    let Some(route) = Route::of(AdapterKind::Local, connection.auth, None) else {
+        return Err(Unrunnable::new(format!(
+            "the server `{called}` is reached in a way this build does not know"
+        )));
+    };
+    if let Decision::Refuse { reason, .. } = policy.decide(route) {
+        return Err(Unrunnable::new(refusal_words(
+            AdapterKind::Local,
+            route,
+            reason,
+        )));
+    }
+    let Some(model) = run.model.clone() else {
+        return Err(Unrunnable::new(format!(
+            "no model is chosen for the server `{called}`: choose one under AI connection, then \
+             ask again"
+        )));
+    };
+    // `validate` holds a local connection to an address, so this only reads it.
+    let endpoint = connection
+        .server_url
+        .as_deref()
+        .ok_or_else(|| {
+            Unrunnable::new(format!(
+                "the server `{called}` has no address, so it is not run"
+            ))
+        })
+        .and_then(|address| {
+            Endpoint::parse(address).map_err(|why| {
+                Unrunnable::new(format!(
+                    "the address of the server `{called}` is not one this build can reach: {why}"
+                ))
+            })
+        })?;
+    let defaults = LocalConfig::for_model(model);
+    let config = LocalConfig {
+        effort: run.effort.clone(),
+        max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
+        timeout: run
+            .limits
+            .seconds
+            .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
+        // What a person who knows the model says of its context: how many times to begin
+        // again, how big the context is, and how full it may be. Nothing is assumed of a
+        // model that was not described.
+        handoffs: run.limits.handoffs.unwrap_or(defaults.handoffs),
+        context_tokens: run.limits.context_tokens,
+        handoff_percent: run
+            .limits
+            .handoff_percent
+            .unwrap_or(defaults.handoff_percent),
+        places: run.limits.places.map_or(defaults.places, |p| p as usize),
+        ..defaults
+    };
+    Ok((endpoint, config))
+}
+
+pub(crate) fn run_of(pin: &Pin) -> Result<PinnedRun, Unrunnable> {
     PinnedRun::read(pin).map_err(|_| {
         Unrunnable::new(format!(
             "this request asks to be run for `{}` in a way this build does not know (a newer build \

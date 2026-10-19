@@ -67,6 +67,7 @@ import {
   parseReadConnection,
   parseReadDocument,
   parseRevisedDivision,
+  parseDraftedDivision,
   parseBound,
   parseConfirmedDivision,
   parseDividedDocument,
@@ -122,6 +123,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   accept_import: parseImportAccepted,
   divide_document: parseDividedDocument,
   revise_division: parseRevisedDivision,
+  draft_division: parseDraftedDivision,
   read_division: parseDivision,
   confirm_division: parseConfirmedDivision,
   start_intake: (v) => parseIntakeStarted(v, "start_intake"),
@@ -778,6 +780,41 @@ describe("the replies the core gives", () => {
     expect(revised.carried.destinations).toEqual([{ kind: "new", spec: null, title: "Lamp control" }]);
     // The draft is the ledger as the tools wrote it, whose paragraphs the screen reads.
     expect(JSON.parse(revised.ledger).allotments[0].blocks).toEqual(["b0001", "b0002", "b0003"]);
+  });
+
+  it("say what a model's draft placed, what was not taken of its answer and what is left unplaced, by part id", () => {
+    const drafted = parseDraftedDivision(importReplies.answers["draft_division"]);
+
+    expect(drafted.connection).toEqual({ id: "pc2", name: "pc2 (tunnel)", model: "qwen-test" });
+    expect(drafted.parts).toBe(3);
+    expect(drafted.draft.unreadable).toBeNull();
+    expect(drafted.draft.suggestions).toEqual([
+      { part: "s1", key: "d0", title: null },
+      { part: "s3", key: "d1", title: null },
+    ]);
+    // Leaving a part out is not a place a draft may give, and is refused as such with the part left unplaced.
+    expect(drafted.draft.refused.map((r) => [r.item, r.code])).toEqual([[3, "left-out"]]);
+    expect(drafted.draft.unplaced).toEqual(["s2"]);
+  });
+
+  it("refuse a draft by the word the screen branches on", () => {
+    for (const kind of ["no-connection", "draft-unavailable", "draft-failed"]) {
+      expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
+    }
+    expect(asCommandError(importReplies.refusals["draft-unavailable"])?.detail).toEqual({ adapter: "claude-code" });
+    expect(asCommandError(importReplies.refusals["draft-failed"])?.detail).toMatchObject({ failure: "size" });
+  });
+
+  it("are refused when a draft names a seconds that is not a number or a suggestion with no part", () => {
+    const answer = structuredClone(importReplies.answers["draft_division"]) as {
+      seconds: unknown;
+      draft: { suggestions: Array<Record<string, unknown>> };
+    };
+    answer.seconds = "fast";
+    expect(() => parseDraftedDivision(answer)).toThrow(/seconds/);
+    answer.seconds = 1;
+    delete answer.draft.suggestions[0]?.["part"];
+    expect(() => parseDraftedDivision(answer)).toThrow(/part/);
   });
 
   it("read a ledger that leaves a part out, which names no spec and no title", () => {

@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 7;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 8;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2586,6 +2586,86 @@ export function parseDividedDocument(value: unknown): DividedDocument {
     created: created(r, where),
     outline: parseOutline(r["outline"], `${where}.outline`),
     not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
+/** A destination the owner has when a draft is asked for, by the key the model answers by. */
+export interface DraftDestination {
+  key: string;
+  kind: "spec" | "new";
+  title: string;
+}
+
+/** A part a model placed: at a destination the owner has (`key`), or at a new one it named (`title`). */
+export interface Suggestion {
+  part: string;
+  key: string | null;
+  title: string | null;
+}
+
+/** One item of a model's answer that was not taken, with the typed reason SCE gave. */
+export interface RefusedItem {
+  item: number;
+  code: string;
+  why: string;
+}
+
+/** A model's draft of a division as SCE read it: suggestions, what was not taken and what is left unplaced. */
+export interface DivisionDraft {
+  suggestions: Suggestion[];
+  refused: RefusedItem[];
+  /** The parts the model was told of and did not place: the owner places them. */
+  unplaced: string[];
+  /** Set when the whole answer could not be read: there is no suggestion, and why. */
+  unreadable: RefusedItem | null;
+}
+
+/** `draft_division`: which connection answered, how long it took, and the draft. Nothing is placed by it. */
+export interface DraftedDivision {
+  connection: { id: string; name: string; model: string };
+  seconds: number;
+  /** How many parts the model was told of. */
+  parts: number;
+  draft: DivisionDraft;
+}
+
+function parseRefusedItem(value: unknown, where: string): RefusedItem {
+  const r = record(value, where);
+  return { item: count(r, "item", where), code: text(r, "code", where), why: text(r, "why", where) };
+}
+
+/** `draft_division`. */
+export function parseDraftedDivision(value: unknown): DraftedDivision {
+  const where = "draft_division";
+  const r = record(value, where);
+  const connection = record(r["connection"], `${where}.connection`);
+  const draft = record(r["draft"], `${where}.draft`);
+  const at = `${where}.draft`;
+  const prompt = record(r["prompt"], `${where}.prompt`);
+  const seconds = r["seconds"];
+  if (typeof seconds !== "number" || seconds < 0) throw new ContractError(`${where}.seconds`, "a number of seconds");
+  const unreadable = draft["unreadable"];
+  return {
+    connection: {
+      id: text(connection, "id", `${where}.connection`),
+      name: text(connection, "name", `${where}.connection`),
+      model: text(connection, "model", `${where}.connection`),
+    },
+    seconds,
+    parts: count(prompt, "parts", `${where}.prompt`),
+    draft: {
+      suggestions: list(draft, "suggestions", at).map((s, i) => {
+        const item = record(s, `${at}.suggestions[${i}]`);
+        return {
+          part: text(item, "part", `${at}.suggestions[${i}]`),
+          key: nullableText(item, "key", `${at}.suggestions[${i}]`),
+          title: nullableText(item, "title", `${at}.suggestions[${i}]`),
+        };
+      }),
+      refused: list(draft, "refused", at).map((x, i) => parseRefusedItem(x, `${at}.refused[${i}]`)),
+      unplaced: stringList(draft, "unplaced", at),
+      unreadable: unreadable === null || unreadable === undefined ? null : parseRefusedItem(unreadable, `${at}.unreadable`),
+    },
   };
 }
 

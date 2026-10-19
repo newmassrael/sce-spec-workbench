@@ -283,6 +283,49 @@
         "v": 1
       }
     },
+    "draft_division": {
+      "connection": {
+        "id": "pc2",
+        "model": "qwen-test",
+        "name": "pc2 (tunnel)"
+      },
+      "draft": {
+        "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "kind": "divide-document",
+        "recipe": "1",
+        "refused": [
+          {
+            "code": "left-out",
+            "item": 3,
+            "why": "leaving a part out is the owner's to decide, not the draft's"
+          }
+        ],
+        "suggestions": [
+          {
+            "key": "d0",
+            "part": "s1",
+            "title": null
+          },
+          {
+            "key": "d1",
+            "part": "s3",
+            "title": null
+          }
+        ],
+        "unplaced": [
+          "s2"
+        ],
+        "unreadable": null,
+        "v": 1
+      },
+      "prompt": {
+        "characters": 1500,
+        "destinations": 2,
+        "parts": 3,
+        "recipe": "divide-document 1"
+      },
+      "seconds": 0.0
+    },
     "import_document": {
       "complete": true,
       "created": true,
@@ -568,6 +611,21 @@
       "kind": "bad-section",
       "message": "`--out` is not the id of a part of the document"
     },
+    "draft-failed": {
+      "detail": {
+        "cause": "context-full",
+        "failure": "size"
+      },
+      "kind": "draft-failed",
+      "message": "the server answered 400: the request exceeds the available context size"
+    },
+    "draft-unavailable": {
+      "detail": {
+        "adapter": "claude-code"
+      },
+      "kind": "draft-unavailable",
+      "message": "`pc2 (tunnel)` is not a model server, and only a model server can draw a division yet: choose one under AI connection, or place the parts by hand"
+    },
     "import-tool-failed": {
       "kind": "import-tool-failed",
       "message": "`extract` ended with 7: it broke"
@@ -583,6 +641,10 @@
       },
       "kind": "import-tool-timeout",
       "message": "the authoring tools did not finish `extract` in time: it did not answer within 1 seconds"
+    },
+    "no-connection": {
+      "kind": "no-connection",
+      "message": "no AI connection is chosen: choose one under AI connection, then ask again"
     },
     "nothing-chosen": {
       "kind": "nothing-chosen",

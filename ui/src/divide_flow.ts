@@ -17,6 +17,9 @@ import type { ConfirmedDivision, DividedDocument, DocumentSection, Spec } from "
 import {
   addExisting,
   addNew,
+  applyDraft,
+  clearDraft,
+  destinationsOf,
   pickAll,
   placeOne,
   planOf,
@@ -43,7 +46,7 @@ import type { Say } from "./import_view";
 
 /** What dividing needs of the screen it is drawn in. */
 export interface DivideHost {
-  readonly api: Pick<Api, "confirmDivision">;
+  readonly api: Pick<Api, "confirmDivision" | "draftDivision">;
   readonly t: Say;
   readonly redraw: () => void;
   /** A failure that is not about the document (no server, no token): the screen's own handling is the whole answer. */
@@ -86,6 +89,13 @@ export class DivideFlow {
   private notice: string | null = null;
   /** The newest thing asked of the core; an answer that arrives after the person left is dropped. */
   private ticket = 0;
+  /** A model is asked for a draft, which can take minutes: the owner goes on placing while it works. */
+  private drafting = false;
+  /** What became of the last draft, said in a note beside the parts and not as an error: a model that placed
+   * little is an answer. */
+  private aiNote: string | null = null;
+  /** The newest draft asked for; an answer for an older one, or for a division let go of, is dropped. */
+  private draftTicket = 0;
   /** What is drawn now, so that a name being typed changes the bar and the pills and not the whole screen. */
   private root: HTMLElement | null = null;
   private bar: HTMLElement | null = null;
@@ -95,6 +105,7 @@ export class DivideFlow {
   /** Begin with a document the core has kept as an intake: the spec that holds it is the first destination. */
   start(origin: Spec, name: string, divided: DividedDocument, saved: Draft | null = null): void {
     this.ticket += 1;
+    this.forgetDraft();
     this.held = {
       name,
       intake: divided.intake.id,
@@ -114,6 +125,7 @@ export class DivideFlow {
    */
   startRevision(name: string, intake: string, draft: Draft, revision: Revision): void {
     this.ticket += 1;
+    this.forgetDraft();
     this.held = { name, intake, sections: revision.paragraphs, draft, revision, restored: false };
     this.phase = { kind: "edit" };
     this.busy = false;
@@ -123,11 +135,96 @@ export class DivideFlow {
   /** Let go of the division: an answer still on its way is not drawn. */
   stop(): void {
     this.ticket += 1;
+    this.forgetDraft();
     this.held = null;
     this.root = null;
     this.bar = null;
     this.busy = false;
     this.notice = null;
+  }
+
+  /** A model's draft that is on its way is not wanted any more, and what was said of the last is let go of. */
+  private forgetDraft(): void {
+    this.draftTicket += 1;
+    this.drafting = false;
+    this.aiNote = null;
+  }
+
+  /**
+   * Ask a model for a draft of the division, with the destinations the owner has now. Nothing is placed by the
+   * asking: what comes back is put into the parts that are still not placed when it arrives, marked as the
+   * model's, and the owner moves or confirms each. What a model could not do, or was not able to be asked, is
+   * said and the owner places the parts by hand.
+   */
+  private async draftWithAi(): Promise<void> {
+    const held = this.held;
+    if (held === null || held.revision !== null || this.drafting) return;
+    const ticket = ++this.draftTicket;
+    this.drafting = true;
+    this.aiNote = null;
+    this.notice = null;
+    this.host.redraw();
+    try {
+      const answer = await this.host.api.draftDivision(held.intake, destinationsOf(held.draft));
+      if (ticket !== this.draftTicket || this.held === null) return;
+      this.drafting = false;
+      const say = this.host.t;
+      const name = answer.connection.name;
+      if (answer.draft.unreadable !== null) {
+        this.aiNote = say("dvAiUnreadable", { name });
+      } else {
+        const applied = applyDraft(this.held.draft, answer.draft.suggestions);
+        this.held = { ...this.held, draft: applied.draft, restored: false };
+        const left = answer.parts - applied.placed;
+        const note =
+          applied.placed === 0
+            ? say("dvAiNothing", { name })
+            : say(left === 0 ? "dvAiNoteAll" : "dvAiNote", {
+                name,
+                placed: String(applied.placed),
+                left: String(left),
+              });
+        const refused =
+          answer.draft.refused.length === 0 ? "" : ` ${say("dvAiRefused", { n: String(answer.draft.refused.length) })}`;
+        // Measured on public documents: with one spec and nothing else to place parts in, a model puts nearly
+        // everything there once the document is of more than two subjects. A person who has named the specs gets
+        // the better draft, and is told so when they have not.
+        const alone = destinationsOf(held.draft).length === 1 ? ` ${say("dvAiHintAlone")}` : "";
+        this.aiNote = `${note}${refused}${alone}`;
+      }
+      this.host.redraw();
+    } catch (error) {
+      if (ticket !== this.draftTicket) return;
+      this.drafting = false;
+      if (this.host.handled(error)) return;
+      this.notice = this.draftFailure(error);
+      this.host.redraw();
+    }
+  }
+
+  /** Why a draft was not made, in words a person can act on: the core's kinds are branched on, not its sentences. */
+  private draftFailure(error: unknown): string {
+    const say = this.host.t;
+    if (error instanceof CommandFailure) {
+      switch (error.kind) {
+        case "no-connection":
+          return say("dvAiNoConnection");
+        case "too-many-parts":
+          return say("dvAiTooMany");
+        case "draft-unavailable":
+        case "draft-failed":
+          return say("dvAiFailed", { detail: error.message });
+        default:
+          break;
+      }
+    }
+    return this.host.explain(error);
+  }
+
+  /** The owner takes the model's draft away: what it placed and they did not touch is not placed again. */
+  private clearAi(): void {
+    this.aiNote = null;
+    this.change((draft) => clearDraft(draft), "dv:ai");
   }
 
   /**
@@ -193,6 +290,9 @@ export class DivideFlow {
       onRename: (key, title) => this.rename(key, title),
       onRemove: (key) => this.change((draft) => removeDest(draft, key), "dv:add-new"),
       onConfirm: () => void this.confirm(true, false),
+      ai: { working: this.drafting, marked: held.draft.ai.size > 0, note: this.aiNote },
+      onDraft: () => void this.draftWithAi(),
+      onClearDraft: () => this.clearAi(),
     };
   }
 
