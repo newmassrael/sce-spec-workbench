@@ -466,6 +466,13 @@ class FakeCore implements Transport {
     this.modelHistoryOf.set(id, [...(this.modelHistoryOf.get(id) ?? []), revision]);
   }
 
+  /** Which entrance this core says it is: the desktop window, or the browser shell a token reaches. */
+  private entranceName: "desktop" | "browser" = "desktop";
+
+  setEntrance(entrance: "desktop" | "browser"): void {
+    this.entranceName = entrance;
+  }
+
   /** The SVG this core draws for a model, so a test can look for it on the screen. */
   figureSvg(text: string): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="40pt" height="20pt"><text x="0" y="10">picture of ${text}</text></svg>`;
@@ -520,10 +527,11 @@ class FakeCore implements Transport {
           application_command_set_version: this.applicationSet,
           commands: [],
           root: "/fake/specs",
-          entrance: "desktop",
+          entrance: this.entranceName,
           settings: true,
-          writes_settings: true,
-          starts_programs: true,
+          // What the browser entrance may not do, as the real core says it (`Entrance`).
+          writes_settings: this.entranceName === "desktop",
+          starts_programs: this.entranceName === "desktop",
         };
       case "read_spec_heads": {
         if (spec === undefined) throw new CommandFailure("not-found", "spec `absent`");
@@ -3577,6 +3585,17 @@ describe("asking for a model", () => {
       "claude auth login",
       "claude auth login --console",
     ]);
+  });
+
+  it("has no AI connection panel in the browser, which can change none of it and starts no program", async () => {
+    core.setEntrance("browser");
+    await app.start();
+    await settle();
+
+    expect(root.querySelector("#ai-settings")).toBeNull();
+    // What the browser still says is which connection a generation would use.
+    await click("Alpha");
+    expect(root.querySelector("#generation-target")).not.toBeNull();
   });
 
   it("keeps the panel open through a redraw that is not the person's", async () => {

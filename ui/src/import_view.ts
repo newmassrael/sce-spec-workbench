@@ -1,0 +1,516 @@
+// SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+// SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+
+// What bringing a document in looks like: the drop target, the states of an import, and the two
+// ways a review reads (what the text changes in the spec; the original beside what was written of it,
+// with one choice for each row that is asked about). The drawing follows `design/boards/Main`,
+// `ImportStates`, `MdReview` and `Review`.
+//
+// Nothing here keeps state or asks the core: each function is given what to draw and what to call when
+// a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
+
+import type { DecisionKind } from "./contract";
+import { h, type Child } from "./dom";
+import type { Key } from "./i18n";
+import type { ImportFailure } from "./import_model";
+import { wordDiff, type ChangeRow, type ReviewRow } from "./review_model";
+
+export type Say = (key: Key, values?: Record<string, string>) => string;
+
+function icon(name: string): HTMLElement {
+  return h("span", { class: `ic ic-${name}`, "aria-hidden": "true" });
+}
+
+/** What the readers' own kinds of refusal mean to a person, in the design's words. */
+const UNREADABLE_WORDS: Record<string, Key> = {
+  "sniff-mismatch": "impUnreadableSniff",
+  "format-unread": "impUnreadableFormat",
+  "pack-missing": "impUnreadablePack",
+};
+
+/**
+ * The sentence a refusal is said in. A file the tools would not read is said in the design's words by
+ * the kind of refusal; what the tool itself said is kept apart (`toolWords`) for whoever needs it.
+ */
+export function failureWords(say: Say, failure: ImportFailure): string {
+  switch (failure.kind) {
+    case "unreadable": {
+      const known = failure.code === null ? undefined : UNREADABLE_WORDS[failure.code];
+      if (known !== undefined) return say(known);
+      // `convert` refuses a document whose reader found no words in it.
+      return failure.tool === "convert" ? say("impUnreadableEmpty") : say("impUnreadableOther");
+    }
+    case "no-tools":
+      return say("impNoTools", { why: failure.why });
+    case "tool-failed":
+      return say("impToolFailed", { detail: failure.words });
+    case "tool-slow":
+      return say("impToolSlow");
+    case "too-large":
+      return say("impTooLarge");
+    case "open-proposal":
+      return say("impOpenBody");
+    case "bad-name":
+      return say("impBadName", { detail: failure.words });
+    case "other":
+      return failure.words;
+  }
+}
+
+/** What the tool itself said of a file it would not read, for a line that says it was the tool's. */
+export function toolWords(failure: ImportFailure): string | null {
+  return failure.kind === "unreadable" && failure.words !== "" ? failure.words : null;
+}
+
+export interface DropTargetOptions {
+  readonly say: Say;
+  readonly title: string;
+  readonly lead: string;
+  readonly over: boolean;
+  readonly onPick: (file: File) => void;
+  readonly onOver: (over: boolean) => void;
+}
+
+/** The first screen, and the first of the states: one place to put a document, and a way to choose one. */
+export function dropTarget(options: DropTargetOptions): HTMLElement {
+  const { say, onPick, onOver } = options;
+  const input = h("input", {
+    type: "file",
+    id: "import-file",
+    class: "imp-file",
+    onchange: (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (file !== undefined) onPick(file);
+    },
+  });
+  const area = h(
+    "div",
+    {
+      class: options.over ? "drop over" : "drop",
+      ondragenter: (event) => {
+        event.preventDefault();
+        onOver(true);
+      },
+      ondragover: (event) => {
+        // Without this the browser does not offer the drop to us at all.
+        event.preventDefault();
+      },
+      ondragleave: (event) => {
+        // A leave into a child of the target is not a leave.
+        const next = (event as DragEvent).relatedTarget;
+        if (!(next instanceof Node) || !area.contains(next)) onOver(false);
+      },
+      ondrop: (event) => {
+        event.preventDefault();
+        const file = (event as DragEvent).dataTransfer?.files?.[0];
+        if (file !== undefined) onPick(file);
+        else onOver(false);
+      },
+    },
+    h("span", { class: "tile" }, icon("upload")),
+    h(
+      "div",
+      { class: "drop-words" },
+      h("div", { class: "drop-main" }, options.over ? say("impDropOver") : say("impDrop")),
+      options.over ? null : h("div", { class: "drop-sub" }, say("impFormats")),
+    ),
+    options.over
+      ? null
+      : h("label", { class: "btn", for: "import-file" }, icon("doc"), say("impPick")),
+    input,
+  );
+  return h(
+    "div",
+    { class: "imp-stage" },
+    h("h2", { class: "imp-title" }, options.title),
+    h("p", { class: "imp-lead" }, options.lead),
+    area,
+  );
+}
+
+/** A file is with the core: kept as it is, then read. */
+export function workingCard(say: Say, name: string): HTMLElement {
+  return h(
+    "div",
+    { class: "imp-stage" },
+    h(
+      "div",
+      { class: "card", role: "status" },
+      h(
+        "div",
+        { class: "file" },
+        h("span", { class: "badge b-work" }, h("span", { class: "spin", "aria-hidden": "true" })),
+        h(
+          "div",
+          { class: "file-words" },
+          h("div", { class: "file-name" }, say("impWorking", { name })),
+          h("div", { class: "file-sub" }, say("impWorkingNote")),
+        ),
+      ),
+    ),
+  );
+}
+
+export interface RefusedOptions {
+  readonly say: Say;
+  readonly name: string;
+  readonly failure: ImportFailure;
+  readonly onOther: () => void;
+  readonly onGoToOpen: (proposal: string) => void;
+  readonly onReplace: () => void;
+}
+
+/** The core would not take the file: what it said, and what can be done about it. */
+export function refusedCard(options: RefusedOptions): HTMLElement {
+  const { say, failure } = options;
+  const heading = failure.kind === "open-proposal" ? say("impOpenTitle") : say("impRefusedTitle");
+  const actions: Child[] =
+    failure.kind === "open-proposal"
+      ? [
+          h("button", { type: "button", class: "btn", onclick: () => options.onGoToOpen(failure.proposal) }, say("impOpenGo")),
+          h("button", { type: "button", class: "btn out", onclick: options.onReplace }, say("impOpenReplace")),
+        ]
+      : [h("button", { type: "button", class: "btn", onclick: options.onOther }, icon("doc"), say("impOther"))];
+  return h(
+    "div",
+    { class: "imp-stage" },
+    h(
+      "div",
+      { class: "card", role: "alert" },
+      h("div", { class: "card-head" }, h("span", { class: "badge b-attn round" }, icon("alert")), h("h2", {}, heading)),
+      h("div", { class: "file-ref" }, icon("doc"), h("span", {}, options.name)),
+      h("p", { class: "card-body" }, failureWords(say, failure)),
+      toolWords(failure) === null ? null : h("p", { class: "card-tool" }, say("impToolWords", { words: toolWords(failure) ?? "" })),
+      h("div", { class: "card-acts" }, ...actions),
+    ),
+  );
+}
+
+// ---- the review --------------------------------------------------------------------------------
+
+export interface BarOptions {
+  readonly say: Say;
+  readonly title: string;
+  /** Whether the check asked anything at all: "everything is checked" is said only of a review that had something to check. */
+  readonly asked: boolean;
+  readonly toCheck: number;
+  readonly changedLines: number | null;
+  readonly notCarried: number;
+  readonly canSave: boolean;
+  readonly saveWithheld: string | null;
+  readonly saving: boolean;
+  readonly discarding: boolean;
+  readonly ended: boolean;
+  readonly onBack: () => void;
+  readonly onSave: () => void;
+  readonly onDiscard: () => void;
+}
+
+/** The bar of the review: the spec, what is left to decide, what changes, and the two ways out. */
+export function reviewBar(options: BarOptions): HTMLElement {
+  const { say } = options;
+  const counts: Child[] = [
+    options.toCheck > 0
+      ? h("span", { class: "count" }, say("rvwToCheck", { n: String(options.toCheck) }))
+      : options.asked
+        ? h("span", { class: "count done" }, icon("check"), say("rvwAllChecked"))
+        : null,
+    options.changedLines === null
+      ? null
+      : options.changedLines === 0
+        ? h("span", { class: "count quiet" }, say("rvwNoChange"))
+        : h("span", { class: options.asked ? "count quiet" : "count done" }, say("rvwChanges", { n: String(options.changedLines) })),
+    options.notCarried > 0
+      ? h("span", { class: "count" }, say("rvwNotCarried", { n: String(options.notCarried) }))
+      : null,
+  ];
+  const busy = options.saving || options.discarding;
+  return h(
+    "div",
+    { class: "bar-top" },
+    h("button", { type: "button", class: "btn quiet icon", "aria-label": say("rvwBack"), onclick: options.onBack }, icon("back")),
+    h("span", { class: "bar-title" }, options.title),
+    ...counts,
+    h(
+      "span",
+      { class: "bar-acts" },
+      options.ended
+        ? null
+        : h(
+            "button",
+            { type: "button", class: "btn quiet", disabled: busy, onclick: options.onDiscard },
+            options.discarding ? say("rvwDiscarding") : say("rvwDiscard"),
+          ),
+      options.ended
+        ? null
+        : h(
+            "button",
+            {
+              type: "button",
+              class: "btn",
+              id: "review-save",
+              disabled: !options.canSave || busy,
+              // A button that is off says why in words, to a reader who cannot see it is off.
+              "aria-describedby": options.saveWithheld === null ? undefined : "review-withheld",
+              onclick: options.onSave,
+            },
+            icon("check"),
+            options.saving ? say("rvwSaving") : say("rvwSave"),
+          ),
+    ),
+  );
+}
+
+/** The two headings over the two columns. */
+function columns(left: string, right: string, ...rows: Child[]): HTMLElement {
+  return h(
+    "div",
+    { class: "cols", role: "table" },
+    h("div", { class: "colhead", role: "columnheader" }, left),
+    h("div", { class: "colhead right", role: "columnheader" }, right),
+    h("div", { class: "paper", role: "rowgroup" }, ...rows),
+  );
+}
+
+function cell(className: string, ...children: Child[]): HTMLElement {
+  return h("div", { class: `cell ${className}`.trim(), role: "cell" }, ...children);
+}
+
+/**
+ * A row of two cells. Each says which column it is of (`data-label`), for a narrow screen where the
+ * columns are one above the other and the headings over them are not beside what they head.
+ */
+function pairOf(attributes: Record<string, string>, left: string, right: string, a: HTMLElement, b: HTMLElement): HTMLElement {
+  a.setAttribute("data-label", left);
+  b.setAttribute("data-label", right);
+  return h("div", { class: "pair", role: "row", ...attributes }, a, b);
+}
+
+/** What the text changes in the spec: the line the spec has beside the line it would have. */
+export function changesGrid(say: Say, left: string, right: string, rows: readonly ChangeRow[], hadText: boolean): HTMLElement {
+  const drawn = rows.map((row): Child => {
+    if (row.kind === "gap") return h("div", { class: "cell gap", role: "presentation" }, "···");
+    const oldWords = row.old;
+    const newWords = row.new;
+    const tag: Child =
+      row.kind === "changed"
+        ? h("span", { class: "tag n" }, say("rvwTagChanged"))
+        : row.kind === "added"
+          ? h("span", { class: "tag n" }, say("rvwTagAdded"))
+          : row.kind === "removed"
+            ? h("span", { class: "tag" }, say("rvwTagRemoved"))
+            : null;
+    const changed = row.kind !== "same";
+    const before =
+      oldWords === null
+        ? cell("empty chg", hadText ? say("rvwNotInSpec") : say("rvwNoText"))
+        : cell(changed ? "chg" : "", row.kind === "removed" ? h("del", {}, oldWords) : oldWords);
+    const after =
+      newWords === null
+        ? cell("empty chg", say("rvwNotInDocument"))
+        : cell(
+            changed ? "chg" : "",
+            tag,
+            // A paragraph that became another says which words were taken out and put in; one that
+            // was added or stayed says nothing of the kind.
+            row.kind === "changed" && oldWords !== null
+              ? h(
+                  "span",
+                  {},
+                  ...wordDiff(oldWords, newWords).map((piece) =>
+                    piece.kind === "same" ? piece.text : h(piece.kind === "del" ? "del" : "ins", {}, piece.text),
+                  ),
+                )
+              : row.kind === "same"
+                ? newWords
+                : h("ins", {}, newWords),
+          );
+    return pairOf({}, left, right, before, after);
+  });
+  return columns(left, right, ...drawn);
+}
+
+/**
+ * What a spec with no text yet will say once the document is saved: one column of what is written,
+ * since there is nothing in the spec to put across from it and a row for each paragraph that says
+ * "not in the spec" would be the same words down the whole page.
+ */
+export function firstTextGrid(heading: string, rows: readonly ChangeRow[]): HTMLElement {
+  const drawn = rows
+    .filter((row) => row.kind !== "gap" && row.new !== null)
+    .map((row) => h("div", { class: "pair", role: "row" }, cell("", row.new)));
+  return h(
+    "div",
+    { class: "cols one", role: "table" },
+    h("div", { class: "colhead", role: "columnheader" }, heading),
+    h("div", { class: "paper", role: "rowgroup" }, ...drawn),
+  );
+}
+
+export interface RowsOptions {
+  readonly say: Say;
+  readonly left: string;
+  readonly right: string;
+  readonly rows: readonly ReviewRow[];
+  readonly editing: { readonly block: string; readonly text: string } | null;
+  readonly reopened: ReadonlySet<string>;
+  readonly busy: boolean;
+  readonly onDecide: (block: string, what: DecisionKind, text?: string) => void;
+  readonly onEdit: (block: string, text: string | null) => void;
+  readonly onType: (text: string) => void;
+  /** Send the words typed so far as the correction of `block`. */
+  readonly onFixSave: (block: string) => void;
+  readonly onReopen: (block: string) => void;
+}
+
+const WHY_WORDS: Record<string, Key> = {
+  check: "rvwWhyCheck",
+  recognised: "rvwWhyRecognised",
+  "not-in-original": "rvwWhyNotInOriginal",
+  missing: "rvwWhyMissing",
+};
+
+const DONE_WORDS: Record<DecisionKind, Key> = {
+  keep: "rvwDoneKeep",
+  correct: "rvwDoneFix",
+  drop: "rvwDoneDrop",
+  add: "rvwDoneAdd",
+};
+
+/** The original beside what was written of it, one row each, and a choice for every row that is asked about. */
+export function rowsGrid(options: RowsOptions): HTMLElement {
+  const { say } = options;
+  const drawn = options.rows.map((row): Child => {
+    const asked = row.why !== null;
+    const open = asked && (row.decision === null || options.reopened.has(row.id));
+    // The row stays flagged while it is asked about, and is quiet once the owner has answered.
+    const left =
+      row.original === null
+        ? cell("empty" + (open ? " flag" : ""), say("rvwWhyNotInOriginal"))
+        : cell(open ? "flag" : "", row.original);
+    const right = rightCell(options, row, open);
+    return pairOf({ "data-block": row.id }, options.left, options.right, left, right);
+  });
+  return columns(options.left, options.right, ...drawn);
+}
+
+function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLElement {
+  const { say } = options;
+  const asked = row.why !== null;
+  const writtenWords = row.written;
+  if (!asked) {
+    return writtenWords === null ? cell("empty", say("rvwNotInDocument")) : cell("", writtenWords);
+  }
+  const why = WHY_WORDS[row.why ?? ""];
+  if (!open && row.decision !== null) {
+    // Decided: the choice is said, the words are shown as they will be, and it can be changed.
+    const decision = row.decision;
+    // What the text will say for this row: the owner's words, the original's block that is added, the
+    // block as written; a block that is left out says nothing.
+    const shown =
+      decision.what === "correct"
+        ? decision.text
+        : decision.what === "add"
+          ? row.original
+          : decision.what === "keep"
+            ? writtenWords
+            : null;
+    const word = row.of === "left-out" && decision.what === "drop" ? say("rvwDoneSkip") : say(DONE_WORDS[decision.what]);
+    return cell(
+      "",
+      h("span", { class: "tag ok" }, icon("check"), word),
+      shown === null ? null : h("div", {}, shown),
+      h(
+        "div",
+        { class: "acts" },
+        h("button", { type: "button", class: "mini", disabled: options.busy, onclick: () => options.onReopen(row.id) }, say("rvwChangeMind")),
+      ),
+    );
+  }
+  const flagTag = h("span", { class: "tag" }, icon("alert"), why === undefined ? (row.why ?? "") : say(why));
+  const editing = options.editing !== null && options.editing.block === row.id ? options.editing : null;
+  if (editing !== null) {
+    // The field is typed in and is not redrawn as it is typed in, so the button beside it is asked
+    // about the words as they are now, here, and the words are read when it is pressed.
+    const save = h(
+      "button",
+      {
+        type: "button",
+        class: "mini pri",
+        disabled: options.busy || editing.text.trim() === "",
+        onclick: () => options.onFixSave(row.id),
+      },
+      say("rvwFixSave"),
+    );
+    const area = h("textarea", {
+      class: "fix",
+      rows: "3",
+      "aria-label": say("rvwFixLabel"),
+      oninput: (event) => {
+        const words = (event.target as HTMLTextAreaElement).value;
+        options.onType(words);
+        save.disabled = options.busy || words.trim() === "";
+      },
+    });
+    area.value = editing.text;
+    return cell(
+      "flag",
+      flagTag,
+      area,
+      h(
+        "div",
+        { class: "acts" },
+        save,
+        h("button", { type: "button", class: "mini", onclick: () => options.onEdit(row.id, null) }, say("rvwFixCancel")),
+      ),
+    );
+  }
+  const button = (label: Key, what: DecisionKind, primary: boolean): HTMLElement =>
+    h(
+      "button",
+      {
+        type: "button",
+        class: primary ? "mini pri" : "mini",
+        disabled: options.busy,
+        onclick: () => options.onDecide(row.id, what),
+      },
+      say(label),
+    );
+  const fix = h(
+    "button",
+    {
+      type: "button",
+      class: "mini",
+      disabled: options.busy,
+      onclick: () => options.onEdit(row.id, row.original ?? row.written ?? ""),
+    },
+    say("rvwFix"),
+  );
+  const choices: HTMLElement[] =
+    row.why === "missing"
+      ? [button("rvwAdd", "add", true), button("rvwSkip", "drop", false)]
+      : row.why === "not-in-original"
+        ? [button("rvwDrop", "drop", true), button("rvwKeep", "keep", false)]
+        : [button("rvwKeep", "keep", true), fix, button("rvwDrop", "drop", false)];
+  return cell(
+    "flag",
+    flagTag,
+    writtenWords === null ? null : h("div", {}, writtenWords),
+    h("div", { class: "acts" }, ...choices),
+  );
+}
+
+/** What the reader could not carry out of the original: said, so that nobody believes it was saved. */
+export function notCarriedList(say: Say, items: readonly { what: string; why: string | null }[]): HTMLElement | null {
+  if (items.length === 0) return null;
+  return h(
+    "section",
+    { class: "imp-notes", "aria-label": say("rvwNotCarriedTitle") },
+    h("h3", {}, say("rvwNotCarriedTitle")),
+    h(
+      "ul",
+      {},
+      ...items.map((item) => h("li", {}, h("span", { class: "tag" }, icon("alert"), item.what), item.why === null ? null : ` ${item.why}`)),
+    ),
+  );
+}

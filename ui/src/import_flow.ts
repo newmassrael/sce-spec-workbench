@@ -1,0 +1,607 @@
+// SPDX-License-Identifier: LicenseRef-SCE-Spec-Workbench-NonCommercial-1.0 OR LicenseRef-SCE-Commercial
+// SPDX-FileCopyrightText: Copyright (c) 2026 newmassrael
+
+// Bringing a document in, and ending the review of it: what the person chose, what is in flight, and
+// what a press of each button asks of the core.
+//
+// The state is kept here and not in the screen's, for the reason the screen redraws everything it
+// shows: a half-typed correction or a row left open must survive the redraw a decision causes. What
+// is decided is not decided here: the tools read the document, the specs folder says whether the text
+// may be saved and refuses when something moved. This asks, shows the answer in the design's words,
+// and offers the few things a refusal leaves.
+
+import type { Api } from "./api";
+import { CommandFailure } from "./ipc";
+import type { AssembledImport, DecisionKind, Spec } from "./contract";
+import { h, type Child } from "./dom";
+import type { Key } from "./i18n";
+import {
+  base64Of,
+  failureOf,
+  importKey,
+  titleOf,
+  type ImportFailure,
+  type ImportStage,
+  type ImportTarget,
+} from "./import_model";
+import {
+  changesGrid,
+  dropTarget,
+  firstTextGrid,
+  notCarriedList,
+  refusedCard,
+  reviewBar,
+  rowsGrid,
+  workingCard,
+  type Say,
+} from "./import_view";
+import {
+  changeRows,
+  changedLines,
+  parseConversion,
+  parseExtraction,
+  rowsOf,
+  saveWithheld,
+  type NotCarried,
+  type OriginalBlock,
+  type ReviewPanel,
+  type WrittenBlock,
+} from "./review_model";
+
+/** What the flow needs of the screen it is drawn in. */
+export interface ImportHost {
+  readonly api: Pick<
+    Api,
+    | "createSpec"
+    | "removeSpec"
+    | "importDocument"
+    | "listProposals"
+    | "readProposal"
+    | "readProposalDocuments"
+    | "readExtraction"
+    | "decideBlock"
+    | "assembleImport"
+    | "acceptImport"
+    | "rejectProposal"
+    | "rebaseProposal"
+  >;
+  readonly t: Say;
+  readonly redraw: () => void;
+  /** A failure that is not about the document (no server, no token): the screen's own handling is the whole answer. */
+  readonly handled: (error: unknown) => boolean;
+  readonly explain: (error: unknown) => string;
+  /** The review is over and `spec` is the one to be shown now; `info` is what to tell the person. */
+  readonly finished: (spec: Spec, info: string | null) => void;
+  readonly now: () => number;
+  /** Whether there is a spec to go back to from the first screen: on the very first run there is none. */
+  readonly canLeave: () => boolean;
+}
+
+/** What is read of a proposal once and kept, because it does not change while the proposal is open. */
+interface Parts {
+  readonly written: readonly WrittenBlock[];
+  readonly original: readonly OriginalBlock[];
+  readonly notCarried: readonly NotCarried[];
+  readonly member: string;
+}
+
+type Busy = "deciding" | "saving" | "discarding" | "rebasing";
+
+export class ImportFlow {
+  private stage: ImportStage | null = null;
+  private target: ImportTarget = { kind: "new" };
+  /** A file is over the drop target. */
+  private over = false;
+  private press = 0;
+  /** The newest thing asked of the core; an older answer that arrives later is dropped. */
+  private ticket = 0;
+  /** The file last chosen, kept so that a refusal that says "replace" can send it again. */
+  private held: File | null = null;
+  /** Specs this flow made for a file, so that the one that is not kept does not stay behind empty. */
+  private readonly made = new Set<string>();
+  private panel: ReviewPanel | null = null;
+  private parts: Parts | null = null;
+  private busy: Busy | null = null;
+  private notice: { readonly tone: "ok" | "error"; readonly text: string } | null = null;
+  /** The correction being typed: which block, and the words so far. */
+  private editing: { block: string; text: string } | null = null;
+  /** Rows the owner decided and then asked to decide again. */
+  private readonly reopened = new Set<string>();
+  /** The proposal a spec is waiting on, as last asked; `null` when it waits on none. */
+  private readonly pending = new Map<string, string | null>();
+
+  constructor(private readonly host: ImportHost) {}
+
+  isOpen(): boolean {
+    return this.stage !== null;
+  }
+
+  /** Show the drop target for a new spec, or for the text of one that is kept. */
+  open(target: ImportTarget): void {
+    this.ticket += 1;
+    this.target = target;
+    this.stage = { kind: "choose" };
+    this.over = false;
+    this.clearReview();
+    this.host.redraw();
+  }
+
+  close(): void {
+    if (this.stage === null) return;
+    this.ticket += 1;
+    this.stage = null;
+    this.clearReview();
+  }
+
+  private clearReview(): void {
+    this.panel = null;
+    this.parts = null;
+    this.busy = null;
+    this.notice = null;
+    this.editing = null;
+    this.reopened.clear();
+  }
+
+  /** The proposal of `specId` that waits for the person, when there is one. */
+  pendingFor(specId: string): string | null {
+    return this.pending.get(specId) ?? null;
+  }
+
+  /** Ask whether the spec has a document waiting, so the screen can say so when it opens. */
+  async noteSpec(specId: string): Promise<void> {
+    try {
+      const proposals = await this.host.api.listProposals(specId);
+      this.pending.set(specId, proposals.find((p) => p.state === "pending")?.id ?? null);
+    } catch {
+      // Not knowing is not saying there is none; the banner is a convenience, and the screen's own
+      // failures are said where the person is looking.
+      this.pending.delete(specId);
+    }
+    this.host.redraw();
+  }
+
+  /** Open the review of a proposal of `spec`. */
+  async review(spec: Spec, proposal: string): Promise<void> {
+    const ticket = ++this.ticket;
+    this.clearReview();
+    this.stage = { kind: "review", spec, proposal };
+    this.host.redraw();
+    try {
+      const [view, documents] = await Promise.all([
+        this.host.api.readProposal(spec.id, proposal),
+        this.host.api.readProposalDocuments(spec.id, proposal),
+      ]);
+      const extraction = await this.host.api.readExtraction(spec.id, view.proposal.extraction);
+      if (ticket !== this.ticket) return;
+      const read = parseExtraction(extraction.text);
+      this.parts = {
+        written: parseConversion(documents.conversion),
+        original: read.blocks,
+        notCarried: read.notCarried,
+        member: read.member,
+      };
+      await this.settle(spec, proposal, ticket);
+    } catch (error) {
+      if (ticket !== this.ticket) return;
+      this.fail(error);
+    }
+  }
+
+  /**
+   * Read the proposal as it is now and, when the core would take an accept, the text that accepting
+   * would save: asked again after every decision, since the text is of the decisions that were taken.
+   */
+  private async settle(spec: Spec, proposal: string, ticket: number): Promise<void> {
+    const parts = this.parts;
+    if (parts === null) return;
+    const view = await this.host.api.readProposal(spec.id, proposal);
+    let assembled: AssembledImport | null = null;
+    let refusal: string | null = null;
+    if (view.proposal.state === "pending" && view.head_matches) {
+      try {
+        assembled = await this.host.api.assembleImport(spec.id, proposal);
+      } catch (error) {
+        // The tools may refuse the decisions as they stand (every block deleted): that is something to
+        // say beside the rows, not a failure of the screen.
+        if (!(error instanceof CommandFailure) || this.host.handled(error)) throw error;
+        refusal = error.message;
+      }
+    }
+    if (ticket !== this.ticket) return;
+    this.panel = {
+      view,
+      rows: rowsOf(view, parts.written, parts.original),
+      notCarried: parts.notCarried,
+      member: parts.member,
+      assembled,
+    };
+    this.notice = refusal === null ? this.notice : { tone: "error", text: refusal };
+    this.host.redraw();
+  }
+
+  private fail(error: unknown): void {
+    if (this.host.handled(error)) return;
+    this.notice = { tone: "error", text: this.host.explain(error) };
+    this.busy = null;
+    this.host.redraw();
+  }
+
+  // ---- bringing a document in -----------------------------------------------------------------
+
+  private async pick(file: File, supersede: boolean): Promise<void> {
+    const ticket = ++this.ticket;
+    this.over = false;
+    this.held = file;
+    this.stage = { kind: "working", name: file.name };
+    this.host.redraw();
+    try {
+      const data = base64Of(new Uint8Array(await file.arrayBuffer()));
+      if (ticket !== this.ticket) return;
+      await this.bring(file.name, data, supersede, ticket);
+    } catch (error) {
+      await this.refuse(file.name, error, ticket);
+    }
+  }
+
+  /** Make the spec the document is for, when it is a new one, and send the document. */
+  private async bring(name: string, data: string, supersede: boolean, ticket: number): Promise<void> {
+    let spec: Spec;
+    if (this.target.kind === "new") {
+      spec = await this.host.api.createSpec(titleOf(name, this.host.t("impNewSpecFallback")));
+      this.made.add(spec.id);
+    } else {
+      spec = this.target.spec;
+    }
+    try {
+      this.press += 1;
+      const imported = await this.host.api.importDocument(
+        spec.id,
+        name,
+        data,
+        importKey(this.host.now(), this.press),
+        supersede,
+      );
+      if (ticket !== this.ticket) return;
+      await this.review(spec, imported.proposal.id);
+    } catch (error) {
+      throw new Refusal(error, spec);
+    }
+  }
+
+  /**
+   * Say why the core would not take the document, and take away the spec that was made for it and
+   * got nothing, so a refused file leaves no empty spec in the list.
+   */
+  private async refuse(name: string, error: unknown, ticket: number): Promise<void> {
+    const cause = error instanceof Refusal ? error.reason : error;
+    const created = error instanceof Refusal && this.made.has(error.spec.id) ? error.spec : null;
+    if (created !== null) {
+      try {
+        await this.host.api.removeSpec(created.id);
+      } catch {
+        // It stays in the list, empty: said nowhere because the refusal is the thing to read.
+      }
+      this.made.delete(created.id);
+    }
+    if (ticket !== this.ticket) return;
+    if (this.host.handled(cause)) return;
+    const failure = failureOf(cause);
+    if (failure === null) {
+      this.stage = { kind: "choose" };
+      this.notice = { tone: "error", text: this.host.explain(cause) };
+    } else {
+      this.stage = { kind: "refused", name, failure };
+    }
+    this.host.redraw();
+  }
+
+  /** Send the file again, saying it replaces the document the spec is already waiting on. */
+  private replaceWithHeld(): void {
+    if (this.held !== null && this.target.kind === "spec") void this.pick(this.held, true);
+  }
+
+  // ---- ending the review ----------------------------------------------------------------------
+
+  private async decide(block: string, what: DecisionKind, text?: string): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "review" || this.busy !== null) return;
+    const ticket = this.ticket;
+    this.busy = "deciding";
+    this.notice = null;
+    this.host.redraw();
+    try {
+      await this.host.api.decideBlock(stage.spec.id, stage.proposal, block, what, text);
+      this.editing = null;
+      this.reopened.delete(block);
+      this.busy = null;
+      await this.settle(stage.spec, stage.proposal, ticket);
+    } catch (error) {
+      this.busy = null;
+      if (ticket !== this.ticket) return;
+      if (this.host.handled(error)) return;
+      this.notice = { tone: "error", text: this.host.t("rvwDecideFailed", { detail: this.host.explain(error) }) };
+      this.host.redraw();
+    }
+  }
+
+  private async save(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "review" || this.busy !== null) return;
+    const ticket = this.ticket;
+    this.busy = "saving";
+    this.notice = null;
+    this.host.redraw();
+    try {
+      await this.host.api.acceptImport(stage.spec.id, stage.proposal);
+      this.made.delete(stage.spec.id);
+      this.close();
+      this.host.finished(stage.spec, this.host.t("rvwSaved"));
+    } catch (error) {
+      this.busy = null;
+      if (ticket !== this.ticket) return;
+      if (this.host.handled(error)) return;
+      // Whatever the core refused, nothing was written: read the proposal again, and the screen says
+      // what it now is (the text moved, or a decision was taken since).
+      this.notice = { tone: "error", text: this.host.t("rvwSaveFailed", { detail: this.host.explain(error) }) };
+      try {
+        await this.settle(stage.spec, stage.proposal, ticket);
+      } catch (again) {
+        this.fail(again);
+      }
+      this.host.redraw();
+    }
+  }
+
+  private async discard(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "review" || this.busy !== null) return;
+    const ticket = this.ticket;
+    this.busy = "discarding";
+    this.notice = null;
+    this.host.redraw();
+    try {
+      await this.host.api.rejectProposal(stage.spec.id, stage.proposal);
+      if (this.made.has(stage.spec.id)) {
+        // A spec made for this document and given nothing: it is not kept, so it does not stay empty.
+        try {
+          await this.host.api.removeSpec(stage.spec.id);
+        } catch {
+          // It stays in the list, empty; the discard itself went through.
+        }
+        this.made.delete(stage.spec.id);
+        this.close();
+        this.host.finished(stage.spec, null);
+        return;
+      }
+      this.close();
+      this.host.finished(stage.spec, this.host.t("rvwDiscarded"));
+    } catch (error) {
+      this.busy = null;
+      if (ticket !== this.ticket) return;
+      this.fail(error);
+    }
+  }
+
+  private async rebase(): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "review" || this.busy !== null) return;
+    this.busy = "rebasing";
+    this.notice = null;
+    this.host.redraw();
+    try {
+      const carried = await this.host.api.rebaseProposal(stage.spec.id, stage.proposal);
+      this.busy = null;
+      await this.review(stage.spec, carried.proposal.id);
+      this.notice = { tone: "ok", text: this.host.t("rvwRebased") };
+      this.host.redraw();
+    } catch (error) {
+      this.busy = null;
+      this.fail(error);
+    }
+  }
+
+  // ---- drawing --------------------------------------------------------------------------------
+
+  /** The screen's whole main pane while a document is being brought in or checked. */
+  view(): HTMLElement {
+    const stage = this.stage;
+    const say = this.host.t;
+    if (stage === null) return h("div", {});
+    const body: Child =
+      stage.kind === "choose"
+        ? this.chooseView()
+        : stage.kind === "working"
+          ? workingCard(say, stage.name)
+          : stage.kind === "refused"
+            ? this.refusedView(stage.name, stage.failure)
+            : this.reviewView(stage.spec);
+    return h("section", { class: "imp" }, this.noticeBanner(stage.kind !== "review"), body);
+  }
+
+  private noticeBanner(offered: boolean): Child {
+    if (!offered || this.notice === null) return null;
+    return h(
+      "p",
+      { class: this.notice.tone === "ok" ? "banner banner-ok" : "banner banner-error", role: this.notice.tone === "ok" ? "status" : "alert" },
+      this.notice.text,
+    );
+  }
+
+  private chooseView(): HTMLElement {
+    const say = this.host.t;
+    const target = this.target;
+    // Back is offered where there is somewhere to go back to; on the first run it would lead to nothing.
+    const back =
+      target.kind === "spec" || this.host.canLeave()
+        ? h(
+            "div",
+            { class: "imp-top" },
+            h(
+              "button",
+              { type: "button", class: "btn quiet", onclick: () => this.leave() },
+              h("span", { class: "ic ic-back", "aria-hidden": "true" }),
+              say("impBack"),
+            ),
+          )
+        : null;
+    return h(
+      "div",
+      {},
+      back,
+      dropTarget({
+        say,
+        title: target.kind === "new" ? say("impTitleNew") : say("impTitleSpec", { title: target.spec.title }),
+        lead: target.kind === "new" ? say("impLeadNew") : say("impLeadSpec"),
+        over: this.over,
+        onPick: (file) => void this.pick(file, false),
+        onOver: (over) => {
+          if (this.over === over) return;
+          this.over = over;
+          this.host.redraw();
+        },
+      }),
+    );
+  }
+
+  /** Leave the import without a document: back to the spec that was shown. */
+  private leave(): void {
+    const target = this.target;
+    this.close();
+    if (target.kind === "spec") this.host.finished(target.spec, null);
+    else this.host.redraw();
+  }
+
+  private refusedView(name: string, failure: ImportFailure): HTMLElement {
+    return refusedCard({
+      say: this.host.t,
+      name,
+      failure,
+      onOther: () => this.open(this.target),
+      onGoToOpen: (proposal) => {
+        if (this.target.kind === "spec") void this.review(this.target.spec, proposal);
+      },
+      onReplace: () => this.replaceWithHeld(),
+    });
+  }
+
+  private reviewView(spec: Spec): HTMLElement {
+    const say = this.host.t;
+    const panel = this.panel;
+    if (panel === null) {
+      return h("div", {}, this.noticeBanner(true), h("p", { class: "muted", role: "status" }, say("rvwLoading")));
+    }
+    const state = panel.view.proposal.state;
+    const withheld = saveWithheld(panel);
+    const toCheck = panel.view.undecided.length;
+    const asked = panel.view.proposal.asks.length > 0;
+    const had = panel.assembled?.report.changes.had_text ?? panel.view.proposal.against !== null;
+    const name = panel.member === "" ? "" : panel.member;
+    const bar = reviewBar({
+      say,
+      title: spec.title,
+      asked,
+      toCheck,
+      changedLines: changedLines(panel.assembled),
+      notCarried: panel.notCarried.length,
+      canSave: withheld === null,
+      saveWithheld: withheld,
+      saving: this.busy === "saving",
+      discarding: this.busy === "discarding",
+      ended: state !== "pending",
+      onBack: () => this.leaveReview(spec),
+      onSave: () => void this.save(),
+      onDiscard: () => void this.discard(),
+    });
+    const why = this.withheldNote(withheld, toCheck, state);
+    const compared = panel.assembled === null ? null : changeRows(panel.assembled.report.changes);
+    // A spec with no text has nothing to put across from the document: it is shown as one column.
+    const changes =
+      compared === null
+        ? null
+        : had
+          ? changesGrid(say, say("rvwColNow"), say("rvwColNew", { name }), compared, had)
+          : firstTextGrid(say("rvwColNew", { name }), compared);
+    const comparison =
+      asked && changes !== null
+        ? h("details", { class: "imp-changes", open: toCheck === 0 }, h("summary", {}, say("rvwChanges", { n: String(changedLines(panel.assembled) ?? 0) })), changes)
+        : changes;
+    return h(
+      "div",
+      { class: "imp-review" },
+      bar,
+      h("div", { class: "imp-body" }, this.noticeBanner(true), why,
+        asked
+          ? rowsGrid({
+              say,
+              left: say("rvwColOriginal", { name }),
+              right: say("rvwColWritten"),
+              rows: panel.rows,
+              editing: this.editing,
+              reopened: this.reopened,
+              busy: this.busy !== null,
+              onDecide: (block, what, text) => void this.decide(block, what, text),
+              onEdit: (block, text) => {
+                this.editing = text === null ? null : { block, text };
+                this.host.redraw();
+              },
+              onType: (text) => {
+                if (this.editing !== null) this.editing = { block: this.editing.block, text };
+                // No redraw: the field is being typed in, and a redraw would take it away.
+              },
+              onFixSave: (block) => {
+                const words = this.editing?.text ?? "";
+                if (this.editing?.block === block && words.trim() !== "") void this.decide(block, "correct", words);
+              },
+              onReopen: (block) => {
+                this.reopened.add(block);
+                this.host.redraw();
+              },
+            })
+          : null,
+        comparison,
+        notCarriedList(say, panel.notCarried),
+      ),
+    );
+  }
+
+  /** Why the save is off, said where the person looks, and the one thing to do when there is one. */
+  private withheldNote(withheld: ReturnType<typeof saveWithheld>, toCheck: number, state: string): Child {
+    const say = this.host.t;
+    if (withheld === null) return null;
+    if (withheld === "ended") {
+      const key: Key =
+        state === "accepted" ? "rvwEndedAccepted" : state === "rejected" ? "rvwEndedRejected" : "rvwEndedSuperseded";
+      return h("p", { class: "note", id: "review-withheld" }, h("span", { class: "ic ic-alert", "aria-hidden": "true" }), h("span", {}, say(key)));
+    }
+    if (withheld === "moved") {
+      return h(
+        "p",
+        { class: "note", id: "review-withheld" },
+        h("span", { class: "ic ic-alert", "aria-hidden": "true" }),
+        h("span", {}, say("rvwMoved"), " "),
+        h("button", { type: "button", class: "mini pri", disabled: this.busy !== null, onclick: () => void this.rebase() }, say("rvwRebase")),
+      );
+    }
+    return h(
+      "p",
+      { class: "note quiet", id: "review-withheld" },
+      withheld === "undecided" ? say("rvwWithheldUndecided", { n: String(toCheck) }) : say("rvwWithheldAssembling"),
+    );
+  }
+
+  /** Back from the review without ending it: the proposal waits, and the spec is shown. */
+  private leaveReview(spec: Spec): void {
+    this.close();
+    this.host.finished(spec, null);
+  }
+}
+
+/** A refusal while a document was being sent, with the spec it was sent for. */
+class Refusal extends Error {
+  constructor(
+    readonly reason: unknown,
+    readonly spec: Spec,
+  ) {
+    super("the document was refused");
+  }
+}

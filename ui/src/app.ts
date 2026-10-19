@@ -111,6 +111,7 @@ import {
 } from "./generation_model";
 import { movedParts, sameRequest, UNREAD, type SpecOnScreen } from "./heads_model";
 import { initialLocale, languageName, LOCALES, translate, type Key, type Locale } from "./i18n";
+import { ImportFlow } from "./import_flow";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED, type Transport } from "./ipc";
 import {
   drawFailureOf,
@@ -193,6 +194,8 @@ export interface Environment {
 
 export class App {
   private readonly api: Api;
+  /** A document being brought in, or checked before it is saved as the spec. */
+  private readonly importFlow: ImportFlow;
   private locale: Locale;
   /** How large the drawings are shown, as a multiple of the size SCE set them at. */
   private zoom: number;
@@ -318,6 +321,32 @@ export class App {
     this.api = apiOver(env.transport);
     this.locale = initialLocale(readKept(env.storage, LOCALE_KEY), env.browserLanguage);
     this.zoom = zoomFrom(readKept(env.storage, ZOOM_KEY));
+    this.importFlow = new ImportFlow({
+      api: this.api,
+      t: (key, values) => this.t(key, values),
+      redraw: () => this.render(),
+      handled: (error) => this.askForToken(error),
+      explain: (error) => this.explain(error),
+      finished: (spec, info) => void this.finishImport(spec, info),
+      now: () => Date.now(),
+      canLeave: () => this.listing !== null && this.listing.specs.length > 0,
+    });
+  }
+
+  /**
+   * A document was saved as a spec's text, or let go of, or the review was left: show the spec it was
+   * for, read again, since its text may be new and a spec may have been made for it.
+   */
+  private async finishImport(spec: Spec, info: string | null): Promise<void> {
+    await this.guard(async () => {
+      this.listing = await this.api.listSpecs();
+    });
+    const shown = this.listing?.specs.find((s) => s.id === spec.id);
+    if (shown !== undefined) {
+      await this.openSpec(shown);
+      if (info !== null && this.selected?.id === shown.id) this.info = info;
+    }
+    this.render();
   }
 
   async start(): Promise<void> {
@@ -349,6 +378,10 @@ export class App {
       this.triedToken = false;
     });
     this.loading = false;
+    // The first thing to see with no spec is where to put a document (design/boards/Main).
+    if (this.fatal === null && !this.needsToken && this.listing !== null && this.listing.specs.length === 0) {
+      this.importFlow.open({ kind: "new" });
+    }
     this.render();
     // After the first drawing: asking Claude Code can take seconds, and the specs are not waiting for it.
     void this.ai?.load().then(() => this.render());
@@ -386,6 +419,7 @@ export class App {
   /** Load `spec` into the editor. Of several requests in flight, only the newest is applied. */
   private async select(spec: Spec): Promise<void> {
     const ticket = ++this.opening;
+    this.importFlow.close();
     this.pendingSwitch = null;
     this.notice = null;
     this.info = null;
@@ -449,6 +483,7 @@ export class App {
       void this.loadSpec(spec.id, true);
       void this.loadAnswers(spec.id);
       void this.loadRequest(spec.id, this.session);
+      void this.importFlow.noteSpec(spec.id);
       this.watch();
     }
   }
@@ -1826,9 +1861,11 @@ export class App {
         this.switchBanner(),
         this.notice === null ? null : h("p", { class: "banner banner-error", role: "alert" }, this.notice),
         this.info === null ? null : h("p", { class: "banner banner-ok", role: "status" }, this.info),
-        this.selected === null || this.editor === null
-          ? h("p", { class: "muted" }, this.t("pickASpec"))
-          : this.specPane(this.selected, this.editor),
+        this.importFlow.isOpen()
+          ? this.importFlow.view()
+          : this.selected === null || this.editor === null
+            ? h("p", { class: "muted" }, this.t("pickASpec"))
+            : this.specPane(this.selected, this.editor),
       ),
     );
   }
@@ -1957,10 +1994,28 @@ export class App {
             h("ul", {}, ...listing.unreadable.map((u) => h("li", {}, `${u.id}: ${u.reason}`))),
           )
         : null,
+      h(
+        "button",
+        {
+          id: "import-open",
+          type: "button",
+          class: "import-open",
+          onclick: () => this.importFlow.open({ kind: "new" }),
+        },
+        this.t("impOpen"),
+      ),
       h("h3", {}, this.t("newSpec")),
       form,
-      this.ai?.view() ?? null,
+      this.aiPanel(),
     );
+  }
+
+  /**
+   * The AI connection settings are the person at the keyboard's: the browser entrance changes none
+   * of them and starts no program, so a panel there would only list what it cannot touch.
+   */
+  private aiPanel(): HTMLElement | null {
+    return this.described?.entrance === "desktop" ? (this.ai?.view() ?? null) : null;
   }
 
   private specPane(spec: Spec, editor: EditorModel): HTMLElement {
@@ -1996,6 +2051,17 @@ export class App {
         h(
           "button",
           {
+            id: "import-into-spec",
+            type: "button",
+            class: "quiet",
+            disabled: this.somethingIsSaving(),
+            onclick: () => this.importFlow.open({ kind: "spec", spec }),
+          },
+          this.t("impOpenIntoSpec"),
+        ),
+        h(
+          "button",
+          {
             type: "button",
             class: "quiet",
             disabled: this.somethingIsSaving(),
@@ -2008,6 +2074,7 @@ export class App {
         ),
       ),
       this.removing ? this.removeBanner(spec) : null,
+      this.pendingImportBanner(spec),
       // Two columns where the screen is wide enough: the text on one side and what
       // SCE says of its model on the other, because the page is read AGAINST the
       // text. Narrow, they stack in the same order.
@@ -2045,6 +2112,19 @@ export class App {
         ),
         h("div", { class: "model-column" }, this.generationSection(), this.modelPanel(spec)),
       ),
+    );
+  }
+
+  /** A document brought in earlier that is still waiting to be checked: said, with the way to it. */
+  private pendingImportBanner(spec: Spec): HTMLElement | null {
+    const proposal = this.importFlow.pendingFor(spec.id);
+    if (proposal === null) return null;
+    return h(
+      "p",
+      { id: "import-pending", class: "banner banner-warn", role: "status" },
+      this.t("impPending"),
+      " ",
+      h("button", { type: "button", onclick: () => void this.importFlow.review(spec, proposal) }, this.t("impOpenGo")),
     );
   }
 

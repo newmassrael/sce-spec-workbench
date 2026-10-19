@@ -6,8 +6,9 @@
 /*
   Tokens are roles, not colours, and these are the ones of `design/boards/app.css`: a rule names the role
   it means and never a value. The design is the source of truth for the names and the values; a role the
-  design defines and this stylesheet has no use for yet (the AI's colour, the people hues, the rows of a
-  side-by-side check) is added with the screen that uses it, so that none is defined and left unread.
+  design defines and this stylesheet has no use for yet (the AI's colour, the people hues) is added with
+  the screen that uses it, so that none is defined and left unread. The rows of a side-by-side check
+  came with the screen that brings a document in.
 
   - The page is grey and a card is white; a divider is `--line`, and the border of a control is
     `--line-strong`, because a control has to be found (3:1 against what it sits on, which `--line`
@@ -26,19 +27,39 @@
   --line-strong: #858fa1;
   --chip-hover: #e9ecf1;
   --sel-bg: #fafbff;
+  --hover: #fafbfc;
   --ink: #141922;
+  --ink-2: #444d5c;
   --ink-3: #667085;
   --accent: #2f5bea;
   --accent-ink: #1d3fb8;
   --accent-tint: #edf1fe;
   --on-accent: #ffffff;
+  --on-ink: #ffffff;
+  --btn-hover: #2a3240;
   --attn: #8a4b00;
+  --attn-icon: #a15c00;
   --attn-tint: #fff3d6;
   --attn-line: #f1d9a6;
+  --bar-bg: rgba(246, 247, 249, 0.92);
   --del-bg: #fde3e1;
   --del-ink: #8c1d18;
   --ins-bg: #ddebff;
   --ins-ink: #1d3fb8;
+  /* Rows of a side-by-side check: needs a decision, changed, empty. */
+  --flag-bg: #fff9ea;
+  --flag-line: #f1e2b8;
+  --flag-a: #fbf1d6;
+  --flag-b: #fff9ea;
+  --chg-bg: #f7f9ff;
+  --chg-line: #dce4fb;
+  --chg-a: #e9eefc;
+  --chg-b: #f7f9ff;
+  --empty-a: #f1f3f6;
+  --empty-b: #f6f7f9;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px rgba(16, 24, 40, 0.06);
   --font: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -51,19 +72,36 @@
     --line-strong: #6b7689;
     --chip-hover: #2a3140;
     --sel-bg: #1a2030;
+    --hover: #1b2029;
     --ink: #e8ecf3;
+    --ink-2: #b4bdcb;
     --ink-3: #8e98a8;
     --accent: #7c98ff;
     --accent-ink: #a9bdff;
     --accent-tint: #1c2650;
     --on-accent: #0e1530;
+    --on-ink: #0f1218;
+    --btn-hover: #ffffff;
     --attn: #f0b35a;
+    --attn-icon: #e8a33c;
     --attn-tint: #33260f;
     --attn-line: #5a4318;
+    --bar-bg: rgba(15, 18, 24, 0.92);
     --del-bg: #4a1d1a;
     --del-ink: #ffb4ad;
     --ins-bg: #1d3266;
     --ins-ink: #b8ccff;
+    --flag-bg: #2a2312;
+    --flag-line: #4a3b16;
+    --flag-a: #33290f;
+    --flag-b: #2a2312;
+    --chg-bg: #161d33;
+    --chg-line: #27345e;
+    --chg-a: #1c2850;
+    --chg-b: #161d33;
+    --empty-a: #1b2029;
+    --empty-b: #151920;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -155,6 +193,12 @@ body {
   border-color: var(--accent);
   background: var(--sel-bg);
   font-weight: 600;
+}
+
+/* Bringing a document in is the way most specs start, so it is the first thing under the list. */
+.import-open {
+  width: 100%;
+  margin: 12px 0 4px;
 }
 
 .new-spec {
@@ -729,5 +773,696 @@ textarea:focus-visible {
 
   .source {
     min-height: 40vh;
+  }
+}
+
+/*
+  Bringing a document in and checking it (`design/boards/Main`, `ImportStates`, `MdReview`, `Review`).
+  Everything is under `.imp` so that the controls of the screens that came before keep the look they
+  have: the design's button is a taller, filled one, and these screens are the first to use it.
+*/
+.imp {
+  font-size: 15px;
+  line-height: 24px;
+  word-break: keep-all;
+}
+
+.imp .ic {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--g) center / contain no-repeat;
+  mask: var(--g) center / contain no-repeat;
+}
+
+.imp .ic-upload {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 16V4 M7 9l5-5 5 5 M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.imp .ic-doc {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3h8l5 5v13H6z M14 3v5h5 M9 13h7 M9 17h7' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.imp .ic-check {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.imp .ic-alert {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 8v5 M12 16.5h.01 M10.3 3.9L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.imp .ic-back {
+  --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 5l-7 7 7 7' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* The design's button: filled with the ink, or quiet, or outlined. A disabled one is a flat fill with
+   quiet text and says why in words beside it; it is not the same button at half strength. */
+.imp .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--ink);
+  color: var(--on-ink);
+  font: 500 15px/1 var(--font);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+
+.imp .btn:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.imp .btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.imp .btn.quiet {
+  background: transparent;
+  color: var(--ink-2);
+  padding: 0 14px;
+}
+
+.imp .btn.quiet:hover:not(:disabled) {
+  background: var(--chip-hover);
+}
+
+.imp .btn.out {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+
+.imp .btn.out:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.imp .btn.icon {
+  width: 44px;
+  padding: 0;
+}
+
+.imp .btn:disabled {
+  background: var(--chip-hover);
+  color: var(--ink-3);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.imp .mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: 500 14px/1 var(--font);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.imp .mini:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.imp .mini.pri {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+.imp .mini.pri:hover:not(:disabled) {
+  background: var(--btn-hover);
+}
+
+.imp .mini:disabled {
+  background: var(--chip-hover);
+  border-color: var(--line);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.imp .btn:focus-visible,
+.imp .mini:focus-visible,
+.imp textarea:focus-visible,
+.imp .imp-changes summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The file field is there for the keyboard and for a screen reader, and drawn by the label beside it. */
+.imp .imp-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.imp .drop:has(.imp-file:focus-visible) .btn {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.imp-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 0 64px;
+  text-align: center;
+}
+
+.imp-top {
+  padding: 0 0 4px;
+}
+
+.imp .imp-title {
+  margin: 0;
+  font: 700 clamp(24px, 4vw, 32px) / 1.3 var(--font);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.imp .imp-lead {
+  margin: 0;
+  max-width: 46ch;
+  font: 400 16px/26px var(--font);
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.imp .drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  margin-top: 24px;
+  padding: 44px 32px 40px;
+  background: var(--card);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.imp .drop:hover,
+.imp .drop.over {
+  border-color: var(--accent);
+  background: var(--sel-bg);
+}
+
+.imp .drop.over {
+  border-style: solid;
+}
+
+.imp .tile {
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s ease;
+}
+
+.imp .tile .ic {
+  width: 28px;
+  height: 28px;
+}
+
+.imp .drop:hover .tile,
+.imp .drop.over .tile {
+  transform: translateY(-4px);
+}
+
+.imp .drop-main {
+  font: 600 18px/28px var(--font);
+}
+
+.imp .drop.over .drop-main {
+  color: var(--accent-ink);
+}
+
+.imp .drop-sub {
+  margin-top: 4px;
+  font: 400 14px/22px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding: 20px;
+  background: var(--card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.imp .card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.imp .card-head h2 {
+  margin: 0;
+  font: 700 18px/28px var(--font);
+}
+
+.imp .card-body {
+  margin: 0;
+  font: 400 15px/24px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .file-ref {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: 600 14px/22px var(--font);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* What the tool itself said stays quiet and set apart: it is the tool's words, in the tool's language. */
+.imp .card-tool {
+  margin: -4px 0 0;
+  font: 400 13px/20px var(--font);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.imp .card-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.imp .badge {
+  display: inline-flex;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.imp .badge.round {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.imp .b-attn {
+  background: var(--attn-tint);
+  color: var(--attn);
+}
+
+.imp .b-work {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.imp .file {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.imp .file-words {
+  flex: 1;
+  min-width: 0;
+}
+
+.imp .file-name {
+  font: 600 15px/22px var(--font);
+  overflow-wrap: anywhere;
+}
+
+.imp .file-sub {
+  font: 400 14px/22px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .spin {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2.5px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-top-color: var(--accent);
+  animation: imp-spin 1s linear infinite;
+}
+
+@keyframes imp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imp .spin {
+    animation: none;
+  }
+
+  .imp .tile,
+  .imp .btn,
+  .imp .drop {
+    transition: none;
+  }
+}
+
+.imp .note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 auto 16px;
+  max-width: 1072px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--attn-tint);
+  color: var(--attn);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.imp .note .ic {
+  margin-top: 2px;
+}
+
+.imp .note.quiet {
+  background: var(--chip-hover);
+  color: var(--ink-2);
+}
+
+/* The review. The bar keeps the count and the two ways out in sight while the rows scroll. */
+.imp .bar-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 4px;
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.imp .bar-title {
+  font: 700 16px/24px var(--font);
+  overflow-wrap: anywhere;
+}
+
+.imp .bar-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.imp .count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--attn-tint);
+  color: var(--attn);
+  font: 600 14px/1 var(--font);
+  white-space: nowrap;
+}
+
+.imp .count.done {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+
+.imp .count.quiet {
+  background: var(--chip-hover);
+  color: var(--ink-2);
+}
+
+.imp .count .ic {
+  width: 14px;
+  height: 14px;
+}
+
+.imp .imp-body {
+  padding: 8px 0 64px;
+}
+
+.imp .cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.imp .cols.one {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.imp .colhead {
+  position: sticky;
+  top: 64px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 4px 12px;
+  background: var(--page);
+  color: var(--ink-2);
+  font: 500 14px/22px var(--font);
+  overflow-wrap: anywhere;
+}
+
+/* The two columns are one sheet of paper: its corners are round, and each row is a pair of cells. */
+.imp .paper {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.imp .pair {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.imp .cell {
+  min-width: 0;
+  padding: 14px 28px;
+  background: var(--card);
+  font: 400 16px/28px "Noto Serif KR", "Nanum Myeongjo", Batang, serif;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.imp .cell.empty {
+  background: repeating-linear-gradient(135deg, var(--empty-a) 0 8px, var(--empty-b) 8px 16px);
+  color: var(--ink-3);
+  font: 500 14px/24px var(--font);
+  display: flex;
+  align-items: center;
+}
+
+.imp .cell.chg {
+  background: var(--chg-bg);
+  border-top: 1px solid var(--chg-line);
+}
+
+.imp .cell.empty.chg {
+  background: repeating-linear-gradient(135deg, var(--chg-a) 0 8px, var(--chg-b) 8px 16px);
+}
+
+.imp .cell.flag {
+  background: var(--flag-bg);
+  border-top: 1px solid var(--flag-line);
+}
+
+.imp .cell.empty.flag {
+  background: repeating-linear-gradient(135deg, var(--flag-a) 0 8px, var(--flag-b) 8px 16px);
+}
+
+.imp .cell.gap {
+  grid-column: 1 / -1;
+  padding: 4px 28px;
+  text-align: center;
+  color: var(--ink-3);
+  font: 400 14px/20px var(--font);
+}
+
+.imp del {
+  background: var(--del-bg);
+  color: var(--del-ink);
+  text-decoration: line-through;
+}
+
+.imp ins {
+  background: var(--ins-bg);
+  color: var(--ins-ink);
+  text-decoration: none;
+}
+
+.imp .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  margin: 0 8px 6px 0;
+  border-radius: 999px;
+  background: var(--attn-tint);
+  color: var(--attn);
+  font: 500 12px/1 var(--font);
+  white-space: normal;
+}
+
+.imp .tag.n,
+.imp .tag.ok {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+
+.imp .tag .ic {
+  width: 13px;
+  height: 13px;
+}
+
+.imp .acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.imp textarea.fix {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: 400 16px/28px "Noto Serif KR", "Nanum Myeongjo", Batang, serif;
+  resize: vertical;
+}
+
+.imp .imp-changes {
+  max-width: 1120px;
+  margin: 24px auto 0;
+}
+
+.imp .imp-changes summary {
+  cursor: pointer;
+  padding: 8px 4px;
+  font: 500 14px/22px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .imp-notes {
+  max-width: 1120px;
+  margin: 24px auto 0;
+}
+
+.imp .imp-notes h3 {
+  margin: 0 0 8px;
+  font: 600 14px/22px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .imp-notes ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 14px/22px var(--font);
+  color: var(--ink-2);
+}
+
+.imp .imp-notes li {
+  padding: 4px 0;
+}
+
+/* A phone: the two columns become one, each cell under the one it is compared with. The headings are
+   not beside what they head any more, so each cell says which column it is of. */
+@media (max-width: 720px) {
+  .imp .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .imp .cols:not(.one) .colhead {
+    display: none;
+  }
+
+  .imp .colhead {
+    position: static;
+  }
+
+  .imp .cell[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font: 500 12px/18px var(--font);
+    color: var(--ink-3);
+  }
+
+  /* An empty cell is a row of its own words, so its label goes above them and not beside them. */
+  .imp .cell.empty[data-label] {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .imp .cell {
+    padding: 12px 16px;
+  }
+
+  .imp .drop {
+    padding: 32px 16px 28px;
   }
 }

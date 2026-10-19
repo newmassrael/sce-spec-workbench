@@ -17,10 +17,20 @@ import {
   parseDescribed,
   parseFigures,
   parseFindClients,
+  parseAssembledImport,
+  parseExtractionRead,
   parseHistory,
   parseHostListing,
+  parseImportAccepted,
+  parseImportedDocument,
   parseJudgment,
   parseListing,
+  parseProposalDecided,
+  parseProposalDocuments,
+  parseProposalList,
+  parseProposalRegistered,
+  parseProposalRejected,
+  parseProposalView,
   parseQueue,
   parseReadConnection,
   parseReadRevisionReport,
@@ -41,6 +51,7 @@ import {
   parseSpecSnapshot,
   sameBasis,
   type AdapterListing,
+  type AssembledImport,
   type Answers,
   type AuthPolicy,
   type Basis,
@@ -55,8 +66,17 @@ import {
   type GenerationRequest,
   type HistoryEntry,
   type HostListing,
+  type ImportedDocument,
   type Judgment,
   type Listing,
+  type Proposal,
+  type ProposalAccepted,
+  type ProposalDecision,
+  type ProposalDocuments,
+  type ProposalRegistered,
+  type ProposalView,
+  type DecisionKind,
+  type ExtractionRead,
   type Queue,
   type ReadRevisionReport,
   type RegisteredRequest,
@@ -250,6 +270,53 @@ export interface Api {
    * keep is refused with `bad-connection`; a server that does not answer is a state of the answer.
    */
   readServerStatus(serverUrl: string): Promise<ServerStatus>;
+  /**
+   * Bring a document in: keep it as an original, read it, convert it by rule, check the
+   * conversion, and register a proposal made of the four against the text the spec has now.
+   * `data` is the file's bytes as base64 and `name` the name the person knows it by. `key` makes
+   * the same press, sent again, the proposal it already made; another open proposal is refused
+   * (`active-proposal`) unless `supersede` says this one replaces it. A file the tools will not
+   * take is refused as `unreadable-original`, in the tools' own words; no tools, or tools that
+   * failed or ran out of time, are `import-tool-*`.
+   */
+  importDocument(
+    id: string,
+    name: string,
+    data: string,
+    key: string,
+    supersede?: boolean,
+  ): Promise<ImportedDocument>;
+  /** The proposals of the spec, the newest first. */
+  listProposals(id: string): Promise<Proposal[]>;
+  /** One proposal with its decisions, what is still asked, and whether the text is where it was. */
+  readProposal(id: string, proposal: string): Promise<ProposalView>;
+  /** The conversion and the check report of a proposal, as they were kept. */
+  readProposalDocuments(id: string, proposal: string): Promise<ProposalDocuments>;
+  /** An extraction as it was saved. */
+  readExtraction(id: string, digest: Revision): Promise<ExtractionRead>;
+  /** Say what the owner does with a block; `text` is the owner's words, for `correct` only. */
+  decideBlock(
+    id: string,
+    proposal: string,
+    block: string,
+    what: DecisionKind,
+    text?: string,
+  ): Promise<ProposalDecision>;
+  /**
+   * The text accepting would save, and what it changes in the spec's text now. Nothing is written,
+   * so it can be asked again after every decision.
+   */
+  assembleImport(id: string, proposal: string): Promise<AssembledImport>;
+  /**
+   * Accept: the text the decisions make becomes the spec's, in one step. Refused, and nothing
+   * written, as `moved` (the text changed since the proposal was made: `rebaseProposal` carries it
+   * forward), `undecided` (a question has no decision), `decisions-moved` or `proposal-ended`.
+   */
+  acceptImport(id: string, proposal: string): Promise<ProposalAccepted>;
+  /** Let go of the proposal. The spec's text is untouched. */
+  rejectProposal(id: string, proposal: string, note?: string): Promise<Proposal>;
+  /** Carry a proposal whose text moved forward to the text there is now, with its decisions. */
+  rebaseProposal(id: string, proposal: string): Promise<ProposalRegistered>;
 }
 
 /** A connection and the revision of it the person read: what a request is made for. */
@@ -414,6 +481,39 @@ export function apiOver(transport: Transport): Api {
     },
     async readServerStatus(serverUrl) {
       return parseServerStatus(await transport.call("read_server_status", { server_url: serverUrl }));
+    },
+    async importDocument(id, name, data, key, supersede = false) {
+      const args = { id, name, data, key, origin: "gui", ...(supersede ? { supersede: true } : {}) };
+      return parseImportedDocument(await transport.call("import_document", args));
+    },
+    async listProposals(id) {
+      return parseProposalList(await transport.call("list_proposals", { id }));
+    },
+    async readProposal(id, proposal) {
+      return parseProposalView(await transport.call("read_proposal", { id, proposal }));
+    },
+    async readProposalDocuments(id, proposal) {
+      return parseProposalDocuments(await transport.call("read_proposal_documents", { id, proposal }));
+    },
+    async readExtraction(id, digest) {
+      return parseExtractionRead(await transport.call("read_extraction", { id, digest }));
+    },
+    async decideBlock(id, proposal, block, what, text) {
+      const args = { id, proposal, block, what, ...(text === undefined ? {} : { text }) };
+      return parseProposalDecided(await transport.call("decide_block", args));
+    },
+    async assembleImport(id, proposal) {
+      return parseAssembledImport(await transport.call("assemble_import", { id, proposal }));
+    },
+    async acceptImport(id, proposal) {
+      return parseImportAccepted(await transport.call("accept_import", { id, proposal }));
+    },
+    async rejectProposal(id, proposal, note) {
+      const args = { id, proposal, ...(note === undefined ? {} : { note }) };
+      return parseProposalRejected(await transport.call("reject_proposal", args));
+    },
+    async rebaseProposal(id, proposal) {
+      return parseProposalRegistered(await transport.call("rebase_proposal", { id, proposal }), "rebase_proposal");
     },
   };
 }
