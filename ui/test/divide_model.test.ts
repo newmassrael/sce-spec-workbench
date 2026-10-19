@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { DocumentSection, Spec } from "../src/contract";
+import type { DocumentSection, RevisedDivision, Spec } from "../src/contract";
 import {
   addExisting,
   addNew,
@@ -16,6 +16,7 @@ import {
   inTheWay,
   OUT,
   pickAll,
+  placeOne,
   planOf,
   readiness,
   removeDest,
@@ -23,10 +24,14 @@ import {
   send,
   setShared,
   startDraft,
+  startRevision,
+  stillAsked,
   tally,
   togglePicked,
+  wasKey,
   type Draft,
 } from "../src/divide_model";
+import type { OriginalBlock } from "../src/review_model";
 
 const spec = (id: string, title: string): Spec => ({ id, title, created_at: "" });
 
@@ -240,5 +245,163 @@ describe("what became of a spec", () => {
     expect(inTheWay(step)).toBe("p-1");
     expect(inTheWay({ ...step, error: { kind: "bad-ledger", message: "x", detail: {} } })).toBeNull();
     expect(inTheWay({ ...step, error: null })).toBeNull();
+  });
+});
+
+// ---- a revised document ----------------------------------------------------------------------------
+
+const block = (id: string, text: string, kind = "paragraph"): OriginalBlock => ({ id, kind, text, howRead: "text-layer" });
+
+const NEW_BLOCKS = [
+  block("b1", "Lamp", "heading"),
+  block("b2", "The lamp is on."),
+  block("b3", "Fan", "heading"),
+  block("b4", "The fan runs above 45 degrees."),
+  block("b5", "The fan has a manual switch."),
+];
+const OLD_BLOCKS = [
+  block("b1", "Lamp", "heading"),
+  block("b2", "The lamp is on."),
+  block("b3", "Fan", "heading"),
+  block("b4", "The fan runs above 40 degrees."),
+  block("b6", "The fan is silent in sleep mode."),
+];
+
+function carried(over: Partial<RevisedDivision["carried"]> = {}, ledger?: unknown): RevisedDivision {
+  return {
+    intake: {
+      id: "new", title: "t", key: "k", origin: "gui", created_at: "", member: "m",
+      original: "a".repeat(64), extraction: "b".repeat(64),
+    },
+    created: true,
+    carried: {
+      carried: 3,
+      changed: [{ block: "b4", from_block: "b4", was: [{ to: { kind: "new", spec: null, title: "Fan" }, reason: null }] }],
+      fresh: ["b5"],
+      gone: [{ block: "b6", was: [{ to: { kind: "new", spec: null, title: "Fan" }, reason: null }] }],
+      destinations: [
+        { kind: "spec", spec: "lamp-1", title: null },
+        { kind: "new", spec: null, title: "Fan" },
+        { kind: "left-out", spec: null, title: null },
+      ],
+      ...over,
+    },
+    ledger: JSON.stringify(
+      ledger ?? {
+        v: 1,
+        allotments: [
+          { to: { kind: "spec", spec: "lamp-1" }, blocks: ["b1", "b2"] },
+          { to: { kind: "new", title: "Fan" }, blocks: ["b3"] },
+        ],
+      },
+    ),
+    saved: true,
+    not_carried: [],
+  };
+}
+
+describe("a revised document", () => {
+  const begin = (revised = carried()) => startRevision(revised, [spec("lamp-1", "Lamp control")], NEW_BLOCKS, OLD_BLOCKS);
+
+  it("puts what was carried where it went, names a spec by its title, and places nothing that was asked", () => {
+    const { draft, revision } = begin();
+
+    expect(draft.dests.map((d) => (d.kind === "spec" ? d.spec.title : d.title))).toEqual(["Lamp control", "Fan"]);
+    expect(draft.to).toEqual({ b1: ["d0"], b2: ["d0"], b3: ["d1"] });
+    // The paragraphs of the revision are the ones carried and the ones asked, in the document's order.
+    expect(revision.paragraphs.map((p) => p.id)).toEqual(["b1", "b2", "b3", "b4", "b5"]);
+    expect(revision.paragraphs.every((p) => p.blocks === 1)).toBe(true);
+    expect(stillAsked(draft, revision)).toBe(2);
+  });
+
+  it("keeps the words of a paragraph that changed, the old words, and the heading a new one stands under", () => {
+    const { revision } = begin();
+
+    expect(revision.words.get("b4")).toBe("The fan runs above 45 degrees.");
+    expect(revision.oldWords.get("b4")).toBe("The fan runs above 40 degrees.");
+    expect(revision.oldWords.get("b6")).toBe("The fan is silent in sleep mode.");
+    expect(revision.under.get("b5")).toBe("Fan");
+    expect(revision.under.get("b1")).toBe("Lamp");
+  });
+
+  it("is not ready until every paragraph asked about is placed, and then is", () => {
+    const { draft, revision } = begin();
+    const sections = revision.paragraphs;
+
+    expect(readiness(draft, sections)).toEqual({ kind: "unplaced", paragraphs: 2 });
+    const once = placeOne(draft, "b4", "d1");
+    expect(stillAsked(once, revision)).toBe(1);
+    expect(readiness(once, sections)).toEqual({ kind: "unplaced", paragraphs: 1 });
+    const both = placeOne(once, "b5", OUT);
+    expect(stillAsked(both, revision)).toBe(0);
+    expect(readiness(both, sections)).toEqual({ kind: "ready", specs: 2 });
+  });
+
+  it("places a paragraph at one place, so that placing it again moves it", () => {
+    const { draft } = begin();
+
+    expect(placeOne(placeOne(draft, "b4", "d1"), "b4", "d0").to["b4"]).toEqual(["d0"]);
+  });
+
+  it("points at the destination the old paragraph had been at, and not at one that is gone", () => {
+    const { draft, revision } = begin();
+    const [changed] = revision.changed;
+    if (changed === undefined) throw new Error("nothing changed");
+
+    expect(wasKey(draft, changed.was)).toBe("d1");
+    expect(wasKey(removeDest(draft, "d1"), changed.was)).toBeNull();
+    expect(wasKey(draft, [{ to: { kind: "left-out", spec: null, title: null }, reason: "x" }])).toBe(OUT);
+  });
+
+  it("plans by paragraph id, in the document's order, and leaves out a spec that was given nothing", () => {
+    const { draft, revision } = begin();
+    let placed = placeOne(placeOne(draft, "b4", "d0"), "b5", "d0");
+    placed = removeDest(placed, "d1");
+
+    // b3 went only to the spec that was removed, so it is placed nowhere now: asking for the plan of a draft
+    // that is not ready is the caller's mistake, but the plan does not name a spec it gives nothing.
+    const plan = planOf(placed, revision.paragraphs, "blocks");
+    expect(plan).toEqual([{ to: { kind: "spec", spec: "lamp-1" }, blocks: ["b1", "b2", "b4", "b5"] }]);
+    const kept = planOf(placeOne(draft, "b4", "d1"), revision.paragraphs, "blocks");
+    expect(kept.map((p) => p.blocks)).toEqual([["b1", "b2"], ["b3", "b4"]]);
+  });
+
+  it("keeps the reason a paragraph was left out for, one allotment for each reason", () => {
+    const revised = carried(
+      {
+        changed: [],
+        fresh: [],
+        gone: [],
+        carried: 4,
+        destinations: [
+          { kind: "spec", spec: "lamp-1", title: null },
+          { kind: "left-out", spec: null, title: null },
+        ],
+      },
+      {
+        v: 1,
+        allotments: [
+          { to: { kind: "spec", spec: "lamp-1" }, blocks: ["b3"] },
+          { to: { kind: "left-out" }, reason: "the cover", blocks: ["b1"] },
+          { to: { kind: "left-out" }, reason: "not a requirement", blocks: ["b2"] },
+        ],
+      },
+    );
+    const { draft, revision } = begin(revised);
+
+    expect(readiness(draft, revision.paragraphs)).toEqual({ kind: "ready", specs: 1 });
+    expect(planOf(draft, revision.paragraphs, "blocks", (id) => revision.reasons.get(id) ?? "")).toEqual([
+      { to: { kind: "spec", spec: "lamp-1" }, blocks: ["b3"] },
+      { to: { kind: "left-out" }, reason: "the cover", blocks: ["b1"] },
+      { to: { kind: "left-out" }, reason: "not a requirement", blocks: ["b2"] },
+    ]);
+  });
+
+  it("says a spec it does not know by its id, and keeps a spec to be made as one", () => {
+    const { draft } = startRevision(carried(), [], NEW_BLOCKS, OLD_BLOCKS);
+
+    const first = draft.dests[0];
+    expect(first?.kind === "spec" ? first.spec.title : null).toBe("lamp-1");
+    expect(draft.dests[1]?.kind).toBe("new");
   });
 });

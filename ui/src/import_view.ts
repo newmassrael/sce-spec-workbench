@@ -9,7 +9,7 @@
 // Nothing here keeps state or asks the core: each function is given what to draw and what to call when
 // a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
 
-import type { DecisionKind, DocumentSection, ReadDocument } from "./contract";
+import type { DecisionKind, DocumentSection, Intake, ReadDocument } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
@@ -184,6 +184,10 @@ export interface PartsOptions {
   readonly onBack: () => void;
   /** Send the parts to several specs instead of bringing them into this one. */
   readonly onDivide: () => void;
+  /** The documents that were divided, which this one may be a new version of. */
+  readonly divided: readonly Intake[];
+  /** This document is a new version of the divided one with this id: carry its division. */
+  readonly onCarry: (intake: string) => void;
 }
 
 /** What a part is called when the document gave it no title: a place in it. */
@@ -258,6 +262,22 @@ export function partsCard(options: PartsOptions): HTMLElement {
       h("button", { type: "button", class: "mini", onclick: options.onAll }, say("impPartsAll")),
       h("button", { type: "button", class: "mini", onclick: options.onNone }, say("impPartsNone")),
       h("button", { type: "button", class: "mini", "data-focus": "parts:divide", onclick: options.onDivide }, say("impPartsDivide")),
+      options.divided.length === 0
+        ? null
+        : h(
+            "select",
+            {
+              class: "mini part-carry",
+              "aria-label": say("impPartsCarry"),
+              "data-focus": "parts:carry",
+              onchange: (event) => {
+                const chosen = (event.target as HTMLSelectElement).value;
+                if (chosen !== "") options.onCarry(chosen);
+              },
+            },
+            h("option", { value: "", selected: true }, say("impPartsCarry")),
+            ...options.divided.map((intake) => h("option", { value: intake.id }, intake.title)),
+          ),
       h(
         "span",
         { class: "parts-totals", role: "status" },

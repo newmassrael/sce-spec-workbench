@@ -35,6 +35,9 @@ const DOCUMENT: &str =
 
 const TWO_FUNCTIONS: &str = "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 30 seconds.\n\n# Fan\n\nThe fan runs above 40 degrees.\n";
 
+/// The same document as the customer sent it again: the timing changed and a line was added to the fan.
+const REVISED_FUNCTIONS: &str = "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 60 seconds.\n\n# Fan\n\nThe fan runs above 40 degrees.\n\nThe fan stops below 30 degrees.\n";
+
 fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
@@ -299,6 +302,45 @@ fn replies() -> Value {
         ask("read_division", json!({"id": intake_id})),
     );
 
+    // A revised document: the division of another intake carried to the second version of its document. The
+    // ledger of that intake is a plan saved and not walked (it leaves the fan unplaced), so that it names a spec
+    // to be made by its title and not by an id, and what the carry says does not change between runs.
+    let again = ask("create_spec", json!({"title": "Revised source"}));
+    let again_id = again["id"].as_str().unwrap().to_string();
+    let first = ask(
+        "read_document",
+        json!({"id": again_id, "name": "functions.md", "data": base64(TWO_FUNCTIONS.as_bytes())}),
+    );
+    let begun = ask(
+        "divide_document",
+        json!({
+            "id": again_id, "original": first["original"], "extraction": first["extraction"],
+            "title": "functions", "key": "div-2", "origin": "gui",
+        }),
+    );
+    let begun_id = begun["intake"]["id"].as_str().unwrap().to_string();
+    ask(
+        "confirm_division",
+        json!({
+            "id": begun_id, "origin": "gui",
+            "destinations": [{"to": {"kind": "new", "title": "Lamp control"}, "sections": ["s1", "s2"]}],
+        }),
+    );
+    let second = ask(
+        "read_document",
+        json!({"id": again_id, "name": "functions-2.md", "data": base64(REVISED_FUNCTIONS.as_bytes())}),
+    );
+    let revised = ask(
+        "revise_division",
+        json!({
+            "intake": begun_id, "id": again_id,
+            "original": second["original"], "extraction": second["extraction"],
+            "title": "functions, second version", "key": "div-3", "origin": "gui",
+        }),
+    );
+    let revised_id = revised["intake"]["id"].as_str().unwrap().to_string();
+    answers.insert("revise_division".into(), revised);
+
     for command in IMPORT_COMMANDS {
         assert!(
             answers.keys().any(|name| name == command),
@@ -315,6 +357,9 @@ fn replies() -> Value {
     name_the_unstable(&mut document, &spec_id, "<spec-id>");
     name_the_unstable(&mut document, &source_id, "<source-spec-id>");
     name_the_unstable(&mut document, &intake_id, "<intake-id>");
+    name_the_unstable(&mut document, &again_id, "<revised-source-spec-id>");
+    name_the_unstable(&mut document, &begun_id, "<first-version-intake-id>");
+    name_the_unstable(&mut document, &revised_id, "<second-version-intake-id>");
     for (number, (made_spec, made_proposal)) in made.iter().enumerate() {
         name_the_unstable(
             &mut document,

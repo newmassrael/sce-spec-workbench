@@ -11,6 +11,8 @@
 //! - [`divide_document`] starts the division of a document a spec already holds (the person has read it for
 //!   one spec and found it holds several), and says the parts the owner can send to specs.
 //! - [`read_division`] says the same of an intake that is already there, and where each spec has come.
+//! - [`revise_division`] carries a division to a revised document: what is word for word the same goes where it
+//!   went, and what changed, is new or is gone is named, for the owner to place.
 //! - [`confirm_division`] saves the owner's plan as the ledger (when one is given), has SCE count it, and
 //!   when SCE finds nothing left without a place walks the specs: makes the spec to be made, copies the
 //!   document into it, and registers a proposal that is its part of the division.
@@ -124,6 +126,163 @@ pub(crate) fn read_division<C: Clock>(
         "division": view,
         "outline": outline_of(context, &text)?,
         "not_carried": not_carried(&text),
+    }))
+}
+
+/// What `revise_division` is given.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReviseDivision {
+    /// The intake of the document that was divided, whose ledger is carried.
+    intake: String,
+    /// The spec that holds the revised document, read as `read_document` reads one.
+    id: String,
+    original: String,
+    extraction: String,
+    /// What the revised document is called.
+    title: String,
+    /// What makes the same press sent again the intake it already made.
+    key: String,
+    origin: String,
+}
+
+/// The ledger as the specs it was made for are now: a spec that was to be made, and was made, is said as
+/// that spec. The tools match paragraphs and carry destinations as they are written, and a title that has
+/// become a spec is a spec the revision is for; a title never made stays a spec to be made.
+fn ledger_of_specs_made(ledger_text: &str, bindings: &Value) -> Result<String, CommandError> {
+    let mut ledger: Value = serde_json::from_str(ledger_text)
+        .map_err(|e| failed(format!("the ledger the intake holds is not JSON: {e}")))?;
+    let made: BTreeMap<&str, &str> = bindings
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|b| Some((b["title"].as_str()?, b["spec"].as_str()?)))
+                .collect()
+        })
+        .unwrap_or_default();
+    for allotment in ledger["allotments"].as_array_mut().into_iter().flatten() {
+        let title = match (
+            allotment["to"]["kind"].as_str(),
+            allotment["to"]["title"].as_str(),
+        ) {
+            (Some("new"), Some(title)) => title.to_string(),
+            _ => continue,
+        };
+        if let Some(spec) = made.get(title.as_str()) {
+            allotment["to"] = json!({ "kind": "spec", "spec": spec });
+        }
+    }
+    Ok(ledger.to_string())
+}
+
+/// Carry the division of a document to its revision: the revised document is kept beside the specs as an
+/// intake of its own, and its first ledger is the draft the tools make of the old one, with the paragraphs
+/// whose words are the same placed where they were and everything else asked.
+///
+/// The draft is saved as the new intake's ledger only when it has none, so that pressing this again does not
+/// take the owner's saved work back to the draft. What is asked is said by id, as the tools say it: the
+/// paragraphs that changed, the ones that are new, and the ones that are gone.
+pub(crate) fn revise_division<C: Clock>(
+    context: &Context<'_, C>,
+    args: ReviseDivision,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    let old = ask(context, "read_intake", json!({ "id": args.intake }))?;
+    if old["ledger"].is_null() {
+        return Err(refuse(
+            "no-division",
+            "the intake has no ledger yet, so there is nothing to carry to a revision",
+            Value::Null,
+        ));
+    }
+    let old_ledger = ledger_of_specs_made(&text_of(&old["ledger"], "text")?, &old["bindings"])?;
+    let old_extraction = text_of(
+        &ask(
+            context,
+            "read_intake_extraction",
+            json!({ "id": args.intake }),
+        )?,
+        "text",
+    )?;
+
+    let started = ask(
+        context,
+        "start_intake_from_spec",
+        json!({
+            "id": args.id, "original": args.original, "extraction": args.extraction,
+            "key": args.key, "origin": args.origin, "title": args.title,
+        }),
+    )?;
+    let intake = text_of(&started["intake"], "id")?;
+    let new_extraction = text_of(
+        &ask(context, "read_intake_extraction", json!({ "id": intake }))?,
+        "text",
+    )?;
+
+    let scratch = Scratch::new()?;
+    let dir = scratch.path(".");
+    scratch.write("old.json", old_extraction.as_bytes())?;
+    scratch.write("new.json", new_extraction.as_bytes())?;
+    scratch.write("ledger.json", old_ledger.as_bytes())?;
+    let carry = tools.run_to_success(
+        &dir,
+        &[
+            "carry-ledger",
+            "--old-extraction",
+            "old.json",
+            "--old-ledger",
+            "ledger.json",
+            "--new-extraction",
+            "new.json",
+            "--out",
+            "draft.json",
+            "--json",
+        ],
+        tools.quick_limit(),
+        "bad-division",
+        &[2],
+    )?;
+    let carried: Value = serde_json::from_str(carry.stdout.trim())
+        .map_err(|e| failed(format!("`carry-ledger` did not say what it carried: {e}")))?;
+    let draft = scratch.read("draft.json")?;
+
+    // The draft leaves what was asked unplaced, so its count is "not complete"; the count is kept with it.
+    let counted = tools.run(
+        &dir,
+        &[
+            "check-ledger",
+            "--extraction",
+            "new.json",
+            "--ledger",
+            "draft.json",
+            "--json",
+        ],
+        tools.quick_limit(),
+    )?;
+    if !matches!(counted.code, 0 | 1) {
+        return Err(failed(format!(
+            "`check-ledger` ended with {}: {}",
+            counted.code,
+            first_words(&counted.stderr, &counted.stdout)
+        )));
+    }
+    let view = ask(context, "read_intake", json!({ "id": intake }))?;
+    let saved = view["ledger"].is_null();
+    if saved {
+        ask(
+            context,
+            "save_ledger",
+            json!({ "id": intake, "ledger": draft, "report": counted.stdout.trim() }),
+        )?;
+    }
+    Ok(json!({
+        "intake": started["intake"],
+        "created": started["created"],
+        "carried": carried,
+        "ledger": draft,
+        "saved": saved,
+        "not_carried": not_carried(&new_extraction),
     }))
 }
 

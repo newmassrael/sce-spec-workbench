@@ -18,6 +18,7 @@ import {
   addExisting,
   addNew,
   pickAll,
+  placeOne,
   planOf,
   removeDest,
   renameNew,
@@ -26,8 +27,17 @@ import {
   startDraft,
   togglePicked,
   type Draft,
+  type Revision,
 } from "./divide_model";
-import { divideBar, divideDone, divideEditor, type EditorOptions } from "./divide_view";
+import {
+  divideBar,
+  divideDone,
+  divideEditor,
+  revisionEditor,
+  type BarOptions,
+  type EditorOptions,
+  type RevisionOptions,
+} from "./divide_view";
 import { h } from "./dom";
 import type { Say } from "./import_view";
 
@@ -59,6 +69,8 @@ interface Held {
   readonly intake: string;
   readonly sections: readonly DocumentSection[];
   readonly draft: Draft;
+  /** Set when the document is a revised one, carried from a division: what is placed is a paragraph. */
+  readonly revision: Revision | null;
 }
 
 type Phase =
@@ -81,7 +93,25 @@ export class DivideFlow {
   /** Begin with a document the core has kept as an intake: the spec that holds it is the first destination. */
   start(origin: Spec, name: string, divided: DividedDocument): void {
     this.ticket += 1;
-    this.held = { name, intake: divided.intake.id, sections: divided.outline.sections, draft: startDraft(origin) };
+    this.held = {
+      name,
+      intake: divided.intake.id,
+      sections: divided.outline.sections,
+      draft: startDraft(origin),
+      revision: null,
+    };
+    this.phase = { kind: "edit" };
+    this.busy = false;
+    this.notice = null;
+  }
+
+  /**
+   * Begin with a revised document whose division was carried: the paragraphs that are the same are placed
+   * where they were, and the ones that changed or are new are asked about.
+   */
+  startRevision(name: string, intake: string, draft: Draft, revision: Revision): void {
+    this.ticket += 1;
+    this.held = { name, intake, sections: revision.paragraphs, draft, revision };
     this.phase = { kind: "edit" };
     this.busy = false;
     this.notice = null;
@@ -107,6 +137,31 @@ export class DivideFlow {
     this.notice = null;
     if (focus !== undefined) this.host.focus(focus);
     this.host.redraw();
+  }
+
+  private barOptions(held: Held): BarOptions {
+    return {
+      say: this.host.t,
+      draft: held.draft,
+      sections: held.sections,
+      busy: this.busy,
+      onConfirm: () => void this.confirm(true, false),
+    };
+  }
+
+  private revisionOptions(held: Held, revision: Revision): RevisionOptions {
+    return {
+      say: this.host.t,
+      name: held.name,
+      revision,
+      draft: held.draft,
+      busy: this.busy,
+      onBack: () => this.host.back(),
+      onPlace: (block, key) => this.change((draft) => placeOne(draft, block, key), `dvplace:${block}:${key}`),
+      onRename: (key, title) => this.rename(key, title),
+      onRemove: (key) => this.change((draft) => removeDest(draft, key)),
+      onConfirm: () => void this.confirm(true, false),
+    };
   }
 
   private editorOptions(held: Held): EditorOptions {
@@ -151,7 +206,7 @@ export class DivideFlow {
     for (const element of this.root?.querySelectorAll(`[data-dest="${key}"]`) ?? []) {
       element.textContent = title;
     }
-    const next = divideBar(this.editorOptions(this.held));
+    const next = divideBar(this.barOptions(this.held));
     this.bar?.replaceWith(next);
     this.bar = next;
   }
@@ -169,7 +224,12 @@ export class DivideFlow {
     this.notice = null;
     this.host.redraw();
     try {
-      const plan = withPlan ? planOf(held.draft, held.sections) : undefined;
+      const revision = held.revision;
+      const plan = !withPlan
+        ? undefined
+        : revision === null
+          ? planOf(held.draft, held.sections)
+          : planOf(held.draft, held.sections, "blocks", (id) => revision.reasons.get(id) ?? "");
       const result = await this.host.api.confirmDivision(held.intake, plan, supersede);
       if (ticket !== this.ticket) return;
       this.busy = false;
@@ -225,9 +285,11 @@ export class DivideFlow {
         }),
       );
     }
-    const options = this.editorOptions(held);
-    const bar = divideBar(options);
-    const editor = divideEditor(options, bar);
+    const bar = divideBar(this.barOptions(held));
+    const editor =
+      held.revision === null
+        ? divideEditor(this.editorOptions(held), bar)
+        : revisionEditor(this.revisionOptions(held, held.revision), bar);
     this.root = editor;
     this.bar = bar;
     return h("div", {}, banner, editor);

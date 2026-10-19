@@ -54,6 +54,7 @@ pub const COMMANDS: &[&str] = &[
     "import_selection",
     "divide_document",
     "read_division",
+    "revise_division",
     "confirm_division",
     "assemble_import",
     "accept_import",
@@ -95,7 +96,14 @@ pub const COMMANDS: &[&str] = &[
 /// it and, when no paragraph is left without a place, walks the specs and proposes each one's part. They
 /// are added, so no caller of 5 misreads one; the version moves because a screen that divides is held to a
 /// core that answers it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 6;
+///
+/// 7: `revise_division`, which carries a division to a revised document (ADR 0040 of SCE): the revised
+/// document is kept as an intake of its own, and its first ledger is the draft the tools make of the old one,
+/// with the paragraphs whose words are the same placed where they were and the rest named for the owner. A
+/// destination of `confirm_division` may also give paragraphs by id (`blocks`), which is how a revision is
+/// divided. They are added, so no caller of 6 misreads one; the version moves because a screen that carries a
+/// division is held to a core that answers it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 7;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -138,6 +146,7 @@ pub const IMPORT_COMMANDS: &[&str] = &[
     "import_selection",
     "divide_document",
     "read_division",
+    "revise_division",
     "confirm_division",
     "assemble_import",
     "accept_import",
@@ -512,6 +521,7 @@ fn call_import<C: Clock>(
         "import_selection" => import_host::import_selection(context, arguments(args)?),
         "divide_document" => divide_host::divide_document(context, arguments(args)?),
         "read_division" => divide_host::read_division(context, arguments(args)?),
+        "revise_division" => divide_host::revise_division(context, arguments(args)?),
         "confirm_division" => divide_host::confirm_division(context, arguments(args)?),
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),

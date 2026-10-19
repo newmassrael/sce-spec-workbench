@@ -66,6 +66,7 @@ import {
   parseReadAnswers,
   parseReadConnection,
   parseReadDocument,
+  parseRevisedDivision,
   parseBound,
   parseConfirmedDivision,
   parseDividedDocument,
@@ -120,6 +121,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   assemble_import: parseAssembledImport,
   accept_import: parseImportAccepted,
   divide_document: parseDividedDocument,
+  revise_division: parseRevisedDivision,
   read_division: parseDivision,
   confirm_division: parseConfirmedDivision,
   start_intake: (v) => parseIntakeStarted(v, "start_intake"),
@@ -762,6 +764,35 @@ describe("the replies the core gives", () => {
     const read = parseDivision(importReplies.answers["read_division"]);
     expect(read.division.ledger?.entry.complete).toBe(true);
     expect(read.division.bindings.map((b) => b.title)).toEqual(["Fan control", "Lamp control"]);
+  });
+
+  it("say what carrying a division to a revised document placed, and what it asks, by paragraph id", () => {
+    const revised = parseRevisedDivision(importReplies.answers["revise_division"]);
+
+    expect(revised).toMatchObject({ created: true, saved: true });
+    expect(revised.carried.carried).toBe(5);
+    expect(revised.carried.changed.map((c) => [c.block, c.from_block])).toEqual([["b0004", "b0004"]]);
+    expect(revised.carried.changed[0]?.was[0]?.to).toMatchObject({ kind: "new", title: "Lamp control" });
+    expect(revised.carried.fresh).toEqual(["b0007"]);
+    expect(revised.carried.gone).toEqual([]);
+    expect(revised.carried.destinations).toEqual([{ kind: "new", spec: null, title: "Lamp control" }]);
+    // The draft is the ledger as the tools wrote it, whose paragraphs the screen reads.
+    expect(JSON.parse(revised.ledger).allotments[0].blocks).toEqual(["b0001", "b0002", "b0003"]);
+  });
+
+  it("read a ledger that leaves a part out, which names no spec and no title", () => {
+    const view = structuredClone(replies.answers["read_intake"]) as {
+      destinations: Array<Record<string, unknown>>;
+    };
+    view.destinations.push({ to: { kind: "left-out" }, reason: "the cover", blocks: 2, spec_missing: false });
+
+    const read = parseIntakeRead(view);
+
+    expect(read.destinations.at(-1)).toMatchObject({ to: { kind: "left-out", spec: null, title: null }, reason: "the cover" });
+    expect(() => {
+      view.destinations.push({ to: { kind: "somewhere" }, reason: "", blocks: 1, spec_missing: false });
+      parseIntakeRead(view);
+    }).toThrow(/kind/);
   });
 
   it("refuse a document by the word the screen branches on, and carry what it needs to say it", () => {

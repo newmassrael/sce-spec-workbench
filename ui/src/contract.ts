@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 6;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 7;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2471,6 +2471,98 @@ export function parseDivision(value: unknown): Division {
   };
 }
 
+/** Where an old paragraph had been placed: a spec, a spec to be made, or out of the document. */
+export interface WherePlaced {
+  to: { kind: "spec" | "new" | "left-out"; spec: string | null; title: string | null };
+  /** Why it was left out, when it was. */
+  reason: string | null;
+}
+
+/** A new paragraph that stands where an old one with no twin stood: pointed at, and never carried. */
+export interface ChangedParagraph {
+  block: string;
+  from_block: string;
+  was: WherePlaced[];
+}
+
+/** An old paragraph that nothing in the revised document stands for. */
+export interface GoneParagraph {
+  block: string;
+  was: WherePlaced[];
+}
+
+/** What carrying the ledger to a revised document placed and what it asks, by paragraph id. */
+export interface CarriedLedger {
+  /** How many paragraphs are word for word the same and went where they went. */
+  carried: number;
+  changed: ChangedParagraph[];
+  fresh: string[];
+  gone: GoneParagraph[];
+  /** The destinations of the old ledger, kept even when nothing was carried to one. */
+  destinations: StepDestination[];
+}
+
+/** `revise_division`: the revised document kept as an intake, and the draft ledger carried to it. */
+export interface RevisedDivision {
+  intake: Intake;
+  created: boolean;
+  carried: CarriedLedger;
+  /** The draft ledger as the tools wrote it: which paragraph went to which destination. */
+  ledger: string;
+  /** Whether the draft was saved as the intake's ledger: `false` when the intake had one already. */
+  saved: boolean;
+  not_carried: NotCarried[];
+}
+
+function parseWherePlaced(value: unknown, where: string): WherePlaced {
+  const r = record(value, where);
+  const to = record(r["to"], `${where}.to`);
+  return {
+    to: {
+      kind: oneOf(to, "kind", `${where}.to`, ["spec", "new", "left-out"] as const),
+      spec: nullableText(to, "spec", `${where}.to`),
+      title: nullableText(to, "title", `${where}.to`),
+    },
+    reason: nullableText(r, "reason", where),
+  };
+}
+
+/** `revise_division`. */
+export function parseRevisedDivision(value: unknown): RevisedDivision {
+  const where = "revise_division";
+  const r = record(value, where);
+  const carried = record(r["carried"], `${where}.carried`);
+  const at = `${where}.carried`;
+  if (typeof r["saved"] !== "boolean") throw new ContractError(`${where}.saved`, "true or false");
+  return {
+    intake: parseIntake(r["intake"], `${where}.intake`),
+    created: created(r, where),
+    carried: {
+      carried: count(carried, "carried", at),
+      changed: list(carried, "changed", at).map((c, i) => {
+        const item = record(c, `${at}.changed[${i}]`);
+        return {
+          block: text(item, "block", `${at}.changed[${i}]`),
+          from_block: text(item, "from_block", `${at}.changed[${i}]`),
+          was: list(item, "was", `${at}.changed[${i}]`).map((w, k) => parseWherePlaced(w, `${at}.changed[${i}].was[${k}]`)),
+        };
+      }),
+      fresh: stringList(carried, "fresh", at),
+      gone: list(carried, "gone", at).map((g, i) => {
+        const item = record(g, `${at}.gone[${i}]`);
+        return {
+          block: text(item, "block", `${at}.gone[${i}]`),
+          was: list(item, "was", `${at}.gone[${i}]`).map((w, k) => parseWherePlaced(w, `${at}.gone[${i}].was[${k}]`)),
+        };
+      }),
+      destinations: list(carried, "destinations", at).map((d, i) => parseStepDestination(d, `${at}.destinations[${i}]`)),
+    },
+    ledger: text(r, "ledger", where),
+    saved: r["saved"],
+    not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+  };
+}
+
 function parseOutline(value: unknown, where: string): DocumentOutline {
   const outline = record(value, where);
   return {
@@ -2508,9 +2600,9 @@ export interface LedgerCount {
 }
 
 const STEP_STATES = ["proposed", "failed"] as const;
-const DESTINATION_KINDS = ["spec", "new"] as const;
+const DESTINATION_KINDS = ["spec", "new", "left-out"] as const;
 
-/** Where a part of the document goes, as the ledger says it. */
+/** Where a part of the document goes, as the ledger says it: a spec, a spec to be made, or out of the document. */
 export interface StepDestination {
   kind: (typeof DESTINATION_KINDS)[number];
   /** The spec's id, for a spec that is there. */
@@ -2551,7 +2643,10 @@ export interface PlannedAllotment {
     | { kind: "left-out" };
   /** Why the parts are left out; only for what is left out, and allowed to be empty. */
   reason?: string;
-  sections: string[];
+  /** Parts of the outline, each taken as its own paragraphs: how a first division is made. */
+  sections?: string[];
+  /** Paragraphs by id: how a revised document is divided, where the outline is no longer what is placed. */
+  blocks?: string[];
 }
 
 function numberList(value: Obj, key: string, where: string): number[] {

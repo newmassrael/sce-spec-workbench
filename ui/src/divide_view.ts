@@ -19,13 +19,17 @@ import {
   OUT,
   readiness,
   stepName,
+  stillAsked,
   tally,
+  wasKey,
   type Destination,
   type Draft,
   type Readiness,
+  type Revision,
 } from "./divide_model";
 import { h, type Child } from "./dom";
 import { depthOf, partName, type Say } from "./import_view";
+import { wordDiff } from "./review_model";
 
 function icon(name: string): HTMLElement {
   return h("span", { class: `ic ic-${name}`, "aria-hidden": "true" });
@@ -75,8 +79,11 @@ function whyWords(say: Say, draft: Draft, ready: Readiness): string {
   }
 }
 
+/** What the bar at the foot of the screen needs, which a first division and a revision share. */
+export type BarOptions = Pick<EditorOptions, "say" | "draft" | "sections" | "busy" | "onConfirm">;
+
 /** The meter and the sentence beside the button, and the button. */
-export function divideBar(options: EditorOptions): HTMLElement {
+export function divideBar(options: BarOptions): HTMLElement {
   const { say, draft, sections } = options;
   const counts = tally(draft, sections);
   const ready = readiness(draft, sections);
@@ -204,7 +211,11 @@ function bulk(options: EditorOptions, parts: number, paragraphs: number): HTMLEl
   );
 }
 
-function destination(options: EditorOptions, dest: Destination, paragraphs: number): HTMLElement {
+function destination(
+  options: Pick<EditorOptions, "say" | "draft" | "onRename" | "onRemove">,
+  dest: Destination,
+  paragraphs: number,
+): HTMLElement {
   const { say, draft } = options;
   const name =
     dest.kind === "new"
@@ -345,6 +356,182 @@ export function divideEditor(options: EditorOptions, bar: HTMLElement): HTMLElem
         ),
       ),
       side(options),
+    ),
+    bar,
+  );
+}
+
+// ---- a revised document ----------------------------------------------------------------------------
+
+export interface RevisionOptions {
+  readonly say: Say;
+  readonly name: string;
+  readonly revision: Revision;
+  readonly draft: Draft;
+  readonly busy: boolean;
+  readonly onBack: () => void;
+  /** Place one paragraph at a destination, or leave it out (`OUT`). */
+  readonly onPlace: (block: string, key: string) => void;
+  readonly onRename: (key: string, title: string) => void;
+  readonly onRemove: (key: string) => void;
+  readonly onConfirm: () => void;
+}
+
+/** Where an old paragraph had been, in words: the spec, or that it was left out. */
+function wasWords(say: Say, draft: Draft, was: ReadonlyArray<{ to: { kind: string; spec: string | null; title: string | null } }>): Child {
+  const place = was[0];
+  if (place === undefined) return null;
+  if (place.to.kind === "left-out") return h("span", { class: "dv-pill out" }, say("dvOut"));
+  const dest = draft.dests.find((d) =>
+    d.kind === "spec" ? place.to.kind === "spec" && d.spec.id === place.to.spec : place.to.kind === "new" && d.title === place.to.title,
+  );
+  const key = dest?.key;
+  return h("span", { class: key === undefined ? "dv-pill" : pillClass(draft, key), "data-dest": key }, dest === undefined ? (place.to.spec ?? place.to.title ?? "") : nameOf(dest));
+}
+
+/** The buttons that place a paragraph that is asked about: each destination, and out. */
+function placeButtons(options: RevisionOptions, block: string, hint: string | null): HTMLElement {
+  const { say, draft } = options;
+  const here = draft.to[block] ?? [];
+  const button = (key: string, label: string, dest?: string): HTMLElement =>
+    h(
+      "button",
+      {
+        type: "button",
+        class: here.includes(key) ? "mini pri" : hint === key && here.length === 0 ? "mini hint" : "mini",
+        "aria-pressed": here.includes(key) ? "true" : "false",
+        "data-focus": `dvplace:${block}:${key}`,
+        "data-dest": dest,
+        onclick: () => options.onPlace(block, key),
+      },
+      label,
+    );
+  return h(
+    "div",
+    { class: "acts" },
+    ...draft.dests.map((dest) => button(dest.key, nameOf(dest), dest.key)),
+    button(OUT, say("dvOut")),
+  );
+}
+
+function askedRow(options: RevisionOptions, block: string, before: Child, context: Child, body: Child, hint: string | null): HTMLElement {
+  const { draft } = options;
+  const placed = (draft.to[block] ?? []).length > 0;
+  return h(
+    "div",
+    { class: `dv-changed${placed ? "" : " todo"}` },
+    h("div", { class: "dv-ctx" }, before, context),
+    h("div", { class: "tx" }, body),
+    placeButtons(options, block, hint),
+  );
+}
+
+/** The screen where a division is carried to a revised document: what is the same came, and the rest is asked. */
+export function revisionEditor(options: RevisionOptions, bar: HTMLElement): HTMLElement {
+  const { say, draft, revision } = options;
+  const left = stillAsked(draft, revision);
+  const changed = revision.changed.map((item) => {
+    const old = revision.oldWords.get(item.from_block) ?? "";
+    const now = revision.words.get(item.block) ?? "";
+    const pieces = wordDiff(old, now).map((piece) =>
+      piece.kind === "same" ? piece.text : h(piece.kind === "del" ? "del" : "ins", {}, piece.text),
+    );
+    return askedRow(
+      options,
+      item.block,
+      wasWords(say, draft, item.was),
+      say("dvRevWasHere"),
+      h("span", {}, ...pieces),
+      wasKey(draft, item.was),
+    );
+  });
+  const fresh = revision.fresh.map((id) => {
+    const heading = revision.under.get(id) ?? "";
+    return askedRow(
+      options,
+      id,
+      h("span", { class: "dv-pill none" }, say("dvNone")),
+      heading === "" ? say("dvRevAtStart") : say("dvRevUnder", { heading }),
+      revision.words.get(id) ?? "",
+      null,
+    );
+  });
+  const gone = revision.gone.map((item) =>
+    h(
+      "div",
+      { class: "dv-changed" },
+      h("div", { class: "dv-ctx" }, wasWords(say, draft, item.was), say("dvRevWasHere")),
+      h("div", { class: "tx old" }, revision.oldWords.get(item.block) ?? ""),
+    ),
+  );
+  const section = (id: string, title: string, rows: HTMLElement[], note: string | null): Child =>
+    rows.length === 0
+      ? null
+      : h(
+          "section",
+          { "aria-labelledby": id },
+          h("h2", { id, class: "dv-sub" }, title),
+          h("div", { class: "dv-list" }, ...rows),
+          note === null ? null : h("p", { class: "dv-meta dv-note" }, note),
+        );
+  const counts = tally(draft, revision.paragraphs);
+  const nothingAsked = revision.changed.length === 0 && revision.fresh.length === 0;
+  return h(
+    "div",
+    { class: "dv" },
+    h(
+      "div",
+      { class: "bar-top" },
+      h(
+        "button",
+        { type: "button", class: "btn quiet icon", "aria-label": say("dvBack"), "data-focus": "dv:back", onclick: options.onBack },
+        icon("back"),
+      ),
+      h("h2", { class: "bar-title", tabindex: "-1", "data-focus": "stage" }, say("dvRevTitle", { name: options.name })),
+      left > 0
+        ? h("span", { class: "count" }, say("dvRevLeft", { n: String(left) }))
+        : h("span", { class: "count done" }, icon("check"), say("dvCountDone")),
+    ),
+    h("p", { class: "dv-lead" }, nothingAsked ? say("dvRevLeadSame") : say("dvRevLead")),
+    h(
+      "div",
+      { class: "dv-sums" },
+      h("span", { class: "dv-pill out" }, say("dvRevCarried", { n: String(revision.carried) })),
+      h("span", { class: revision.changed.length > 0 ? "dv-pill none" : "dv-pill out" }, say("dvRevChanged", { n: String(revision.changed.length) })),
+      h("span", { class: revision.fresh.length > 0 ? "dv-pill none" : "dv-pill out" }, say("dvRevFresh", { n: String(revision.fresh.length) })),
+      h("span", { class: "dv-pill out" }, say("dvRevGone", { n: String(revision.gone.length) })),
+    ),
+    h(
+      "div",
+      { class: "dv-wrap dv-rev" },
+      h(
+        "div",
+        { class: "dv-revs" },
+        section("dv-r-changed", say("dvRevChangedTitle", { n: String(revision.changed.length) }), changed, say("dvRevChangedNote")),
+        section("dv-r-fresh", say("dvRevFreshTitle", { n: String(revision.fresh.length) }), fresh, null),
+        section("dv-r-gone", say("dvRevGoneTitle", { n: String(revision.gone.length) }), gone, say("dvRevGoneNote")),
+      ),
+      h(
+        "aside",
+        { class: "dv-side", "aria-label": say("dvSpecs") },
+        h(
+          "div",
+          { class: "dv-card" },
+          h("h2", {}, say("dvSpecs")),
+          ...draft.dests.map((dest) => destination(options, dest, counts.perDest[dest.key] ?? 0)),
+        ),
+        h(
+          "div",
+          { class: "dv-card" },
+          h("h2", {}, say("dvOutTitle")),
+          h(
+            "div",
+            { class: "dv-dest" },
+            h("span", { class: "nm" }, h("span", { class: "dv-pill out" }, say("dvOut")), h("span", { class: "kd" }, say("dvOutNote"))),
+            h("span", { class: "ct" }, say("dvCount", { n: String(counts.out) })),
+          ),
+        ),
+      ),
     ),
     bar,
   );

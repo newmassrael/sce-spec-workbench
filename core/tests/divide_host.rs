@@ -346,6 +346,190 @@ fn a_spec_that_cannot_take_its_part_is_said_and_the_others_go_on() {
     assert_eq!(finished["failed"], 0, "{finished}");
 }
 
+// ------------------------------------------------------------------------------ a revised document
+
+/// The document as the customer sent it again, with one requirement changed (the fan runs when the room is
+/// hot, not warm) and one paragraph added at the end.
+const REVISED: &str = "# Lamp\n\nThe lamp turns on when the switch is pressed.\n\n# Fan\n\nThe fan runs when the room is hot.\n\n# Glossary\n\nA switch is a push button.\n\nA fan is a rotor.\n";
+
+impl Rig {
+    /// The revised document read into the spec that held the first, and its division carried from `begun`.
+    fn revise(&self, begun: &Begun, key: &str) -> Value {
+        let read = self.ask(
+            "read_document",
+            json!({"id": begun.spec, "name": "room-2.md", "data": base64(REVISED.as_bytes())}),
+        );
+        self.ask(
+            "revise_division",
+            json!({
+                "intake": begun.intake,
+                "id": begun.spec,
+                "original": read["original"],
+                "extraction": read["extraction"],
+                "title": "room, second version",
+                "key": key,
+                "origin": "gui",
+            }),
+        )
+    }
+}
+
+fn ids(value: &Value) -> Vec<&str> {
+    value
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["block"].as_str().or_else(|| item.as_str()).unwrap())
+        .collect()
+}
+
+#[test]
+fn a_revision_carries_what_is_the_same_and_names_what_changed_is_new_or_is_gone() {
+    let rig = Rig::real("divide-revise");
+    let begun = rig.begin("press-1");
+    rig.confirm(&begun, Some(whole_plan(&begun)), false);
+
+    let revised = rig.revise(&begun, "press-2");
+
+    assert_eq!(revised["created"], true, "{revised}");
+    assert_eq!(revised["saved"], true, "{revised}");
+    let carried = &revised["carried"];
+    // Five of the six old paragraphs (headings count) are word for word the same; the fan's requirement
+    // changed and is pointed at, and the paragraph added at the end is new. Nothing was removed.
+    assert_eq!(carried["carried"], 5, "{carried}");
+    assert_eq!(ids(&carried["changed"]), ["b0004"], "{carried}");
+    assert_eq!(carried["changed"][0]["from_block"], "b0004");
+    assert_eq!(ids(&carried["fresh"]), ["b0007"], "{carried}");
+    assert!(carried["gone"].as_array().unwrap().is_empty(), "{carried}");
+
+    // The draft is the new intake's ledger as it stands, and SCE counts it as not complete.
+    let new_intake = revised["intake"]["id"].as_str().unwrap();
+    assert_ne!(new_intake, begun.intake);
+    let read = rig.ask("read_division", json!({"id": new_intake}));
+    assert_eq!(read["division"]["ledger"]["entry"]["complete"], false);
+    let walked = rig.ask(
+        "confirm_division",
+        json!({"id": new_intake, "origin": "gui"}),
+    );
+    assert_eq!(walked["complete"], false, "{walked}");
+    assert_eq!(walked["steps"].as_array().unwrap().len(), 0);
+    let unplaced: Vec<&str> = walked["report"]["unplaced"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b.as_str().unwrap())
+        .collect();
+    assert_eq!(unplaced, ["b0004", "b0007"]);
+}
+
+#[test]
+fn a_spec_that_was_made_for_a_title_is_the_spec_a_revision_carries_to() {
+    let rig = Rig::real("divide-revise-made");
+    let begun = rig.begin("press-1");
+    let first = rig.confirm(&begun, Some(whole_plan(&begun)), false);
+    let fan_spec = step_of(&first, "Fan control")["spec"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let revised = rig.revise(&begun, "press-2");
+
+    // The destinations of the carry are specs by id: the one that held the document and the one made for the
+    // fan, and not a title that has already become a spec.
+    let destinations = revised["carried"]["destinations"].as_array().unwrap();
+    assert!(
+        destinations
+            .iter()
+            .any(|d| d["kind"] == "spec" && d["spec"] == fan_spec.as_str()),
+        "{destinations:?}"
+    );
+    assert!(
+        destinations.iter().all(|d| d["kind"] != "new"),
+        "{destinations:?}"
+    );
+}
+
+#[test]
+fn a_revision_is_finished_by_naming_paragraphs_and_each_spec_gets_its_own_part() {
+    let rig = Rig::real("divide-revise-finish");
+    let begun = rig.begin("press-1");
+    let first = rig.confirm(&begun, Some(whole_plan(&begun)), false);
+    let fan_spec = step_of(&first, "Fan control")["spec"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let revised = rig.revise(&begun, "press-2");
+    let new_intake = revised["intake"]["id"].as_str().unwrap().to_string();
+
+    // The owner places the changed paragraph with the fan and the new one out, by paragraph. A spec that
+    // waits on the first version's check is replaced.
+    let plan = json!([
+        {"to": {"kind": "spec", "spec": begun.spec}, "blocks": ["b0001", "b0002"]},
+        {"to": {"kind": "spec", "spec": fan_spec}, "blocks": ["b0003", "b0004"]},
+        {"to": {"kind": "left-out"}, "reason": "definitions", "blocks": ["b0005", "b0006", "b0007"]},
+    ]);
+    let finished = rig.ask(
+        "confirm_division",
+        json!({"id": new_intake, "destinations": plan, "supersede": true, "origin": "gui"}),
+    );
+
+    assert_eq!(finished["complete"], true, "{finished}");
+    assert_eq!(finished["proposed"], 2, "{finished}");
+    assert_eq!(finished["failed"], 0, "{finished}");
+    // What a spec waited on under the first version is ended, and the one that waits is of the revision.
+    let waiting: Vec<Value> = rig
+        .proposals(&fan_spec)
+        .into_iter()
+        .filter(|p| p["state"] == "pending")
+        .collect();
+    assert_eq!(waiting.len(), 1, "{waiting:?}");
+}
+
+#[test]
+fn a_division_with_no_ledger_has_nothing_to_carry_to_a_revision() {
+    let rig = Rig::real("divide-revise-none");
+    let begun = rig.begin("press-1");
+    let read = rig.ask(
+        "read_document",
+        json!({"id": begun.spec, "name": "room-2.md", "data": base64(REVISED.as_bytes())}),
+    );
+
+    let error = rig.refused(
+        "revise_division",
+        json!({
+            "intake": begun.intake, "id": begun.spec,
+            "original": read["original"], "extraction": read["extraction"],
+            "title": "room 2", "key": "press-2", "origin": "gui",
+        }),
+    );
+
+    assert_eq!(error.kind, "no-division");
+}
+
+#[test]
+fn pressing_revise_again_does_not_take_the_owners_saved_work_back_to_the_draft() {
+    let rig = Rig::real("divide-revise-twice");
+    let begun = rig.begin("press-1");
+    rig.confirm(&begun, Some(whole_plan(&begun)), false);
+    let revised = rig.revise(&begun, "press-2");
+    let new_intake = revised["intake"]["id"].as_str().unwrap().to_string();
+    let plan = json!([
+        {"to": {"kind": "spec", "spec": begun.spec}, "blocks": ["b0001", "b0002", "b0003", "b0004"]},
+        {"to": {"kind": "left-out"}, "reason": "all else", "blocks": ["b0005", "b0006", "b0007"]},
+    ]);
+    rig.ask(
+        "confirm_division",
+        json!({"id": new_intake, "destinations": plan, "supersede": true, "origin": "gui"}),
+    );
+
+    let again = rig.revise(&begun, "press-2");
+
+    assert_eq!(again["created"], false, "{again}");
+    assert_eq!(again["saved"], false, "{again}");
+    let read = rig.ask("read_division", json!({"id": new_intake}));
+    assert_eq!(read["division"]["ledger"]["entry"]["complete"], true);
+}
+
 #[test]
 fn a_division_of_an_intake_that_is_not_there_is_refused() {
     let rig = Rig::real("divide-unknown");

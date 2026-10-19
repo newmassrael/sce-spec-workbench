@@ -467,6 +467,53 @@
         ],
         "v": 1
       }
+    },
+    "revise_division": {
+      "carried": {
+        "carried": 5,
+        "changed": [
+          {
+            "block": "b0004",
+            "from_block": "b0004",
+            "was": [
+              {
+                "to": {
+                  "kind": "new",
+                  "title": "Lamp control"
+                }
+              }
+            ]
+          }
+        ],
+        "destinations": [
+          {
+            "kind": "new",
+            "title": "Lamp control"
+          }
+        ],
+        "extraction": "fcbbb15beb2fef03e5cfc6106f26da6a161b82f61c7686d0fba668ab855a8448",
+        "fresh": [
+          "b0007"
+        ],
+        "gone": [],
+        "ledger": "143bb54941994cd82e0d6a5ca6eec79b49548686f03ae2a3f759c90974388fd9",
+        "old_extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
+        "v": 1
+      },
+      "created": true,
+      "intake": {
+        "created_at": "2026-10-03T09:00:00Z",
+        "extraction": "fcbbb15beb2fef03e5cfc6106f26da6a161b82f61c7686d0fba668ab855a8448",
+        "id": "<second-version-intake-id>",
+        "key": "div-3",
+        "member": "functions-2.md",
+        "origin": "gui",
+        "original": "feb92b2a7ec85a02624e7f8b9c5930760fe3cd5dfef804daca315ab1dc347818",
+        "title": "functions, second version"
+      },
+      "ledger": "{\"allotments\":[{\"blocks\":[\"b0001\",\"b0002\",\"b0003\"],\"to\":{\"kind\":\"new\",\"title\":\"Lamp control\"}}],\"extraction\":\"fcbbb15beb2fef03e5cfc6106f26da6a161b82f61c7686d0fba668ab855a8448\",\"v\":1}",
+      "not_carried": [],
+      "saved": true
     }
   },
   "refusals": {

@@ -12,7 +12,8 @@
 
 import type { Api } from "./api";
 import { CommandFailure } from "./ipc";
-import type { AssembledImport, DecisionKind, ReadDocument, Spec } from "./contract";
+import type { AssembledImport, DecisionKind, Intake, ReadDocument, Spec } from "./contract";
+import { startRevision } from "./divide_model";
 import { DivideFlow } from "./divide_flow";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
@@ -67,6 +68,9 @@ export interface ImportHost {
     | "importSelection"
     | "divideDocument"
     | "confirmDivision"
+    | "listIntakes"
+    | "readIntakeExtraction"
+    | "reviseDivision"
     | "listSpecs"
     | "listProposals"
     | "readProposal"
@@ -136,6 +140,8 @@ export class ImportFlow {
 
   /** The division of a document among specs, which the parts screen leads to. */
   private readonly divide: DivideFlow;
+  /** The documents that were divided, as last asked when a document was read. */
+  private divided: readonly Intake[] = [];
 
   constructor(private readonly host: ImportHost) {
     this.divide = new DivideFlow({
@@ -343,6 +349,10 @@ export class ImportFlow {
       }
       this.chosen = allSections(doc);
       this.replacing = supersede;
+      // The documents that were divided: this one may be a new version of one of them. Not knowing them is
+      // not a reason to stop the choosing, which has no use for them.
+      this.divided = await this.host.api.listIntakes().catch(() => []);
+      if (ticket !== this.ticket) return;
       this.enter({ kind: "parts", name, spec, doc });
       this.host.redraw();
     } catch (error) {
@@ -423,6 +433,44 @@ export class ImportFlow {
       );
       if (ticket !== this.ticket) return;
       this.divide.start(stage.spec, stage.name, divided);
+      this.enter({ kind: "divide", name: stage.name, spec: stage.spec, doc: stage.doc });
+      this.host.redraw();
+    } catch (error) {
+      if (ticket !== this.ticket) return;
+      this.fail(error);
+    }
+  }
+
+  /**
+   * The owner says the document is a new version of one that was divided: the core keeps it as an intake and
+   * carries the old division to it, and what is the same is placed where it was while the rest is asked about.
+   */
+  private async startCarry(from: string): Promise<void> {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    const ticket = ++this.ticket;
+    this.press += 1;
+    try {
+      const revised = await this.host.api.reviseDivision(
+        from,
+        stage.spec.id,
+        stage.doc,
+        titleOf(stage.name, this.host.t("impNewSpecFallback")),
+        importKey(this.host.now(), this.press),
+      );
+      const [now, before, listing] = await Promise.all([
+        this.host.api.readIntakeExtraction(revised.intake.id),
+        this.host.api.readIntakeExtraction(from),
+        this.host.api.listSpecs(),
+      ]);
+      if (ticket !== this.ticket) return;
+      const { draft, revision } = startRevision(
+        revised,
+        listing.specs,
+        parseExtraction(now.text).blocks,
+        parseExtraction(before.text).blocks,
+      );
+      this.divide.startRevision(stage.name, revised.intake.id, draft, revision);
       this.enter({ kind: "divide", name: stage.name, spec: stage.spec, doc: stage.doc });
       this.host.redraw();
     } catch (error) {
@@ -639,6 +687,8 @@ export class ImportFlow {
                 onBring: () => void this.bringChosen(),
                 onBack: () => void this.backFromParts(),
                 onDivide: () => void this.startDivision(),
+                divided: this.divided,
+                onCarry: (intake) => void this.startCarry(intake),
               })
             : stage.kind === "divide"
               ? this.divide.view()

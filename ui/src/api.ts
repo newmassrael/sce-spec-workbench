@@ -35,7 +35,10 @@ import {
   parseReadConnection,
   parseConfirmedDivision,
   parseDividedDocument,
+  parseIntakeExtraction,
+  parseIntakeList,
   parseReadDocument,
+  parseRevisedDivision,
   parseReadRevisionReport,
   parseRegisteredRequest,
   parseRequestCandidateTexts,
@@ -76,7 +79,10 @@ import {
   type ProposalAccepted,
   type ConfirmedDivision,
   type DividedDocument,
+  type Intake,
+  type IntakeExtraction,
   type PlannedAllotment,
+  type RevisedDivision,
   type ReadDocument,
   type ProposalDecision,
   type ProposalDocuments,
@@ -318,6 +324,18 @@ export interface Api {
    * intake.
    */
   divideDocument(id: string, document: ReadDocument, title: string, key: string): Promise<DividedDocument>;
+  /** The documents beside the specs that are divided or being divided, the newest first. */
+  listIntakes(): Promise<Intake[]>;
+  /** The extraction an intake holds, as text and by its digest. */
+  readIntakeExtraction(intake: string): Promise<IntakeExtraction>;
+  /**
+   * Carry the division of `intake` to a revised document that spec `id` holds (read as `readDocument` reads
+   * one): the revised document is kept as an intake of its own, and its first ledger is the draft the tools
+   * make, with the paragraphs whose words are the same placed where they were and the rest named. The draft
+   * does not replace a ledger the new intake has already. Refused as `no-division` when `intake` has no
+   * ledger yet.
+   */
+  reviseDivision(intake: string, id: string, document: ReadDocument, title: string, key: string): Promise<RevisedDivision>;
   /**
    * Make the owner's plan the intake's ledger and have SCE count it. A plan that leaves a paragraph without
    * a place is answered with the count and nothing is made (`complete: false`). One that leaves none walks
@@ -549,6 +567,16 @@ export function apiOver(transport: Transport): Api {
     async divideDocument(id, document, title, key) {
       const args = { id, original: document.original, extraction: document.extraction, title, key, origin: "gui" };
       return parseDividedDocument(await transport.call("divide_document", args));
+    },
+    async listIntakes() {
+      return parseIntakeList(await transport.call("list_intakes"));
+    },
+    async readIntakeExtraction(intake) {
+      return parseIntakeExtraction(await transport.call("read_intake_extraction", { id: intake }));
+    },
+    async reviseDivision(intake, id, document, title, key) {
+      const args = { intake, id, original: document.original, extraction: document.extraction, title, key, origin: "gui" };
+      return parseRevisedDivision(await transport.call("revise_division", args));
     },
     async confirmDivision(intake, destinations, supersede = false) {
       const args = {

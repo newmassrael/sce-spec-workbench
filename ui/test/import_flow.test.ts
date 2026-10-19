@@ -19,6 +19,8 @@ import type {
   DivisionStep,
   DocumentSection,
   ImportedDocument,
+  Intake,
+  IntakeExtraction,
   LedgerCount,
   Listing,
   PlannedAllotment,
@@ -29,6 +31,7 @@ import type {
   ProposalDocuments,
   ProposalRegistered,
   ProposalView,
+  RevisedDivision,
   Spec,
 } from "../src/contract";
 import { ImportFlow, type ImportHost } from "../src/import_flow";
@@ -77,6 +80,79 @@ function section(id: string, title: string, parent: string | null = null): Docum
   };
 }
 
+/** A document that was divided, and the new version of it the customer sent: one requirement changed, one added. */
+const OLD_VERSION = {
+  v: 1,
+  extractor: "plain",
+  extractor_version: "1",
+  member: "functions.md",
+  blocks: [
+    { id: "b1", kind: "heading", text: "Lamp" },
+    { id: "b2", kind: "paragraph", text: "The lamp is on." },
+    { id: "b3", kind: "heading", text: "Fan" },
+    { id: "b4", kind: "paragraph", text: "The fan runs above 40 degrees." },
+    { id: "b5", kind: "paragraph", text: "The fan can be switched off by hand." },
+    { id: "b6", kind: "paragraph", text: "The fan is silent in sleep mode." },
+  ],
+  not_carried: [],
+};
+
+const NEW_VERSION = {
+  ...OLD_VERSION,
+  member: "functions-2.md",
+  blocks: [
+    { id: "b1", kind: "heading", text: "Lamp" },
+    { id: "b2", kind: "paragraph", text: "The lamp is on." },
+    { id: "b3", kind: "heading", text: "Fan" },
+    { id: "b4", kind: "paragraph", text: "The fan runs above 45 degrees." },
+    { id: "b5", kind: "paragraph", text: "The fan has a manual switch." },
+  ],
+};
+
+const OLD_INTAKE: Intake = {
+  id: "intake-old",
+  title: "functions",
+  key: "ui-1",
+  origin: "gui",
+  created_at: "2026-10-19T00:00:00Z",
+  member: "functions.md",
+  original: hex(1),
+  extraction: hex(2),
+};
+
+/**
+ * What carrying the division of `OLD_VERSION` to `NEW_VERSION` says: the lamp (the heading and its sentence)
+ * went to the spec that held the document, the fan's heading to a spec to be made; the fan's requirement changed
+ * and one sentence is new, and the old sentence about sleep mode is gone.
+ */
+function carriedOver(document: { original: string; extraction: string }): RevisedDivision {
+  return {
+    intake: { ...OLD_INTAKE, id: "intake-new", title: "functions, second version", member: "functions-2.md", original: document.original, extraction: document.extraction },
+    created: true,
+    carried: {
+      carried: 3,
+      changed: [{ block: "b4", from_block: "b4", was: [{ to: { kind: "new", spec: null, title: "Fan" }, reason: null }] }],
+      fresh: ["b5"],
+      gone: [{ block: "b6", was: [{ to: { kind: "new", spec: null, title: "Fan" }, reason: null }] }],
+      destinations: [
+        { kind: "spec", spec: "spec-1", title: null },
+        { kind: "new", spec: null, title: "Fan" },
+        { kind: "left-out", spec: null, title: null },
+      ],
+    },
+    ledger: JSON.stringify({
+      v: 1,
+      extraction: document.extraction,
+      allotments: [
+        { to: { kind: "spec", spec: "spec-1" }, blocks: ["b1", "b2"] },
+        { to: { kind: "new", title: "Fan" }, blocks: ["b3"] },
+      ],
+    }),
+    saved: true,
+    not_carried: [],
+  };
+}
+
 /** SCE's count of a ledger that leaves nothing without a place. */
 function fullCount(): LedgerCount {
   return { complete: true, words: 6, in_specs: 6, left_out: 0, unplaced: [], contradicting: [], shared: [], empty: [] };
@@ -112,6 +188,10 @@ class FakeCore {
   readWith: (() => Promise<ReadDocument>) | null = null;
   /** The proposals made of part of a document. */
   readonly partial = new Set<string>();
+  /** The documents that were divided, which a document read now may be a new version of. */
+  intakes: Intake[] = [];
+  /** What the next `revise_division` answers instead of the default carry. */
+  reviseWith: (() => RevisedDivision) | null = null;
   /** What the next `confirm_division` answers instead of a proposal for each spec of the plan. */
   confirmWith: ((plan: readonly PlannedAllotment[] | undefined) => ConfirmedDivision) | null = null;
   /** The specs a division made, by the title they were made with. */
@@ -259,6 +339,19 @@ class FakeCore {
       });
       return { complete: true, report: fullCount(), proposed: steps.length, failed: 0, steps };
     },
+    listIntakes: async (): Promise<Intake[]> => {
+      this.record("list_intakes");
+      return this.intakes;
+    },
+    readIntakeExtraction: async (id): Promise<IntakeExtraction> => {
+      this.record("read_intake_extraction", id);
+      return { digest: hex(3), text: JSON.stringify(id === "intake-old" ? OLD_VERSION : NEW_VERSION) };
+    },
+    reviseDivision: async (intake, id, document, title, key): Promise<RevisedDivision> => {
+      this.record("revise_division", intake, id, title, key);
+      if (this.reviseWith !== null) return this.reviseWith();
+      return carriedOver({ ...document });
+    },
     listSpecs: async (): Promise<Listing> => {
       this.record("list_specs");
       return { specs: this.listed, unreadable: [] };
@@ -378,6 +471,9 @@ class FakeCore {
     | "importSelection"
     | "divideDocument"
     | "confirmDivision"
+    | "listIntakes"
+    | "readIntakeExtraction"
+    | "reviseDivision"
     | "listSpecs"
     | "listProposals"
     | "readProposal"
@@ -1609,6 +1705,161 @@ describe("dividing a document among specs", () => {
     await settle();
 
     expect(r.core.callsOf("remove_spec")).toEqual([]);
+  });
+});
+
+/** A document read that may be a new version of one that was divided, and the person says it is. */
+async function toCarry(): Promise<void> {
+  r.core.sections = twoFunctions();
+  r.core.intakes = [OLD_INTAKE];
+  r.flow.open({ kind: "new" });
+  await chooseFile(r, file("functions-2.md", "# Lamp\n"));
+  const select = r.root.querySelector<HTMLSelectElement>(".part-carry");
+  if (select === null) throw new Error(`no choice of an earlier version in: ${r.root.textContent}`);
+  select.value = "intake-old";
+  select.dispatchEvent(new Event("change"));
+  await settle();
+}
+
+function placeButton(root: HTMLElement, block: string, key: string): HTMLButtonElement {
+  const found = root.querySelector<HTMLButtonElement>(`[data-focus="dvplace:${block}:${key}"]`);
+  if (found === null) throw new Error(`no button for ${block} to ${key} in: ${root.textContent}`);
+  return found;
+}
+
+describe("carrying a division to a revised document", () => {
+  it("offers to carry only when a document was divided before", async () => {
+    r.core.sections = twoFunctions();
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("functions-2.md", "# Lamp\n"));
+    expect(r.root.querySelector(".part-carry")).toBeNull();
+
+    r.flow.open({ kind: "new" });
+    r.core.intakes = [OLD_INTAKE];
+    await chooseFile(r, file("functions-2.md", "# Lamp\n"));
+    const options = [...r.root.querySelectorAll(".part-carry option")].map((o) => o.textContent);
+    expect(options).toEqual([say("impPartsCarry"), "functions"]);
+  });
+
+  it("carries what is the same and asks about the rest, with the changed words shown in the paragraph", async () => {
+    await toCarry();
+
+    expect(r.core.callsOf("revise_division")).toEqual([["intake-old", "spec-1", "functions-2", expect.any(String)]]);
+    expect(r.root.textContent).toContain(say("dvRevTitle", { name: "functions-2.md" }));
+    expect(r.root.textContent).toContain(say("dvRevLeft", { n: "2" }));
+    expect(r.root.textContent).toContain(say("dvRevCarried", { n: "3" }));
+    expect(r.root.textContent).toContain(say("dvRevChanged", { n: "1" }));
+    expect(r.root.textContent).toContain(say("dvRevFresh", { n: "1" }));
+    expect(r.root.textContent).toContain(say("dvRevGone", { n: "1" }));
+    // The words that changed are marked in the paragraph, and the ones that did not are not.
+    expect(r.root.querySelector(".dv-changed del")?.textContent).toBe("40");
+    expect(r.root.querySelector(".dv-changed ins")?.textContent).toBe("45");
+    // What is gone is shown, struck through, and not asked about.
+    expect(r.root.querySelector(".tx.old")?.textContent).toBe("The fan is silent in sleep mode.");
+    expect(placeButton(r.root, "b4", "d0")).toBeDefined();
+    expect(r.root.querySelector('[data-focus="dvplace:b6:d0"]')).toBeNull();
+  });
+
+  it("points at where the changed paragraph had been, and places nothing on its own", async () => {
+    await toCarry();
+
+    // The fan is where it was, drawn as the likely answer; nothing is pressed.
+    expect(placeButton(r.root, "b4", "d1").getAttribute("class")).toContain("hint");
+    expect(placeButton(r.root, "b4", "d1").getAttribute("aria-pressed")).toBe("false");
+    expect(placeButton(r.root, "b4", "d0").getAttribute("class")).not.toContain("hint");
+    const confirm = r.root.querySelector<HTMLButtonElement>('[data-focus="dv:confirm"]');
+    expect(confirm?.getAttribute("aria-disabled")).toBe("true");
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyUnplaced", { n: "2" }));
+  });
+
+  it("is ready when each paragraph asked about is placed, and sends the paragraphs by id, leaving out last", async () => {
+    await toCarry();
+
+    placeButton(r.root, "b4", "d1").click();
+    expect(r.root.textContent).toContain(say("dvRevLeft", { n: "1" }));
+    expect(placeButton(r.root, "b4", "d1").getAttribute("aria-pressed")).toBe("true");
+    placeButton(r.root, "b5", "out").click();
+    expect(r.root.textContent).toContain(say("dvCountDone"));
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:confirm"]')?.click();
+    await settle();
+
+    const [intake, plan, supersede] = r.core.callsOf("confirm_division")[0] as [string, PlannedAllotment[], boolean];
+    expect(intake).toBe("intake-new");
+    expect(supersede).toBe(false);
+    expect(plan).toEqual([
+      { to: { kind: "spec", spec: "spec-1" }, blocks: ["b1", "b2"] },
+      { to: { kind: "new", title: "Fan" }, blocks: ["b3", "b4"] },
+      { to: { kind: "left-out" }, reason: "", blocks: ["b5"] },
+    ]);
+    expect(r.root.textContent).toContain(say("dvDoneTitle", { name: "functions-2.md" }));
+  });
+
+  it("changes its mind: a paragraph placed again moves, and is not in two places", async () => {
+    await toCarry();
+
+    placeButton(r.root, "b4", "d1").click();
+    placeButton(r.root, "b4", "d0").click();
+    placeButton(r.root, "b5", "d0").click();
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:confirm"]')?.click();
+    await settle();
+
+    const [, plan] = r.core.callsOf("confirm_division")[0] as [string, PlannedAllotment[]];
+    // The fan keeps only the heading it was carried, and the lamp has both paragraphs asked about.
+    expect(plan).toEqual([
+      { to: { kind: "spec", spec: "spec-1" }, blocks: ["b1", "b2", "b4", "b5"] },
+      { to: { kind: "new", title: "Fan" }, blocks: ["b3"] },
+    ]);
+  });
+
+  it("keeps the reason a paragraph was left out for, and leaves out nothing asked of nobody", async () => {
+    r.core.reviseWith = () => {
+      const answer = carriedOver({ original: hex(1), extraction: hex(9) });
+      return {
+        ...answer,
+        carried: {
+          ...answer.carried,
+          carried: 4,
+          changed: [],
+          fresh: [],
+          gone: [],
+          destinations: [
+            { kind: "spec", spec: "spec-1", title: null },
+            { kind: "left-out", spec: null, title: null },
+          ],
+        },
+        ledger: JSON.stringify({
+          v: 1,
+          extraction: hex(9),
+          allotments: [
+            { to: { kind: "spec", spec: "spec-1" }, blocks: ["b2", "b3", "b4"] },
+            { to: { kind: "left-out" }, reason: "the cover", blocks: ["b1"] },
+          ],
+        }),
+      };
+    };
+    await toCarry();
+
+    // Nothing changed: the screen says so, and the button is on at once.
+    expect(r.root.textContent).toContain(say("dvRevLeadSame"));
+    expect(r.root.querySelector("#dv-why")?.textContent).toBe(say("dvWhyReady"));
+    r.root.querySelector<HTMLButtonElement>('[data-focus="dv:confirm"]')?.click();
+    await settle();
+
+    const [, plan] = r.core.callsOf("confirm_division")[0] as [string, PlannedAllotment[]];
+    expect(plan).toEqual([
+      { to: { kind: "spec", spec: "spec-1" }, blocks: ["b2", "b3", "b4"] },
+      { to: { kind: "left-out" }, reason: "the cover", blocks: ["b1"] },
+    ]);
+  });
+
+  it("says why the core would not carry, and stays on the parts", async () => {
+    r.core.reviseWith = () => {
+      throw new CommandFailure("no-division", "the intake has no ledger yet, so there is nothing to carry to a revision");
+    };
+    await toCarry();
+
+    expect(r.root.querySelector(".banner-error")?.textContent).toContain("nothing to carry");
+    expect(r.root.textContent).toContain(say("impPartsLead"));
   });
 });
 

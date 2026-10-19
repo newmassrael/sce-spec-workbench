@@ -1973,6 +1973,104 @@ textarea:focus-visible {
   color: var(--ink-2);
 }
 
+/* A division carried to a revised document: what changed, what is new and what is gone, a paragraph to a row. */
+.imp .dv-sums {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 28px 0;
+}
+
+.imp .dv-revs {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.imp .dv-sub {
+  margin: 0 0 8px;
+  font: 700 16px/24px var(--font);
+  color: var(--ink);
+}
+
+.imp .dv-note {
+  margin: 8px 0 0;
+}
+
+.imp .dv-changed {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.imp .dv-changed:first-child {
+  border-top: 0;
+}
+
+.imp .dv-changed.todo {
+  background: var(--flag-bg);
+}
+
+.imp .dv-changed .tx {
+  font: 400 16px/28px "Noto Serif KR", serif;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.imp .dv-changed .tx.old {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.imp .dv-changed del {
+  color: var(--del-ink);
+  background: var(--del-bg);
+  text-decoration: line-through;
+}
+
+.imp .dv-changed ins {
+  color: var(--ins-ink);
+  background: var(--ins-bg);
+  text-decoration: none;
+}
+
+.imp .dv-ctx {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  font: 400 13px/20px var(--font);
+  color: var(--ink-3);
+}
+
+.imp .dv-changed .acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.imp .mini.hint {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.imp .part-carry {
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .imp .dv-sums {
+    padding: 12px 16px 0;
+  }
+
+}
+
 .imp .dv-panel .imp-actions {
   margin-top: 20px;
 }

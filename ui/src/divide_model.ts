@@ -11,12 +11,17 @@
 // own (a heading with nothing under it) has nothing to place, and is not counted as unplaced.
 
 import type {
+  ChangedParagraph,
   ConfirmedDivision,
   DivisionStep,
   DocumentSection,
+  GoneParagraph,
   PlannedAllotment,
+  RevisedDivision,
   Spec,
+  WherePlaced,
 } from "./contract";
+import type { OriginalBlock } from "./review_model";
 
 /** The key of what is left out, among the keys of the destinations. */
 export const OUT = "out";
@@ -182,19 +187,193 @@ export function readiness(draft: Draft, sections: readonly DocumentSection[]): R
 }
 
 /**
- * The plan sent when the owner confirms: each destination with the parts it is given in the document's
- * order, then what is left out. Only a draft that is ready has one.
+ * What a plan names: the parts of the outline (a first division), or paragraphs by id (a revised document,
+ * where what is placed is a paragraph and the outline is not what the owner works with).
  */
-export function planOf(draft: Draft, sections: readonly DocumentSection[]): PlannedAllotment[] {
+export type PlanBy = "sections" | "blocks";
+
+/**
+ * The plan sent when the owner confirms: each destination that is given something, with what it is given in
+ * the document's order, then what is left out. A destination given nothing is left out of the plan, since a
+ * ledger has no allotment of nothing; the screen does not let a plan with one be confirmed in the first place,
+ * and a revision has destinations that received nothing and are dropped here. What is left out is grouped by
+ * the reason it was left out for, as the ledger keeps it. Only a draft that is ready has one.
+ */
+export function planOf(
+  draft: Draft,
+  sections: readonly DocumentSection[],
+  by: PlanBy = "sections",
+  reasonOf: (id: string) => string = () => "",
+): PlannedAllotment[] {
   const partsOf = (key: string): string[] =>
     sections.filter((s) => placed(draft, s.id).includes(key)).map((s) => s.id);
-  const plan: PlannedAllotment[] = draft.dests.map((dest) => ({
-    to: dest.kind === "spec" ? { kind: "spec", spec: dest.spec.id } : { kind: "new", title: dest.title.trim() },
-    sections: partsOf(dest.key),
-  }));
-  const out = partsOf(OUT);
-  if (out.length > 0) plan.push({ to: { kind: "left-out" }, reason: "", sections: out });
+  const named = (ids: string[]): Pick<PlannedAllotment, "sections" | "blocks"> =>
+    by === "blocks" ? { blocks: ids } : { sections: ids };
+  const plan: PlannedAllotment[] = [];
+  for (const dest of draft.dests) {
+    const ids = partsOf(dest.key);
+    if (ids.length === 0 && by === "blocks") continue;
+    plan.push({
+      to: dest.kind === "spec" ? { kind: "spec", spec: dest.spec.id } : { kind: "new", title: dest.title.trim() },
+      ...named(ids),
+    });
+  }
+  const byReason = new Map<string, string[]>();
+  for (const id of partsOf(OUT)) {
+    const reason = reasonOf(id);
+    byReason.set(reason, [...(byReason.get(reason) ?? []), id]);
+  }
+  for (const [reason, ids] of byReason) plan.push({ to: { kind: "left-out" }, reason, ...named(ids) });
   return plan;
+}
+
+// ---- a revised document ----------------------------------------------------------------------------
+
+/**
+ * A revised document as the owner places it. What carrying the ledger did not place is asked paragraph by
+ * paragraph, and every paragraph is a part of one paragraph, so that the counting, the readiness and the plan
+ * are the ones of a first division.
+ */
+export interface Revision {
+  /** The intake of the revised document, whose ledger is walked. */
+  readonly intake: string;
+  /** Every paragraph with words of the revised document, in its order, as a part of one paragraph. */
+  readonly paragraphs: readonly DocumentSection[];
+  /** The words of each paragraph of the revised document, and of the old one for what changed or is gone. */
+  readonly words: ReadonlyMap<string, string>;
+  readonly oldWords: ReadonlyMap<string, string>;
+  /** The heading each new paragraph stands under, by its words, for the one that is asked about. */
+  readonly under: ReadonlyMap<string, string>;
+  /** How many paragraphs are the same and went where they went. */
+  readonly carried: number;
+  readonly changed: readonly ChangedParagraph[];
+  readonly fresh: readonly string[];
+  readonly gone: readonly GoneParagraph[];
+  /** Why a paragraph that was carried out of the document was left out. */
+  readonly reasons: ReadonlyMap<string, string>;
+}
+
+function aPart(id: string): DocumentSection {
+  return {
+    id,
+    kind: "heading",
+    title: id,
+    level: 1,
+    parent: null,
+    blocks: 1,
+    characters: 0,
+    tree_blocks: 1,
+    tree_characters: 0,
+    page_first: null,
+    page_last: null,
+  };
+}
+
+/** A paragraph the draft ledger gave to a destination, by the ledger's own text. */
+interface LedgerAllotment {
+  readonly to: { readonly kind: string; readonly spec?: string; readonly title?: string };
+  readonly blocks: readonly string[];
+  readonly reason?: string;
+}
+
+function allotmentsOf(ledger: string): LedgerAllotment[] {
+  const parsed: unknown = JSON.parse(ledger);
+  const list = typeof parsed === "object" && parsed !== null ? (parsed as { allotments?: unknown }).allotments : undefined;
+  return Array.isArray(list) ? (list as LedgerAllotment[]) : [];
+}
+
+/**
+ * The state of a revision when the owner first sees it: the destinations of the old ledger, the paragraphs
+ * the draft placed put where it placed them, and the ones that changed or are new not placed at all.
+ * `specs` is what the screen knows, to say a destination by its title; a spec it does not know is said by id.
+ */
+export function startRevision(
+  revised: RevisedDivision,
+  specs: readonly Spec[],
+  newBlocks: readonly OriginalBlock[],
+  oldBlocks: readonly OriginalBlock[],
+): { draft: Draft; revision: Revision } {
+  const dests: Destination[] = [];
+  const keyOf = (to: { kind: string; spec?: string | null; title?: string | null }): string => {
+    if (to.kind === "left-out") return OUT;
+    const found = dests.find((d) =>
+      d.kind === "spec" ? to.kind === "spec" && d.spec.id === to.spec : to.kind === "new" && d.title === to.title,
+    );
+    if (found !== undefined) return found.key;
+    const key = `d${dests.length}`;
+    if (to.kind === "spec") {
+      const spec = specs.find((s) => s.id === to.spec) ?? { id: to.spec ?? "", title: to.spec ?? "", created_at: "" };
+      dests.push({ key, kind: "spec", spec });
+    } else {
+      dests.push({ key, kind: "new", title: to.title ?? "" });
+    }
+    return key;
+  };
+  for (const destination of revised.carried.destinations) keyOf(destination);
+
+  const to: Record<string, readonly string[]> = {};
+  const reasons = new Map<string, string>();
+  for (const allotment of allotmentsOf(revised.ledger)) {
+    const key = keyOf(allotment.to);
+    for (const id of allotment.blocks) {
+      to[id] = [...(to[id] ?? []), key];
+      if (key === OUT && allotment.reason !== undefined) reasons.set(id, allotment.reason);
+    }
+  }
+
+  const asked = new Set([...revised.carried.changed.map((c) => c.block), ...revised.carried.fresh]);
+  const known = new Set([...Object.keys(to), ...asked]);
+  const words = new Map<string, string>();
+  const under = new Map<string, string>();
+  let heading = "";
+  const paragraphs: DocumentSection[] = [];
+  for (const block of newBlocks) {
+    if (block.kind === "heading") heading = block.text;
+    if (!known.has(block.id)) continue;
+    paragraphs.push(aPart(block.id));
+    words.set(block.id, block.text);
+    under.set(block.id, heading);
+  }
+  const oldWords = new Map(oldBlocks.map((b) => [b.id, b.text] as const));
+  const draft: Draft = { dests, to, picked: new Set(), shared: false, made: dests.length };
+  return {
+    draft,
+    revision: {
+      intake: revised.intake.id,
+      paragraphs,
+      words,
+      oldWords,
+      under,
+      carried: revised.carried.carried,
+      changed: revised.carried.changed,
+      fresh: revised.carried.fresh,
+      gone: revised.carried.gone,
+      reasons,
+    },
+  };
+}
+
+/** Place one paragraph at one destination, or leave it out: what the owner decides for a paragraph asked about. */
+export function placeOne(draft: Draft, id: string, key: string): Draft {
+  return { ...draft, to: { ...draft.to, [id]: [key] } };
+}
+
+/** The destination key an old paragraph had been at, when it is still one of the destinations. */
+export function wasKey(draft: Draft, was: readonly WherePlaced[]): string | null {
+  for (const place of was) {
+    if (place.to.kind === "left-out") return OUT;
+    const found = draft.dests.find((d) =>
+      d.kind === "spec" ? place.to.kind === "spec" && d.spec.id === place.to.spec : place.to.kind === "new" && d.title === place.to.title,
+    );
+    if (found !== undefined) return found.key;
+  }
+  return null;
+}
+
+/** How many of the paragraphs asked about the owner has not placed yet. */
+export function stillAsked(draft: Draft, revision: Revision): number {
+  const asked = [...revision.changed.map((c) => c.block), ...revision.fresh];
+  return asked.filter((id) => (draft.to[id] ?? []).length === 0).length;
 }
 
 /** What one step of a confirmed division is called: the title of the spec it was for. */
