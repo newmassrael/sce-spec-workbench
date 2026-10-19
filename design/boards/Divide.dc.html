@@ -29,7 +29,14 @@ body{margin:0}
         <div class="dv-head">
           <label class="dv-more" style="color: var(--ink-2)"><input class="dv-box" type="checkbox" checked="{{allChecked}}" onChange="{{toggleAll}}">모두 고르기</label>
           <span>문서의 부분 {{partCount}}개 · 문단 {{total}}개</span>
+          <button class="mini" type="button" onClick="{{aiToggle}}"><span class="ic ic-pair" style="width: 14px; height: 14px" aria-hidden="true"></span>{{aiLabel}}</button>
         </div>
+        <sc-if value="{{drafted}}" hint-placeholder-val="{{ false }}">
+          <div class="note" style="background: var(--ai-tint); color: var(--ai); border-radius: 0">
+            <span class="ic ic-pair" style="width: 18px; height: 18px; flex: none; margin-top: 2px" aria-hidden="true"></span>
+            <span>AI가 부록 두 부분을 나눠 봤어요. 아직 정해진 건 없어요. &lsquo;AI 제안&rsquo; 표시는 고르면 사라져요.</span>
+          </div>
+        </sc-if>
         <sc-if value="{{hasSel}}" hint-placeholder-val="{{ false }}">
           <div class="dv-bulk" role="group" aria-label="고른 부분을 보낼 곳">
             <span>{{selText}}</span>
@@ -69,9 +76,7 @@ body{margin:0}
             <span class="ct">문단 {{d.count}}개</span>
           </div>
         </sc-for>
-        <sc-if value="{{canAdd}}" hint-placeholder-val="{{ true }}">
-          <button class="mini" type="button" onClick="{{addDest}}" style="margin-top: 12px"><span class="ic ic-plus" style="width: 14px; height: 14px" aria-hidden="true"></span>사양 하나 더</button>
-        </sc-if>
+        <button class="mini" type="button" onClick="{{addDest}}" style="margin-top: 12px"><span class="ic ic-plus" style="width: 14px; height: 14px" aria-hidden="true"></span>사양 하나 더</button>
       </div>
       <div class="dv-card">
         <h2>뺀 부분</h2>
@@ -121,6 +126,8 @@ class Component extends DCLogic {
     this.state = {
       sel: [],
       more: false,
+      drafted: false,
+      aiMarks: [],
       dests: [
         { id: 'lamp', name: '램프 제어', kind: '이미 있는 사양' },
         { id: 'fan', name: '팬 제어', kind: '새로 만들 사양' },
@@ -130,14 +137,15 @@ class Component extends DCLogic {
   }
   hue(id) {
     const at = this.state.dests.findIndex((d) => d.id === id);
-    return at < 0 ? 'out' : this.hues[at];
+    // Hues repeat after the third spec: a spec is told apart by its name, and the hue only helps the eye.
+    return at < 0 ? 'out' : this.hues[at % this.hues.length];
   }
   nameOf(id) {
     const found = this.state.dests.find((d) => d.id === id);
     return found ? found.name : '뺌';
   }
   renderVals() {
-    const { sel, more, dests, to } = this.state;
+    const { sel, more, dests, to, drafted, aiMarks } = this.state;
     const PARTS = this.parts;
     const HUES = this.hues;
     const total = PARTS.reduce((n, p) => n + p.paras, 0);
@@ -152,10 +160,21 @@ class Component extends DCLogic {
         else if (more && had.length > 0 && !had.includes(id)) next[partId] = [...had, id];
         else next[partId] = [id];
       });
-      this.setState({ to: next, sel: [] });
+      this.setState({ to: next, sel: [], aiMarks: aiMarks.filter((x) => !sel.includes(x)) });
+    };
+    const aiToggle = () => {
+      if (drafted) {
+        const cleared = { ...to };
+        aiMarks.forEach((id) => {
+          cleared[id] = [];
+        });
+        this.setState({ to: cleared, drafted: false, aiMarks: [] });
+      } else {
+        this.setState({ to: { ...to, p9: ['lamp'], p10: ['out'] }, drafted: true, aiMarks: ['p9', 'p10'] });
+      }
     };
     const segs = dests.map((d, i) => ({
-      cls: HUES[i] === '' ? 'a' : HUES[i],
+      cls: HUES[i % HUES.length] === '' ? 'a' : HUES[i % HUES.length],
       style: 'width: ' + (PARTS.filter((p) => to[p.id][0] === d.id).reduce((n, p) => n + p.paras, 0) / total) * 100 + '%',
     }));
     segs.push({ cls: 'o', style: 'width: ' + (PARTS.filter((p) => to[p.id][0] === 'out').reduce((n, p) => n + p.paras, 0) / total) * 100 + '%' });
@@ -165,6 +184,9 @@ class Component extends DCLogic {
       countClass: unplaced > 0 ? '' : 'done',
       partCount: PARTS.length,
       total,
+      drafted,
+      aiToggle,
+      aiLabel: drafted ? 'AI 초안 지우기' : 'AI로 나눠 보기',
       allChecked: sel.length === PARTS.length,
       toggleAll: () => this.setState({ sel: sel.length === PARTS.length ? [] : PARTS.map((p) => p.id) }),
       hasSel: sel.length > 0,
@@ -186,16 +208,20 @@ class Component extends DCLogic {
           cls: (picked ? 'sel ' : '') + (none ? 'todo' : ''),
           checked: picked,
           toggle: () => this.setState({ sel: picked ? sel.filter((x) => x !== p.id) : [...sel, p.id] }),
-          pills: none ? [{ name: '배치 안 됨', cls: 'none' }] : here.map((id) => ({ name: this.nameOf(id), cls: this.hue(id) })),
+          pills: none
+            ? [{ name: '배치 안 됨', cls: 'none' }]
+            : [
+                ...(aiMarks.includes(p.id) ? [{ name: 'AI 제안', cls: 'ai' }] : []),
+                ...here.map((id) => ({ name: this.nameOf(id), cls: this.hue(id) })),
+              ],
         };
       }),
       dests: dests.map((d, i) => ({
         name: d.name,
         kind: d.kind,
-        cls: HUES[i],
+        cls: HUES[i % HUES.length],
         count: PARTS.filter((p) => to[p.id].includes(d.id)).reduce((n, p) => n + p.paras, 0),
       })),
-      canAdd: specs < 3,
       addDest: () =>
         this.setState({ dests: [...dests, { id: 'new' + specs, name: '새 사양 ' + (specs + 1), kind: '새로 만들 사양' }] }),
       outCount: out,
