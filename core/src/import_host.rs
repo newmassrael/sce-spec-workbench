@@ -152,13 +152,16 @@ impl Scratch {
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
-        let mut made = fs::DirBuilder::new();
+        // The document is the owner's, and nobody else on the machine has a reason to read it.
         #[cfg(unix)]
-        {
+        let made = {
             use std::os::unix::fs::DirBuilderExt;
-            // The document is the owner's, and nobody else on the machine has a reason to read it.
+            let mut made = fs::DirBuilder::new();
             made.mode(0o700);
-        }
+            made
+        };
+        #[cfg(not(unix))]
+        let made = fs::DirBuilder::new();
         made.create(&dir)
             .map_err(|e| failed(format!("a folder to work in could not be made: {e}")))?;
         Ok(Scratch(dir))
