@@ -64,6 +64,8 @@ function section(id: string, title: string, parent: string | null = null): Docum
     parent,
     blocks: 2,
     characters: 40,
+    tree_blocks: 2,
+    tree_characters: 40,
     page_first: null,
     page_last: null,
   };
@@ -97,6 +99,8 @@ class FakeCore {
   importWith: (() => Promise<ImportedDocument>) | null = null;
   /** What the next `read_document` does, when it is not the default one-part document. */
   readWith: (() => Promise<ReadDocument>) | null = null;
+  /** The proposals made of part of a document. */
+  readonly partial = new Set<string>();
   /** The parts a document read now has. One part is a document with nothing to choose between. */
   sections: DocumentSection[] = [section("s1", "Door lock")];
   /** What the next `assemble_import` answers, besides the default. */
@@ -197,6 +201,8 @@ class FakeCore {
       }
       if (open !== undefined) open.ended = "superseded";
       const stored = this.makeProposal(spec);
+      // A choice of some of the parts is a proposal of part of the document, which its documents say.
+      if (sections !== undefined) this.partial.add(stored.proposal.id);
       return { proposal: stored.proposal, created: true, complete: this.asks.length === 0, not_carried: [] };
     },
     listProposals: async (id) => {
@@ -210,7 +216,9 @@ class FakeCore {
     readProposalDocuments: async (id, proposal): Promise<ProposalDocuments> => {
       this.record("read_proposal_documents", id, proposal);
       this.find(id, proposal);
-      return { conversion: JSON.stringify(CONVERSION_TEXT), report: "{}", scope: null };
+      return this.partial.has(proposal)
+        ? { conversion: JSON.stringify(CONVERSION_TEXT), report: JSON.stringify({ out_of_scope: 4 }), scope: "{}" }
+        : { conversion: JSON.stringify(CONVERSION_TEXT), report: "{}", scope: null };
     },
     readExtraction: async (id, digest) => {
       this.record("read_extraction", id, digest);
@@ -1203,6 +1211,36 @@ describe("a document with parts to choose between", () => {
     await settle();
 
     expect(r.core.callsOf("import_selection").map((c) => c[3])).toEqual([false, true]);
+  });
+});
+
+describe("a review of part of a document", () => {
+  beforeEach(() => {
+    r.core.sections = twoFunctions();
+    r.flow.open({ kind: "new" });
+  });
+
+  it("says that only part was brought in and how much was left aside, so the part is not taken for the document", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    box(r.root, "s1").click();
+    await settle();
+    button(r.root, say("impPartsImport", { parts: "1" })).click();
+    await settle();
+
+    const note = r.root.querySelector("#review-part");
+    expect(note?.textContent).toBe(say("rvwPartOf", { n: "4" }));
+    expect(note?.getAttribute("class")).toContain("quiet");
+  });
+
+  it("says nothing of the sort of a document that was brought in whole, however it was chosen", async () => {
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("rvwSave"));
+    expect(r.root.querySelector("#review-part")).toBeNull();
   });
 });
 

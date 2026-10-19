@@ -3,8 +3,20 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ContractError } from "../src/contract";
-import { base64Of, failureOf, importKey, titleOf } from "../src/import_model";
+import { ContractError, type DocumentSection, type ReadDocument } from "../src/contract";
+import {
+  allSections,
+  base64Of,
+  chosenState,
+  chosenTotals,
+  failureOf,
+  importKey,
+  isChoosable,
+  pressSection,
+  sectionsToSend,
+  subtree,
+  titleOf,
+} from "../src/import_model";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED } from "../src/ipc";
 
 describe("the title a file's spec is given", () => {
@@ -90,6 +102,91 @@ describe("what a refusal of the core means for the person", () => {
   it("says a contract that broke, and a thing that is not a refusal at all, as words", () => {
     expect(failureOf(new ContractError("import_document.proposal", "an object"))).toMatchObject({ kind: "other" });
     expect(failureOf(new TypeError("boom"))).toEqual({ kind: "other", words: "TypeError: boom" });
+  });
+});
+
+/** A document of two functions, the first with a part under it, as `outline` counts them: each part its own. */
+function document(): ReadDocument {
+  const part = (id: string, parent: string | null, blocks: number, characters: number): DocumentSection => ({
+    id,
+    kind: "heading",
+    title: id,
+    level: parent === null ? 1 : 2,
+    parent,
+    blocks,
+    characters,
+    tree_blocks: blocks,
+    tree_characters: characters,
+    page_first: null,
+    page_last: null,
+  });
+  return {
+    original: "a".repeat(64),
+    extraction: "b".repeat(64),
+    not_carried: [],
+    outline: {
+      by: "headings",
+      sections: [part("s1", null, 2, 80), part("s2", "s1", 2, 36), part("s3", null, 2, 33)],
+    },
+  };
+}
+
+describe("choosing the parts of a document", () => {
+  const all = (doc: ReadDocument): Set<string> => allSections(doc);
+
+  it("asks only of a document that has more than one part to choose between", () => {
+    expect(isChoosable(document())).toBe(true);
+    const one = document();
+    one.outline.sections.splice(1);
+    expect(isChoosable(one)).toBe(false);
+  });
+
+  it("takes a part with the parts under it, in its own press", () => {
+    const doc = document();
+    const sections = doc.outline.sections;
+
+    expect(subtree(sections, "s1")).toEqual(["s1", "s2"]);
+    expect(subtree(sections, "s2")).toEqual(["s2"]);
+    expect(subtree(sections, "s3")).toEqual(["s3"]);
+  });
+
+  it("finds a part half chosen when one of the parts under it is left out, and chosen when none is", () => {
+    const doc = document();
+    const sections = doc.outline.sections;
+
+    expect(chosenState(all(doc), sections, "s1")).toBe("all");
+    expect(chosenState(new Set(["s1", "s3"]), sections, "s1")).toBe("some");
+    expect(chosenState(new Set(["s3"]), sections, "s1")).toBe("none");
+  });
+
+  it("leaves a part out with what is under it when it was all chosen, and chooses it all when it was not", () => {
+    const doc = document();
+    const sections = doc.outline.sections;
+
+    expect([...pressSection(all(doc), sections, "s1")].sort()).toEqual(["s3"]);
+    expect([...pressSection(new Set(["s3"]), sections, "s1")].sort()).toEqual(["s1", "s2", "s3"]);
+    // Half chosen becomes all chosen: a press cannot mean to do nothing.
+    expect([...pressSection(new Set(["s1", "s3"]), sections, "s1")].sort()).toEqual(["s1", "s2", "s3"]);
+    // A part under another is left out alone.
+    expect([...pressSection(all(doc), sections, "s2")].sort()).toEqual(["s1", "s3"]);
+  });
+
+  it("counts what is chosen once: the parts add up to the document, and a part is not counted again under its parent", () => {
+    const doc = document();
+
+    const everything = chosenTotals(all(doc), doc);
+    const leaving = chosenTotals(new Set(["s1", "s3"]), doc);
+
+    expect(everything).toEqual({ parts: 3, of: 3, blocks: 6, characters: 149 });
+    expect(leaving).toEqual({ parts: 2, of: 3, blocks: 4, characters: 113 });
+  });
+
+  it("sends the ids that are chosen, in the document's order, so that a part left out under a chosen one stays out", () => {
+    const doc = document();
+
+    expect(sectionsToSend(new Set(["s3", "s1"]), doc)).toEqual(["s1", "s3"]);
+    expect(sectionsToSend(all(doc), doc)).toBeUndefined();
+    expect(sectionsToSend(new Set(), doc)).toEqual([]);
   });
 });
 

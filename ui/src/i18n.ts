@@ -552,6 +552,9 @@ const en = {
   rvwNoChange: "Nothing changes in the spec",
   rvwToCheck: "{n} to check",
   rvwAllChecked: "Everything is checked",
+  rvwPartOf:
+    "Only part of the document was brought in. The other {n} paragraphs were not read or checked; they stay in the original.",
+  rvwPartOfNone: "Only part of the document was brought in. The rest stays in the original.",
   rvwNotCarried: "{n} the reader could not carry",
   rvwNotCarriedTitle: "What could not be carried",
   rvwSave: "Save as the spec",
@@ -1140,6 +1143,9 @@ const ko: Record<Key, string> = {
   rvwNoChange: "사양에서 바뀌는 것이 없어요",
   rvwToCheck: "확인할 부분 {n}곳",
   rvwAllChecked: "모두 확인했어요",
+  rvwPartOf:
+    "문서의 일부만 가져왔어요. 나머지 {n}개 문단은 읽지도 검사하지도 않았고, 원본에 그대로 있어요.",
+  rvwPartOfNone: "문서의 일부만 가져왔어요. 나머지는 원본에 그대로 있어요.",
   rvwNotCarried: "옮기지 못한 곳 {n}곳",
   rvwNotCarriedTitle: "옮기지 못한 것",
   rvwSave: "사양으로 저장",

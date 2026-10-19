@@ -33,6 +33,7 @@ import {
   dropTarget,
   firstTextGrid,
   notCarriedList,
+  partNote,
   partsCard,
   refusedCard,
   reviewBar,
@@ -45,10 +46,12 @@ import {
   changedLines,
   parseConversion,
   parseExtraction,
+  partOf,
   rowsOf,
   saveWithheld,
   type NotCarried,
   type OriginalBlock,
+  type PartialImport,
   type ReviewPanel,
   type WrittenBlock,
 } from "./review_model";
@@ -89,6 +92,8 @@ interface Parts {
   readonly original: readonly OriginalBlock[];
   readonly notCarried: readonly NotCarried[];
   readonly member: string;
+  /** Set when the proposal is of part of its document. */
+  readonly part: PartialImport | null;
 }
 
 type Busy = "deciding" | "saving" | "discarding" | "rebasing";
@@ -216,6 +221,7 @@ export class ImportFlow {
         original: read.blocks,
         notCarried: read.notCarried,
         member: read.member,
+        part: partOf(documents.scope, documents.report),
       };
       await this.settle(spec, proposal, ticket);
     } catch (error) {
@@ -249,6 +255,7 @@ export class ImportFlow {
     // keyboard goes the first time.
     if (this.panel === null) this.focusRequest = "stage";
     this.panel = {
+      part: parts.part,
       view,
       rows: rowsOf(view, parts.written, parts.original),
       notCarried: parts.notCarried,
@@ -655,7 +662,7 @@ export class ImportFlow {
       "div",
       { class: "imp-review" },
       bar,
-      h("div", { class: "imp-body" }, this.noticeBanner(true), why,
+      h("div", { class: "imp-body" }, this.noticeBanner(true), partNote(say, panel.part), why,
         asked
           ? rowsGrid({
               say,

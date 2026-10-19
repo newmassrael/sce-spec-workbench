@@ -10,6 +10,7 @@ import {
   changedLines,
   parseConversion,
   parseExtraction,
+  partOf,
   rowsOf,
   saveWithheld,
   wordDiff,
@@ -177,7 +178,7 @@ function assembled(decisions: number, changes: Partial<TextChanges> = {}): Assem
 }
 
 function panel(v: ProposalView, assembledText: AssembledImport | null): ReviewPanel {
-  return { view: v, rows: [], notCarried: [], member: "", assembled: assembledText };
+  return { part: null, view: v, rows: [], notCarried: [], member: "", assembled: assembledText };
 }
 
 describe("when the save is offered", () => {
@@ -318,5 +319,26 @@ describe("the comparison with the spec's text", () => {
     expect(changedLines(assembled(0, { added: 3, removed: 2 }))).toBe(5);
     expect(changedLines(assembled(0, { added: 0, removed: 0, unchanged: true }))).toBe(0);
     expect(changedLines(null)).toBeNull();
+  });
+});
+
+describe("whether a proposal is of part of its document", () => {
+  it("is not, when it keeps no scope, whatever the report says", () => {
+    expect(partOf(null, JSON.stringify({ out_of_scope: 9 }))).toBeNull();
+  });
+
+  it("is, with how many paragraphs were left aside, when it keeps one", () => {
+    expect(partOf("{}", JSON.stringify({ out_of_scope: 4 }))).toEqual({ outOfScope: 4 });
+  });
+
+  it("is still a part when the report counts nothing left aside, and says none", () => {
+    expect(partOf("{}", "{}")).toEqual({ outOfScope: 0 });
+    expect(partOf("{}", JSON.stringify({ out_of_scope: -1 }))).toEqual({ outOfScope: 0 });
+    expect(partOf("{}", JSON.stringify({ out_of_scope: "4" }))).toEqual({ outOfScope: 0 });
+  });
+
+  it("refuses a report that is not one, when there is a part to count", () => {
+    expect(() => partOf("{}", "not json")).toThrow(ContractError);
+    expect(partOf(null, "not json")).toBeNull();
   });
 });

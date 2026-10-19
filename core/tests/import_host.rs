@@ -556,6 +556,15 @@ fn a_document_is_read_and_its_parts_are_said_before_anything_is_proposed() {
         [("s1", "Lamp"), ("s2", "Timing"), ("s3", "Fan")]
     );
     assert_eq!(sections[1]["parent"], "s1");
+    // A part counts its own paragraphs, and what it comes to with the parts under it is said apart.
+    assert_eq!(
+        (
+            sections[0]["blocks"].clone(),
+            sections[0]["tree_blocks"].clone()
+        ),
+        (json!(2), json!(4))
+    );
+    assert_eq!(sections[1]["tree_blocks"], 2);
     assert_eq!(read["not_carried"], json!([]));
     // Reading is not importing: the document is kept and nothing is proposed.
     let proposals = rig.ask("list_proposals", json!({"id": spec}));
@@ -595,37 +604,38 @@ fn only_the_part_chosen_is_proposed_checked_and_accepted() {
 }
 
 #[test]
-fn a_part_with_parts_under_it_brings_them_and_a_part_under_it_brings_only_itself() {
+fn a_part_is_its_own_paragraphs_so_a_part_under_a_chosen_one_can_be_left_out() {
     let rig = Rig::real("part-nested");
     let spec = rig.spec();
     let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
 
-    let under = rig
-        .select(&spec, &read, Some(json!(["s2"])), "press-under")
-        .unwrap();
-    let under_text = rig.ask(
-        "assemble_import",
-        json!({"id": spec, "proposal": proposal_id(&under)}),
-    )["text"]
-        .clone();
-    let whole_lamp = rig
-        .try_ask(
-            "import_selection",
-            json!({
-                "id": spec, "original": read["original"], "extraction": read["extraction"],
-                "sections": ["s1"], "key": "press-lamp", "origin": "gui", "supersede": true,
-            }),
-        )
-        .unwrap();
-    let lamp_text = rig.ask(
-        "assemble_import",
-        json!({"id": spec, "proposal": proposal_id(&whole_lamp)}),
-    )["text"]
-        .clone();
+    // What is named is what is taken: the function without the part under it, then the function with it.
+    let texts: Vec<Value> = [
+        ("press-alone", json!(["s1"])),
+        ("press-both", json!(["s1", "s2"])),
+    ]
+    .into_iter()
+    .map(|(key, sections)| {
+        let imported = rig
+            .try_ask(
+                "import_selection",
+                json!({
+                    "id": spec, "original": read["original"], "extraction": read["extraction"],
+                    "sections": sections, "key": key, "origin": "gui", "supersede": true,
+                }),
+            )
+            .unwrap();
+        rig.ask(
+            "assemble_import",
+            json!({"id": spec, "proposal": proposal_id(&imported)}),
+        )["text"]
+            .clone()
+    })
+    .collect();
 
-    assert_eq!(under_text, "## Timing\n\nIt turns off after 30 seconds.\n");
+    assert_eq!(texts[0], "# Lamp\n\nThe lamp is on.\n");
     assert_eq!(
-        lamp_text,
+        texts[1],
         "# Lamp\n\nThe lamp is on.\n\n## Timing\n\nIt turns off after 30 seconds.\n"
     );
 }
@@ -637,7 +647,7 @@ fn every_part_chosen_is_the_whole_document_and_keeps_no_scope() {
     let read = rig.read(&spec, "functions.md", TWO_FUNCTIONS);
 
     let everything = rig
-        .select(&spec, &read, Some(json!(["s1", "s3"])), "press-1")
+        .select(&spec, &read, Some(json!(["s1", "s2", "s3"])), "press-1")
         .unwrap();
     let preview = rig.ask(
         "assemble_import",

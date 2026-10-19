@@ -2185,9 +2185,12 @@ export interface DocumentSection {
   level: number;
   /** The part this one is under, when it is under one. */
   parent: string | null;
-  /** How many blocks with words it holds, the parts under it included. */
+  /** How many blocks with words are its own: from its heading to the next heading of any level. */
   blocks: number;
   characters: number;
+  /** The same with the parts under it. */
+  tree_blocks: number;
+  tree_characters: number;
   page_first: number | null;
   page_last: number | null;
 }
@@ -2221,6 +2224,8 @@ function parseDocumentSection(value: unknown, where: string): DocumentSection {
     parent: parent === null || parent === undefined ? null : text(r, "parent", where),
     blocks: count(r, "blocks", where),
     characters: count(r, "characters", where),
+    tree_blocks: count(r, "tree_blocks", where),
+    tree_characters: count(r, "tree_characters", where),
     page_first: optionalCount(r, "page_first", where),
     page_last: optionalCount(r, "page_last", where),
   };

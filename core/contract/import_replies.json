@@ -126,15 +126,17 @@
         "extraction": "2c0b21611d327a514ce5ebe1740fa3f090ae8597a5ba04d5e5b69cd4d8b05d08",
         "sections": [
           {
-            "blocks": 4,
-            "characters": 55,
+            "blocks": 2,
+            "characters": 19,
             "id": "s1",
             "kind": "heading",
             "level": 1,
             "page_first": null,
             "page_last": null,
             "parent": null,
-            "title": "Lamp"
+            "title": "Lamp",
+            "tree_blocks": 4,
+            "tree_characters": 55
           },
           {
             "blocks": 2,
@@ -145,7 +147,9 @@
             "page_first": null,
             "page_last": null,
             "parent": "s1",
-            "title": "Timing"
+            "title": "Timing",
+            "tree_blocks": 2,
+            "tree_characters": 36
           },
           {
             "blocks": 2,
@@ -156,7 +160,9 @@
             "page_first": null,
             "page_last": null,
             "parent": null,
-            "title": "Fan"
+            "title": "Fan",
+            "tree_blocks": 2,
+            "tree_characters": 33
           }
         ],
         "v": 1

@@ -13,7 +13,7 @@ import type { DecisionKind, DocumentSection, ReadDocument } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
-import { wordDiff, type ChangeRow, type ReviewRow } from "./review_model";
+import { wordDiff, type ChangeRow, type PartialImport, type ReviewRow } from "./review_model";
 
 export type Say = (key: Key, values?: Record<string, string>) => string;
 
@@ -155,6 +155,20 @@ export function workingCard(say: Say, name: string, converting = false): HTMLEle
         ),
       ),
     ),
+  );
+}
+
+/**
+ * What the review says when only part of the document was brought in: that the rest was not read or checked,
+ * and how much of it there is, so that a person who reviews the part does not take it for the document.
+ */
+export function partNote(say: Say, part: PartialImport | null): Child {
+  if (part === null) return null;
+  return h(
+    "p",
+    { class: "note quiet", id: "review-part" },
+    icon("doc"),
+    h("span", {}, part.outOfScope > 0 ? say("rvwPartOf", { n: String(part.outOfScope) }) : say("rvwPartOfNone")),
   );
 }
 

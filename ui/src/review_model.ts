@@ -180,8 +180,29 @@ export function rowsOf(
   return rows;
 }
 
+/** What an import of only part of a document leaves aside, for the review to say so. */
+export interface PartialImport {
+  /** How many paragraphs with words lay outside the part the owner chose: not read, not checked. */
+  readonly outOfScope: number;
+}
+
+/**
+ * Whether a proposal is of part of its document, and how much was left aside. `scope` is the text of the
+ * scope the proposal keeps (`null` for the whole document), and `report` the check's report, which counts
+ * what lay outside it. A part with nothing counted is still a part: it says so with none left aside.
+ */
+export function partOf(scope: string | null, report: string): PartialImport | null {
+  if (scope === null) return null;
+  const where = "report";
+  const root = record(parseJson(report, where), where);
+  const left = root["out_of_scope"];
+  return { outOfScope: typeof left === "number" && Number.isInteger(left) && left >= 0 ? left : 0 };
+}
+
 /** What the person is shown of one proposal: everything its review draws. */
 export interface ReviewPanel {
+  /** Set when the document was imported in part. */
+  readonly part: PartialImport | null;
   readonly view: ProposalView;
   readonly rows: readonly ReviewRow[];
   readonly notCarried: readonly NotCarried[];
