@@ -12,7 +12,7 @@
 
 import type { Api, PartsChoice } from "./api";
 import { CommandFailure } from "./ipc";
-import type { AssembledImport, DecisionKind, DocumentSection, Intake, ReadDocument, Spec } from "./contract";
+import type { AssembledImport, DecisionKind, DocumentSection, Intake, NotRead, ReadDocument, Spec } from "./contract";
 import { restoreDraft, startRevision, type Draft } from "./divide_model";
 import { DivideFlow } from "./divide_flow";
 import { h, type Child } from "./dom";
@@ -21,8 +21,10 @@ import {
   allSections,
   base64Of,
   carryKey,
+  chooseFigure,
   divisionKey,
   failureOf,
+  figureChoice,
   importKey,
   choiceToSend,
   isChoosable,
@@ -32,12 +34,14 @@ import {
   type ImportFailure,
   type ImportStage,
   type ImportTarget,
+  type ItemChoices,
 } from "./import_model";
 import {
   changesGrid,
   dropTarget,
   firstTextGrid,
   notCarriedList,
+  notReadList,
   partNote,
   partsCard,
   refusedCard,
@@ -107,6 +111,8 @@ interface Parts {
   readonly written: readonly WrittenBlock[];
   readonly original: readonly OriginalBlock[];
   readonly notCarried: readonly NotCarried[];
+  /** The pictures asked to be read that were not, as the import said; empty for a proposal opened later. */
+  readonly notRead: readonly NotRead[];
   readonly member: string;
   /** Set when the proposal is of part of its document. */
   readonly part: PartialImport | null;
@@ -130,6 +136,8 @@ export class ImportFlow {
   private chosen = new Set<string>();
   /** The items (a table, a figure, an attachment) left out of the parts by themselves, by block id. */
   private leftOut = new Set<string>();
+  /** The figures whose pictures an AI connection is asked to read, by block id. */
+  private toRead = new Set<string>();
   /** Whether the document being brought in replaces the open proposal of the spec. */
   private replacing = false;
   private panel: ReviewPanel | null = null;
@@ -247,8 +255,11 @@ export class ImportFlow {
     this.host.redraw();
   }
 
-  /** Open the review of a proposal of `spec`. */
-  async review(spec: Spec, proposal: string): Promise<void> {
+  /**
+   * Open the review of a proposal of `spec`. `notRead` are the pictures the import that made it was asked
+   * to read and did not, which only that import's reply says.
+   */
+  async review(spec: Spec, proposal: string, notRead: readonly NotRead[] = []): Promise<void> {
     const ticket = ++this.ticket;
     this.clearReview();
     this.enter({ kind: "review", spec, proposal });
@@ -265,6 +276,7 @@ export class ImportFlow {
         written: parseConversion(documents.conversion),
         original: read.blocks,
         notCarried: notCarriedOf(documents.report, read.notCarried),
+        notRead,
         member: read.member,
         part: partOf(documents.scope, documents.report),
       };
@@ -304,6 +316,7 @@ export class ImportFlow {
       view,
       rows: rowsOf(view, parts.written, parts.original),
       notCarried: parts.notCarried,
+      notRead: parts.notRead,
       member: parts.member,
       assembled,
     };
@@ -358,11 +371,12 @@ export class ImportFlow {
       // be carried to it: a document with no headings is as much a new version as one with many, and the choice
       // of carrying is made on the screen it would otherwise skip.
       if (!isChoosable(doc) && this.divided.length === 0) {
-        await this.bringParts(spec, name, doc, { sections: undefined, leaveOut: [] }, supersede, ticket);
+        await this.bringParts(spec, name, doc, { sections: undefined, leaveOut: [], read: [] }, supersede, ticket);
         return;
       }
       this.chosen = allSections(doc);
       this.leftOut = new Set();
+      this.toRead = new Set();
       this.replacing = supersede;
       this.enter({ kind: "parts", name, spec, doc });
       this.host.redraw();
@@ -391,14 +405,14 @@ export class ImportFlow {
       supersede,
     );
     if (ticket !== this.ticket) return;
-    await this.review(spec, imported.proposal.id);
+    await this.review(spec, imported.proposal.id, imported.not_read);
   }
 
   /** The person pressed "bring in" on the parts they chose. */
   private async bringChosen(): Promise<void> {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
-    const choice = choiceToSend(this.chosen, this.leftOut, stage.doc);
+    const choice = choiceToSend(this.chosen, this.leftOut, stage.doc, this.toRead);
     if (choice.sections !== undefined && choice.sections.length === 0) return;
     const ticket = ++this.ticket;
     try {
@@ -567,8 +581,25 @@ export class ImportFlow {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
     this.leftOut = pressItem(this.leftOut, id);
+    // A figure left out is not read: taken again, it is its mark until reading is asked for again.
+    if (this.leftOut.has(id)) {
+      ({ leftOut: this.leftOut, toRead: this.toRead } = chooseFigure(this.items(), id, "leave"));
+    }
     this.focusRequest = `item:${id}`;
     this.host.redraw();
+  }
+
+  private pressReadItem(id: string): void {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts" || this.leftOut.has(id)) return;
+    const to = figureChoice(this.items(), id) === "read" ? "mark" : "read";
+    ({ leftOut: this.leftOut, toRead: this.toRead } = chooseFigure(this.items(), id, to));
+    this.focusRequest = `read:${id}`;
+    this.host.redraw();
+  }
+
+  private items(): ItemChoices {
+    return { leftOut: this.leftOut, toRead: this.toRead };
   }
 
   /**
@@ -722,8 +753,10 @@ export class ImportFlow {
                 doc: stage.doc,
                 chosen: this.chosen,
                 leftOut: this.leftOut,
+                toRead: this.toRead,
                 onPress: (id) => this.pressPart(id),
                 onPressItem: (id) => this.pressPartItem(id),
+                onReadItem: (id) => this.pressReadItem(id),
                 onAll: () => {
                   // Everything is everything: the items left out are taken again too.
                   this.chosen = allSections(stage.doc);
@@ -889,6 +922,7 @@ export class ImportFlow {
             })
           : null,
         comparison,
+        notReadList(say, panel.notRead),
         notCarriedList(say, panel.notCarried),
       ),
     );

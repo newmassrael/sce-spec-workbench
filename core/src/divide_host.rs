@@ -34,11 +34,12 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use sce_specs::{Clock, CommandError, ConnectionId, Revision};
+use sce_specs::{Clock, CommandError, Revision};
 
+use crate::asking::{chosen_connection, unrunnable};
 use crate::commands::Context;
 use crate::connection::AdapterKind;
-use crate::directory::{local_target, run_of};
+use crate::directory::local_target;
 use crate::import_host::{ask, failed, first_words, head_of, refuse, text_of, tools, Scratch};
 use crate::local::Local;
 use crate::runner::{Cancel, GenerateError};
@@ -339,49 +340,21 @@ pub(crate) fn draft_division<C: Clock>(
     let extraction_text = text_of(&view, "text")?;
 
     // The connection first: a screen that has none is told so before a document is read for nothing.
-    let connections = context.connections.ok_or_else(|| {
-        refuse(
-            "no-connection",
-            "this application keeps no AI connection to ask",
-            Value::Null,
-        )
-    })?;
-    let id = match args.connection.as_deref() {
-        Some(text) => ConnectionId::parse(text)?,
-        None => connections.default_connection()?.ok_or_else(|| {
-            refuse(
-                "no-connection",
-                "no AI connection is chosen: choose one under AI connection, then ask again",
-                Value::Null,
-            )
-        })?,
-    };
-    let stored = connections.read(&id, None)?.ok_or_else(|| {
-        refuse(
-            "no-connection",
-            format!("the AI connection `{id}` is not kept on this computer"),
-            Value::Null,
-        )
-    })?;
-    let called = stored
-        .connection
-        .display_name
-        .clone()
-        .unwrap_or_else(|| id.to_string());
-    let adapter = stored.connection.adapter;
+    let chosen = chosen_connection(context, args.connection.as_deref(), DRAFT_UNAVAILABLE)?;
+    let adapter = chosen.stored.connection.adapter;
     if adapter != AdapterKind::Local {
         return Err(refuse(
-            "draft-unavailable",
+            DRAFT_UNAVAILABLE,
             format!(
-                "`{called}` is not a model server, and only a model server can draw a division yet: \
-                 choose one under AI connection, or place the parts by hand"
+                "`{}` is not a model server, and only a model server can draw a division yet: \
+                 choose one under AI connection, or place the parts by hand",
+                chosen.called
             ),
             json!({ "adapter": adapter.word() }),
         ));
     }
-    let pin = stored.connection.pin(stored.revision.clone());
-    let run = run_of(&pin).map_err(unrunnable)?;
-    let (endpoint, config) = local_target(context.policy, &stored, &run).map_err(unrunnable)?;
+    let (endpoint, config) = local_target(context.policy, &chosen.stored, &chosen.run)
+        .map_err(|why| unrunnable(DRAFT_UNAVAILABLE, why))?;
     let model = config.model.clone();
     let server = Local::asking(endpoint, config);
 
@@ -472,17 +445,19 @@ pub(crate) fn draft_division<C: Clock>(
     let draft: Value = serde_json::from_str(finished.stdout.trim())
         .map_err(|e| failed(format!("`finish-division` did not print a draft: {e}")))?;
     Ok(json!({
-        "connection": { "id": id, "name": called, "model": model },
+        "connection": {
+            "id": chosen.stored.connection.id,
+            "name": chosen.called,
+            "model": model,
+        },
         "seconds": (seconds * 10.0).round() / 10.0,
         "prompt": counts,
         "draft": draft,
     }))
 }
 
-/// A connection that cannot be asked, said in the words that name it by what the person called it.
-fn unrunnable(why: crate::runner::Unrunnable) -> CommandError {
-    refuse("draft-unavailable", why.reason, Value::Null)
-}
+/// The refusal of a division the connection chosen cannot draw.
+const DRAFT_UNAVAILABLE: &str = "draft-unavailable";
 
 /// What `confirm_division` is given.
 #[derive(Deserialize)]

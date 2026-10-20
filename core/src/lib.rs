@@ -27,6 +27,7 @@
 //!
 //! Nothing in this crate knows what a specification is about.
 
+mod asking;
 pub mod auth_policy;
 pub mod claude_code;
 pub mod claude_status;

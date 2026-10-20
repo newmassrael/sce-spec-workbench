@@ -9,7 +9,7 @@
 // Nothing here keeps state or asks the core: each function is given what to draw and what to call when
 // a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
 
-import type { DecisionKind, DocumentItem, DocumentSection, Intake, ReadDocument } from "./contract";
+import type { DecisionKind, DocumentItem, DocumentSection, Intake, NotRead, ReadDocument } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
@@ -186,8 +186,12 @@ export interface PartsOptions {
   readonly chosen: ReadonlySet<string>;
   /** Items (a table, a figure, an attachment) left out of their parts by themselves, by block id. */
   readonly leftOut: ReadonlySet<string>;
+  /** Figures whose pictures an AI connection is asked to read, by block id. */
+  readonly toRead: ReadonlySet<string>;
   readonly onPress: (id: string) => void;
   readonly onPressItem: (id: string) => void;
+  /** Ask for figure `id`'s picture to be read, or take it as its mark again. */
+  readonly onReadItem: (id: string) => void;
   readonly onAll: () => void;
   readonly onNone: () => void;
   readonly onBring: () => void;
@@ -233,9 +237,9 @@ export function depthOf(sections: readonly DocumentSection[], section: DocumentS
  * read, since a part left out is read by nothing.
  */
 export function partsCard(options: PartsOptions): HTMLElement {
-  const { say, doc, chosen, leftOut } = options;
+  const { say, doc, chosen, leftOut, toRead } = options;
   const sections = doc.outline.sections;
-  const totals = chosenTotals(chosen, doc, leftOut);
+  const totals = chosenTotals(chosen, doc, leftOut, toRead);
   // Nothing chosen, or parts chosen whose every block with words is an item left out.
   const emptied = totals.parts > 0 && totals.itemsOut > 0 && totals.blocks === 0;
   const none = totals.parts === 0 || emptied;
@@ -265,6 +269,22 @@ export function partsCard(options: PartsOptions): HTMLElement {
             h("span", { class: "item-kind" }, say(ITEM_WORD[item.kind])),
             h("span", { class: "part-name item-name" }, item.label),
           ),
+          // A figure taken can be read by AI instead of kept as its mark alone; one left out is not read.
+          item.kind === "figure"
+            ? h(
+                "label",
+                { for: `read-${item.id}`, class: "item-read" },
+                h("input", {
+                  type: "checkbox",
+                  id: `read-${item.id}`,
+                  "data-focus": `read:${item.id}`,
+                  checked: taken && !leftOut.has(item.id) && toRead.has(item.id),
+                  disabled: !taken || leftOut.has(item.id),
+                  onchange: () => options.onReadItem(item.id),
+                }),
+                say("impItemRead"),
+              )
+            : null,
         ),
       ),
     );
@@ -330,6 +350,7 @@ export function partsCard(options: PartsOptions): HTMLElement {
           characters: String(totals.characters),
         }),
         totals.itemsOut > 0 ? ` · ${say("impPartsItemsOut", { n: String(totals.itemsOut) })}` : null,
+        totals.figuresRead > 0 ? ` · ${say("impPartsFiguresRead", { n: String(totals.figuresRead) })}` : null,
       ),
     ),
     h("ul", { class: "parts", "aria-label": say("impPartsTitle", { name: options.name }) }, ...rows),
@@ -594,6 +615,7 @@ export interface RowsOptions {
 const WHY_WORDS: Record<string, Key> = {
   check: "rvwWhyCheck",
   recognised: "rvwWhyRecognised",
+  "read-from-picture": "rvwWhyReadFromPicture",
   "not-in-original": "rvwWhyNotInOriginal",
   missing: "rvwWhyMissing",
 };
@@ -749,11 +771,30 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
 
 /** What the reader could not carry out of the original: said, so that nobody believes it was saved. */
 export function notCarriedList(say: Say, items: readonly { what: string; why: string | null }[]): HTMLElement | null {
+  return notesList(say, "rvwNotCarriedTitle", items);
+}
+
+/**
+ * The pictures the owner asked AI to read that were not read: each stays as its mark, and this says which
+ * and why, so that nobody takes the mark for what the picture said.
+ */
+export function notReadList(say: Say, items: readonly NotRead[]): HTMLElement | null {
+  return notesList(
+    say,
+    "rvwNotReadTitle",
+    items.map((item) => ({
+      what: say("rvwNotReadWhat", { picture: item.picture ?? item.block }),
+      why: item.why,
+    })),
+  );
+}
+
+function notesList(say: Say, title: Key, items: readonly { what: string; why: string | null }[]): HTMLElement | null {
   if (items.length === 0) return null;
   return h(
     "section",
-    { class: "imp-notes", "aria-label": say("rvwNotCarriedTitle") },
-    h("h3", {}, say("rvwNotCarriedTitle")),
+    { class: "imp-notes", "aria-label": say(title) },
+    h("h3", {}, say(title)),
     h(
       "ul",
       {},

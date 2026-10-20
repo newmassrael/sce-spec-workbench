@@ -218,60 +218,9 @@ impl Connections {
         let Some(launch) = self.launches.claude() else {
             return Err(claude_not_found());
         };
-        // The program the connection names, when it names one, is what runs: the person chose it
-        // among the ones the application found. It is asked again, because a file can be gone or
-        // replaced since, and a run is not made with another program in its place.
-        let binary = match stored.connection.executable.as_deref() {
-            Some(chosen) => {
-                let chosen = PathBuf::from(chosen);
-                if claude_version_of(&chosen, SAY_WHAT_IT_IS).is_none() {
-                    return Err(Unrunnable::new(format!(
-                        "the Claude Code that `{}` names is gone or no longer says it is Claude \
-                         Code: choose it again under AI connection",
-                        pin.connection
-                    )));
-                }
-                chosen
-            }
-            // The program the host found may have gone since it looked: that is said as it is, and
-            // not as a client that could not be asked something.
-            None if !launch.binary.is_file() => return Err(claude_not_found()),
-            None => launch.binary.clone(),
-        };
-        // What the client printed is for the settings screen, which shows it to the person who
-        // is looking: a reason is said where the specs folder is, and is a sentence of ours.
-        let observed = self.observe(&binary).map_err(|_| {
-            Unrunnable::new(
-                "Claude Code could not be asked who is signed in: check it under AI connection, \
-                 then ask again",
-            )
-        })?;
-        let Some(route) = Route::of(stored.connection.adapter, stored.connection.auth, observed)
-        else {
-            return Err(Unrunnable::new(
-                "nobody is signed in to Claude Code: run `claude auth login` (a subscription) or \
-                 `claude auth login --console` (billed by use) in a terminal, then ask again",
-            ));
-        };
-        if let Decision::Refuse { reason, .. } = self.policy.decide(route) {
-            return Err(Unrunnable::new(refusal_words(
-                AdapterKind::ClaudeCode,
-                route,
-                reason,
-            )));
-        }
-        let defaults = ClaudeCodeConfig::default();
-        let config = ClaudeCodeConfig {
-            model: run.model.clone(),
-            effort: run.effort.clone(),
-            max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
-            max_budget_usd: launch.max_budget_usd,
-            timeout: run
-                .limits
-                .seconds
-                .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
-            places: run.limits.places.map_or(defaults.places, |p| p as usize),
-        };
+        let binary = claude_binary(&stored, &launch.binary)?;
+        claude_allowed(&self.policy, &stored, self.observe(&binary))?;
+        let config = claude_config(run, launch.max_budget_usd);
         Ok(ClaudeCode::new(binary, launch.author.clone(), config))
     }
 
@@ -515,10 +464,88 @@ pub(crate) fn run_of(pin: &Pin) -> Result<PinnedRun, Unrunnable> {
     })
 }
 
-fn claude_not_found() -> Unrunnable {
+pub(crate) fn claude_not_found() -> Unrunnable {
     Unrunnable::new(
         "Claude Code was not found on this computer: install it, or set SCE_CLAUDE to its path",
     )
+}
+
+/// The program a Claude Code connection runs: the one it names, when it names one, or `found`, the
+/// one the application found. The rules are one set, kept here, for a run of a model and for one
+/// question put to the client ([`crate::claude_code::ClaudeReader`]), as [`local_target`]'s are for a
+/// model server.
+pub(crate) fn claude_binary(
+    stored: &StoredConnection,
+    found: &Path,
+) -> Result<PathBuf, Unrunnable> {
+    // The program the connection names, when it names one, is what runs: the person chose it among
+    // the ones the application found. It is asked again, because a file can be gone or replaced
+    // since, and a run is not made with another program in its place.
+    match stored.connection.executable.as_deref() {
+        Some(chosen) => {
+            let chosen = PathBuf::from(chosen);
+            if claude_version_of(&chosen, SAY_WHAT_IT_IS).is_none() {
+                return Err(Unrunnable::new(format!(
+                    "the Claude Code that `{}` names is gone or no longer says it is Claude Code: \
+                     choose it again under AI connection",
+                    stored.connection.id
+                )));
+            }
+            Ok(chosen)
+        }
+        // The program the host found may have gone since it looked: that is said as it is, and not
+        // as a client that could not be asked something.
+        None if !found.is_file() => Err(claude_not_found()),
+        None => Ok(found.to_path_buf()),
+    }
+}
+
+/// Whether Claude Code may be run for a connection, by who `observed` says is signed in to it and
+/// what the build's policy says of that way in.
+pub(crate) fn claude_allowed(
+    policy: &Policy,
+    stored: &StoredConnection,
+    observed: Observation,
+) -> Result<(), Unrunnable> {
+    // What the client printed is for the settings screen, which shows it to the person who is
+    // looking: a reason is said where the specs folder is, and is a sentence of ours.
+    let observed = observed.map_err(|_| {
+        Unrunnable::new(
+            "Claude Code could not be asked who is signed in: check it under AI connection, then \
+             ask again",
+        )
+    })?;
+    let Some(route) = Route::of(stored.connection.adapter, stored.connection.auth, observed) else {
+        return Err(Unrunnable::new(
+            "nobody is signed in to Claude Code: run `claude auth login` (a subscription) or \
+             `claude auth login --console` (billed by use) in a terminal, then ask again",
+        ));
+    };
+    if let Decision::Refuse { reason, .. } = policy.decide(route) {
+        return Err(Unrunnable::new(refusal_words(
+            AdapterKind::ClaudeCode,
+            route,
+            reason,
+        )));
+    }
+    Ok(())
+}
+
+/// How a run of Claude Code is bounded: what `run` asked of it, the client's defaults for the rest,
+/// and what the environment lets a run spend.
+pub(crate) fn claude_config(run: &PinnedRun, max_budget_usd: Option<f64>) -> ClaudeCodeConfig {
+    let defaults = ClaudeCodeConfig::default();
+    ClaudeCodeConfig {
+        model: run.model.clone(),
+        effort: run.effort.clone(),
+        max_turns: run.limits.turns.unwrap_or(defaults.max_turns),
+        max_budget_usd,
+        timeout: run
+            .limits
+            .seconds
+            .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
+        places: run.limits.places.map_or(defaults.places, |p| p as usize),
+    }
 }
 
 fn codex_not_found() -> Unrunnable {

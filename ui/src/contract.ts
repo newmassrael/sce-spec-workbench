@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 9;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 10;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2107,6 +2107,29 @@ export interface ImportedDocument {
   /** Whether the check finds the conversion complete: nothing the owner has to be asked. */
   complete: boolean;
   not_carried: NotCarried[];
+  /** The figures whose pictures an AI connection read, as the owner asked. */
+  read: string[];
+  /** The pictures asked to be read that were not, each with why; their marks stay as they were. */
+  not_read: NotRead[];
+}
+
+/** A picture the owner asked to be read that was not: which figure, which picture, a word and a sentence. */
+export interface NotRead {
+  block: string;
+  picture: string | null;
+  /** What went wrong, in the word the tools or the client gave (`picture-not-showable`, `no-reading`, ...). */
+  code: string;
+  why: string;
+}
+
+function parseNotRead(value: unknown, where: string): NotRead {
+  const r = record(value, where);
+  return {
+    block: text(r, "block", where),
+    picture: nullableText(r, "picture", where),
+    code: text(r, "code", where),
+    why: text(r, "why", where),
+  };
 }
 
 /** One line of what the assembled text changes in the spec's text now. */
@@ -2168,6 +2191,8 @@ export function parseImportedDocument(value: unknown): ImportedDocument {
     created: created(r, where),
     complete: r["complete"],
     not_carried: list(r, "not_carried", where).map((n, i) => parseNotCarried(n, `${where}.not_carried[${i}]`)),
+    read: stringList(r, "read", where),
+    not_read: list(r, "not_read", where).map((n, i) => parseNotRead(n, `${where}.not_read[${i}]`)),
   };
 }
 

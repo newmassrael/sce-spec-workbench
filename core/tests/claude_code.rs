@@ -22,8 +22,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sce_spec_workbench_core::claude_code::{
-    AuthorServer, ClaudeCode, ClaudeCodeConfig, PictureAnswer, PictureQuestion, ALLOWED_TOOLS,
-    NO_READING,
+    AuthorServer, ClaudeCode, ClaudeCodeConfig, ClaudeReader, PictureAnswer, PictureQuestion,
+    ALLOWED_TOOLS, NO_READING,
 };
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job, Trouble};
 use sce_specs::{ModelFiles, Revision, SpecId};
@@ -751,7 +751,11 @@ fn reading_schema() -> Value {
     json!({"type": "object", "required": ["blocks"], "properties": {"blocks": {"type": "array"}}})
 }
 
-fn read(client: &ClaudeCode, schema: &Value) -> Result<PictureAnswer, GenerateError> {
+fn reader(fake: &Fake) -> ClaudeReader {
+    ClaudeReader::new(fake.binary.clone(), ClaudeCodeConfig::default())
+}
+
+fn read(client: &ClaudeReader, schema: &Value) -> Result<PictureAnswer, GenerateError> {
     client.read_picture(
         &PictureQuestion {
             prompt: "Read the picture. (recipe read-picture 1)",
@@ -780,7 +784,7 @@ fn a_reading_gives_the_client_no_tool_no_server_and_the_answer_s_form_it_was_han
     let fake = reading_as("claude-read-flags", &answered(json!({"blocks": []})));
     let schema = reading_schema();
 
-    read(&client(&fake), &schema).unwrap();
+    read(&reader(&fake), &schema).unwrap();
 
     assert_eq!(fake.value_of("--tools").as_deref(), Some(""));
     assert_eq!(
@@ -810,7 +814,7 @@ fn a_reading_gives_the_client_no_tool_no_server_and_the_answer_s_form_it_was_han
 fn the_picture_is_handed_over_as_an_image_beside_the_text_on_one_line() {
     let fake = reading_as("claude-read-stdin", &answered(json!({"blocks": []})));
 
-    read(&client(&fake), &reading_schema()).unwrap();
+    read(&reader(&fake), &reading_schema()).unwrap();
 
     let stdin = fake.read("stdin");
     assert_eq!(stdin.lines().count(), 1, "{stdin}");
@@ -832,7 +836,7 @@ fn the_answer_in_its_form_and_the_model_the_client_said_are_what_a_reading_retur
     let said = json!({"blocks": [{"kind": "diagram", "markdown": "- a -> b", "unsure": false}]});
     let fake = reading_as("claude-read-answer", &answered(said.clone()));
 
-    let answer = read(&client(&fake), &reading_schema()).unwrap();
+    let answer = read(&reader(&fake), &reading_schema()).unwrap();
 
     assert_eq!(
         answer,
@@ -852,7 +856,7 @@ fn a_reply_with_no_answer_in_its_form_is_a_reading_that_did_not_come() {
     );
 
     let Err(GenerateError::Unusable(Trouble { failure, words, .. })) =
-        read(&client(&fake), &reading_schema())
+        read(&reader(&fake), &reading_schema())
     else {
         panic!("expected an unusable reading");
     };
@@ -865,7 +869,7 @@ fn a_reading_that_takes_longer_than_it_is_allowed_is_stopped() {
     let fake = Fake::new("claude-read-slow", "exec sleep 60");
     let started = Instant::now();
 
-    let failed = client(&fake).read_picture(
+    let failed = reader(&fake).read_picture(
         &PictureQuestion {
             prompt: "Read it.",
             picture: PICTURE,

@@ -147,53 +147,65 @@ impl ClaudeCode {
     /// The client as a draft is written: the authoring server's tools of [`ALLOWED_TOOLS`], the
     /// system prompt, and the draft's form.
     fn command(&self, scratch: &Path) -> Command {
-        let mut command = self.confined(scratch, &schema(), self.config.max_turns);
+        let mut command = confined(
+            &self.binary,
+            &self.config,
+            scratch,
+            &schema(),
+            self.config.max_turns,
+        );
         command
             .args(["--allowedTools", &ALLOWED_TOOLS.join(",")])
             .args(["--append-system-prompt", SYSTEM_PROMPT]);
         command
     }
+}
 
-    /// The client as every run starts it: in `scratch`, with no built-in tool, no server but the ones
-    /// `scratch`'s server list names, nothing from the machine's settings, no session kept, `turns`
-    /// turns at most, and an answer that must take the form of `answer`. What a run adds is what it
-    /// may use beyond that, which a reading adds nothing to.
-    fn confined(&self, scratch: &Path, answer: &Value, turns: u32) -> Command {
-        let mut command = Command::new(&self.binary);
-        command
-            .current_dir(scratch)
-            .arg("-p")
-            // A stream of events, one to a line while the client works, so that what it does is
-            // said as it does it; the last of them is the result a single value used to be.
-            .args(["--output-format", "stream-json"])
-            .arg("--verbose")
-            .args(["--json-schema", &answer.to_string()])
-            .args(["--tools", ""])
-            .arg("--strict-mcp-config")
-            .args([
-                "--mcp-config",
-                &scratch.join(MCP_FILE).display().to_string(),
-            ])
-            .args(["--permission-mode", "dontAsk"])
-            .arg("--no-session-persistence")
-            .args(["--setting-sources", ""])
-            .arg("--disable-slash-commands")
-            .args(["--max-turns", &turns.to_string()]);
-        if let Some(model) = &self.config.model {
-            command.args(["--model", model]);
-        }
-        if let Some(effort) = &self.config.effort {
-            command.args(["--effort", effort]);
-        }
-        if let Some(budget) = self.config.max_budget_usd {
-            command.args(["--max-budget-usd", &budget.to_string()]);
-        }
-        command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        command
+/// The client as every run starts it: `binary` in `scratch`, with no built-in tool, no server but the
+/// ones `scratch`'s server list names, nothing from the machine's settings, no session kept, `turns`
+/// turns at most, the model, effort and budget of `config`, and an answer that must take the form of
+/// `answer`. What a run adds is what it may use beyond that, which a reading adds nothing to.
+fn confined(
+    binary: &Path,
+    config: &ClaudeCodeConfig,
+    scratch: &Path,
+    answer: &Value,
+    turns: u32,
+) -> Command {
+    let mut command = Command::new(binary);
+    command
+        .current_dir(scratch)
+        .arg("-p")
+        // A stream of events, one to a line while the client works, so that what it does is
+        // said as it does it; the last of them is the result a single value used to be.
+        .args(["--output-format", "stream-json"])
+        .arg("--verbose")
+        .args(["--json-schema", &answer.to_string()])
+        .args(["--tools", ""])
+        .arg("--strict-mcp-config")
+        .args([
+            "--mcp-config",
+            &scratch.join(MCP_FILE).display().to_string(),
+        ])
+        .args(["--permission-mode", "dontAsk"])
+        .arg("--no-session-persistence")
+        .args(["--setting-sources", ""])
+        .arg("--disable-slash-commands")
+        .args(["--max-turns", &turns.to_string()]);
+    if let Some(model) = &config.model {
+        command.args(["--model", model]);
     }
+    if let Some(effort) = &config.effort {
+        command.args(["--effort", effort]);
+    }
+    if let Some(budget) = config.max_budget_usd {
+        command.args(["--max-budget-usd", &budget.to_string()]);
+    }
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command
 }
 
 /// The file the client reads its servers from, in its folder.
@@ -332,7 +344,41 @@ pub const READING_TURNS: u32 = 3;
 /// wrong is said of that picture in the import's reply.
 pub const NO_READING: &str = "no-reading";
 
-impl ClaudeCode {
+/// Claude Code as a reader of pictures: the program, how a run of it is bounded, and its version. It
+/// has no authoring server, which a draft is written through and a reading never reaches, and it is
+/// not a generator: it is asked one question while a person waits, and no request is made for it.
+#[derive(Debug, Clone)]
+pub struct ClaudeReader {
+    binary: PathBuf,
+    config: ClaudeCodeConfig,
+    version: Option<String>,
+}
+
+impl ClaudeReader {
+    /// A reader that runs `binary`. Its version is asked once, now, as a generator's is.
+    pub fn new(binary: PathBuf, config: ClaudeCodeConfig) -> Self {
+        let version = version_of(&binary);
+        ClaudeReader {
+            binary,
+            config,
+            version,
+        }
+    }
+
+    /// The first Claude Code the application finds, as [`ClaudeCode::find`] finds it.
+    pub fn find(config: ClaudeCodeConfig) -> Option<Self> {
+        candidates(&Search::from_environment())
+            .into_iter()
+            .next()
+            .map(|found| ClaudeReader::new(found.path, config))
+            .filter(|found| found.version.is_some())
+    }
+
+    /// What the program says its version is, when it says.
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
+    }
+
     /// Ask the client to read one picture, and wait at most `allowed` for its answer.
     ///
     /// The picture is handed over as an image on standard input (`--input-format stream-json`), the
@@ -357,7 +403,9 @@ impl ClaudeCode {
             GenerateError::installation(format!("the client's server list: {e}"))
                 .because(cause::WORK_FOLDER)
         })?;
-        let mut command = self.confined(
+        let mut command = confined(
+            &self.binary,
+            &self.config,
             scratch.path(),
             question.answer_schema,
             READING_TURNS.min(self.config.max_turns),

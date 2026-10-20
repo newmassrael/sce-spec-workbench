@@ -114,7 +114,13 @@ pub const COMMANDS: &[&str] = &[
 /// parts that are not taken after all, and `read_document`'s outline lists each part's `items` (ADR 0039,
 /// amended). A choice that names none is the choice it was, so no caller of 8 misreads one; the version moves
 /// because a screen that leaves an item out is held to a core that takes it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 9;
+///
+/// 10: `import_selection` takes `read`, the ids of figures of the chosen parts whose pictures an AI
+/// connection is asked to read, and `connection`, the one that reads them (ADR 0036 of SCE, amended); its
+/// reply says which figures were `read` and which pictures were `not_read`, and why. A choice that reads
+/// nothing is the choice it was, so no caller of 9 misreads one; the version moves because a screen that
+/// asks for a reading is held to a core that does it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 10;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -203,6 +209,9 @@ pub struct Context<'a, C: Clock> {
     /// The program the shell was told is Claude Code (`SCE_CLAUDE`), when it was told one; none
     /// is the first one the application finds.
     pub claude: Option<&'a Path>,
+    /// What the environment lets one run of Claude Code spend (`SCE_CLAUDE_BUDGET_USD`), for a question
+    /// a command puts to it while the person waits, as the runner bounds a request's run by it.
+    pub claude_budget_usd: Option<f64>,
     /// The program the shell was told is Codex (`SCE_CODEX`), when it was told one.
     pub codex: Option<&'a Path>,
     /// Where to look for the programs a connection may name; this process's own places when
@@ -229,10 +238,17 @@ impl<'a, C: Clock> Context<'a, C> {
             policy,
             entrance,
             claude: None,
+            claude_budget_usd: None,
             codex: None,
             search: None,
             import_tools: None,
         }
+    }
+
+    /// With what one run of Claude Code may spend.
+    pub fn with_claude_budget(mut self, max_budget_usd: Option<f64>) -> Self {
+        self.claude_budget_usd = max_budget_usd;
+        self
     }
 
     /// With the authoring tools that bring a document in (or the reason there are none).
@@ -266,7 +282,7 @@ impl<'a, C: Clock> Context<'a, C> {
     }
 
     /// Where to look for the programs a connection may name.
-    fn places(&self) -> Search {
+    pub(crate) fn places(&self) -> Search {
         self.search
             .cloned()
             .unwrap_or_else(Search::from_environment)

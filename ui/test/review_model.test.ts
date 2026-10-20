@@ -179,7 +179,7 @@ function assembled(decisions: number, changes: Partial<TextChanges> = {}): Assem
 }
 
 function panel(v: ProposalView, assembledText: AssembledImport | null): ReviewPanel {
-  return { part: null, view: v, rows: [], notCarried: [], member: "", assembled: assembledText };
+  return { part: null, view: v, rows: [], notCarried: [], notRead: [], member: "", assembled: assembledText };
 }
 
 describe("when the save is offered", () => {

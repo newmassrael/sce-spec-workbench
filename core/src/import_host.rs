@@ -28,6 +28,7 @@
 //! that did not answer in time is `import-tool-timeout`. A review is never left half made by either:
 //! nothing is registered until all four pieces exist.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -39,9 +40,12 @@ use serde_json::{json, Value};
 use sce_specs::commands::{call_with, NoPins};
 use sce_specs::{Clock, CommandError, Revision, SpecId, StoreError};
 
+use crate::asking::{chosen_connection, reader_for, READING_TIME, READING_UNAVAILABLE};
+use crate::claude_code::{ClaudeReader, PictureQuestion};
 use crate::client_run::capture;
 use crate::commands::Context;
 use crate::installed::Installed;
+use crate::runner::{Cancel, GenerateError};
 
 /// The name of the environment variable that names the tools' launcher.
 pub const AUTHOR_CLI_ENV: &str = "SCE_AUTHOR";
@@ -457,12 +461,15 @@ fn valid_block(id: &str) -> bool {
     valid_id(id, 'b', 9)
 }
 
-/// What the owner chose of a document: the parts (all of them when none is named), and the items of
-/// them (a table, a figure, an attachment) left out by themselves.
+/// What the owner chose of a document: the parts (all of them when none is named), the items of them
+/// (a table, a figure, an attachment) left out by themselves, and the figures whose pictures they asked
+/// an AI connection to read (the default connection when none is named).
 #[derive(Clone, Copy, Default)]
 struct Choice<'a> {
     sections: Option<&'a [String]>,
     leave_out: &'a [String],
+    read: &'a [String],
+    connection: Option<&'a str>,
 }
 
 impl Choice<'_> {
@@ -484,6 +491,32 @@ fn propose_part<C: Clock>(
     let original = &kept.original;
     let extraction_digest = &kept.extraction;
     let extraction_text = &kept.extraction_text;
+
+    // A picture to read is asked of a connection that can read one, and that is known before anything
+    // is run: a connection that cannot is said at once, and not after the document was converted.
+    let reader = if choice.read.is_empty() {
+        None
+    } else {
+        if let Some(stranger) = choice.read.iter().find(|id| !valid_block(id)) {
+            return Err(refuse(
+                "bad-block",
+                format!("`{stranger}` is not the id of an item of the document"),
+                json!({ "block": stranger }),
+            ));
+        }
+        if let Some(both) = choice.read.iter().find(|id| choice.leave_out.contains(id)) {
+            return Err(refuse(
+                "read-left-out",
+                format!(
+                    "`{both}` is left out and asked to be read: a picture left out is not read"
+                ),
+                json!({ "block": both }),
+            ));
+        }
+        let chosen = chosen_connection(context, choice.connection, READING_UNAVAILABLE)?;
+        Some(reader_for(context, &chosen)?)
+    };
+
     let scratch = Scratch::new()?;
     scratch.write("e.json", extraction_text.as_bytes())?;
     let dir = scratch.path(".");
@@ -560,13 +593,36 @@ fn propose_part<C: Clock>(
         "unreadable-original",
         &[2],
     )?;
-    let conversion_text = scratch.read("c.json")?;
+    // The pictures the owner asked to be read, added after their marks; the check then counts the
+    // conversion with them, and asks about each block read.
+    let (conversion_file, pictures) = match &reader {
+        Some(reader) => {
+            let pictures = read_chosen_pictures(
+                context,
+                tools,
+                &scratch,
+                args.id,
+                kept,
+                choice.read,
+                scope_flags,
+                reader,
+            )?;
+            let file = if pictures.read.is_empty() {
+                "c.json"
+            } else {
+                "cr.json"
+            };
+            (file, pictures)
+        }
+        None => ("c.json", PicturesRead::default()),
+    };
+    let conversion_text = scratch.read(conversion_file)?;
     let mut check = vec![
         "check-conversion",
         "--extraction",
         "e.json",
         "--conversion",
-        "c.json",
+        conversion_file,
         "--json",
     ];
     check.extend(scope_flags);
@@ -616,7 +672,230 @@ fn propose_part<C: Clock>(
         "created": registered["created"],
         "complete": complete,
         "not_carried": not_carried,
+        "read": pictures.read,
+        "not_read": pictures.not_read,
     }))
+}
+
+/// What became of the pictures the owner asked to be read: the figures whose pictures were read, and
+/// each picture that was not, with why.
+#[derive(Default)]
+struct PicturesRead {
+    read: Vec<String>,
+    not_read: Vec<Value>,
+}
+
+/// Read the pictures the figure blocks `read` mark, with `reader`, and add what was read to the
+/// conversion by rule (`c.json`) as `cr.json` (ADR 0036 of SCE).
+///
+/// The tools take each picture out of the original as it is and write what the client is told; the
+/// client is handed each picture alone; the tools read each answer and add it after its mark. A picture
+/// the tools would not hand over (a format a client cannot be shown, one too heavy) or whose reading did
+/// not come or could not be taken is not a failed import: its mark stays as it was, and the reply says
+/// which and why, so the owner decides what to do about it.
+#[allow(clippy::too_many_arguments)]
+fn read_chosen_pictures<C: Clock>(
+    context: &Context<'_, C>,
+    tools: &ImportTools,
+    scratch: &Scratch,
+    id: &str,
+    kept: &Kept,
+    read: &[String],
+    scope_flags: &[&str],
+    reader: &ClaudeReader,
+) -> Result<PicturesRead, CommandError> {
+    let dir = scratch.path(".");
+    let document = place_original(context, scratch, id, kept)?;
+    let mut prepare = vec![
+        "prepare-reading",
+        "--extraction",
+        "e.json",
+        "--document",
+        document.as_str(),
+        "--out-dir",
+        "reading",
+    ];
+    for block in read {
+        prepare.extend(["--block", block.as_str()]);
+    }
+    prepare.extend(scope_flags);
+    tools.run_to_success(
+        &dir,
+        &prepare,
+        tools.quick_timeout,
+        "unreadable-original",
+        &[2],
+    )?;
+    let listing: Value = serde_json::from_str(&scratch.read("reading/units.json")?)
+        .map_err(|e| failed(format!("`prepare-reading` did not list its units: {e}")))?;
+    let schema: Value = serde_json::from_str(&scratch.read("reading/answer.schema.json")?)
+        .map_err(|e| {
+            failed(format!(
+                "`prepare-reading` did not write the answer's form: {e}"
+            ))
+        })?;
+    let mut not_read: Vec<Value> = listing["refused"].as_array().cloned().unwrap_or_default();
+    let units = listing["units"].as_array().cloned().unwrap_or_default();
+
+    let mut answered: BTreeMap<u64, String> = BTreeMap::new();
+    let mut model: Option<String> = None;
+    for unit in &units {
+        let field = |name: &str| -> Result<String, CommandError> {
+            unit[name]
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| failed(format!("`prepare-reading` listed a unit with no `{name}`")))
+        };
+        let n = unit["n"]
+            .as_u64()
+            .ok_or_else(|| failed("`prepare-reading` listed a unit with no number"))?;
+        let block = field("block")?;
+        let prompt = scratch.read(&format!("reading/{}", field("prompt")?))?;
+        let picture_file = scratch.path(&format!("reading/{}", field("file")?));
+        let picture = fs::read(&picture_file).map_err(|e| {
+            failed(format!(
+                "the tool did not write {}: {e}",
+                picture_file.display()
+            ))
+        })?;
+        let media_type = unit["picture"]["media_type"].as_str().unwrap_or_default();
+        let asked = reader.read_picture(
+            &PictureQuestion {
+                prompt: &prompt,
+                picture: &picture,
+                media_type,
+                answer_schema: &schema,
+            },
+            &Cancel::new(),
+            READING_TIME,
+        );
+        match asked {
+            Ok(answer) => {
+                scratch.write(
+                    &format!("reading/{}", field("answer")?),
+                    answer.answer.to_string().as_bytes(),
+                )?;
+                model = answer.model.or(model);
+                answered.insert(n, block);
+            }
+            Err(error) => not_read.push(not_read_by(&block, &unit["picture"]["name"], &error)),
+        }
+    }
+    if answered.is_empty() {
+        return Ok(PicturesRead {
+            read: Vec::new(),
+            not_read,
+        });
+    }
+
+    let version = reader.version().unwrap_or_default().to_string();
+    let model = model.unwrap_or_default();
+    let finished = tools.run(
+        &dir,
+        &[
+            "finish-reading",
+            "--extraction",
+            "e.json",
+            "--conversion",
+            "c.json",
+            "--dir",
+            "reading",
+            "--runtime",
+            "claude-code",
+            "--runtime-version",
+            &version,
+            "--model",
+            &model,
+            "--out",
+            "cr.json",
+            "--json",
+        ],
+        tools.quick_timeout,
+    )?;
+    // 0 is every answer taken, 1 an answer that could not be; both print what became of each.
+    if !matches!(finished.code, 0 | 1) {
+        return Err(failed(format!(
+            "`finish-reading` ended with {}: {}",
+            finished.code,
+            first_words(&finished.stderr, &finished.stdout)
+        )));
+    }
+    let said: Value = serde_json::from_str(finished.stdout.trim())
+        .map_err(|e| failed(format!("`finish-reading` did not say what it added: {e}")))?;
+    // A unit with no answer is one the client did not read, and is said above with why; the tools say
+    // of it only that there is no answer.
+    for failure in said["failed"].as_array().into_iter().flatten() {
+        if failure["n"]
+            .as_u64()
+            .is_some_and(|n| answered.contains_key(&n))
+        {
+            not_read.push(failure.clone());
+        }
+    }
+    let read = said["read"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(said["nothing_to_read"].as_array().into_iter().flatten())
+        .filter_map(|n| n.as_u64().and_then(|n| answered.get(&n)).cloned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    Ok(PicturesRead { read, not_read })
+}
+
+/// A picture the client did not read, as the reply says it: the figure, the picture, a word for what
+/// went wrong and the client's own sentence.
+fn not_read_by(block: &str, picture: &Value, error: &GenerateError) -> Value {
+    let (code, why) = match error {
+        GenerateError::Cancelled => (
+            "cancelled".to_string(),
+            "the reading was stopped".to_string(),
+        ),
+        GenerateError::Failed(trouble) | GenerateError::Unusable(trouble) => (
+            trouble
+                .failure
+                .cause
+                .clone()
+                .unwrap_or_else(|| trouble.failure.kind.word().to_string()),
+            trouble.words.clone(),
+        ),
+    };
+    json!({ "block": block, "picture": picture, "code": code, "why": why })
+}
+
+/// Place every member of the kept original in the scratch folder at its own path, and give back the
+/// path of the one the extraction was read from: a picture a document holds is taken from the document,
+/// and one a plain-text specification names is the file beside it, as `prepare-reading` reads it.
+fn place_original<C: Clock>(
+    context: &Context<'_, C>,
+    scratch: &Scratch,
+    id: &str,
+    kept: &Kept,
+) -> Result<String, CommandError> {
+    let spec = SpecId::parse(id)?;
+    let digest = revision_of(&kept.original)?;
+    let manifest = context.specs.read_original(&spec, &digest)?;
+    let extraction: Value = serde_json::from_str(&kept.extraction_text)
+        .map_err(|e| failed(format!("the extraction kept is not JSON: {e}")))?;
+    let member = extraction["member"]
+        .as_str()
+        .ok_or_else(|| failed("the extraction kept does not name the member it was read from"))?;
+    for held in &manifest.members {
+        let bytes = context
+            .specs
+            .read_original_member(&spec, &digest, &held.path)?;
+        // The store holds a member's path to one that stays inside the original, so it stays inside
+        // this folder too.
+        let at = scratch.path(&format!("in/{}", held.path));
+        if let Some(parent) = at.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| failed(format!("a folder to work in could not be made: {e}")))?;
+        }
+        fs::write(&at, bytes)
+            .map_err(|e| failed(format!("{} could not be written: {e}", at.display())))?;
+    }
+    Ok(format!("in/{member}"))
 }
 
 /// Bring a document in whole: an original, its extraction, its conversion by rule, the check of it,
@@ -713,6 +992,12 @@ pub(crate) struct ImportSelection {
     /// The ids of items (`items` of a part `read_document` listed) left out of the chosen parts.
     #[serde(default)]
     leave_out: Vec<String>,
+    /// The ids of figures (items of the chosen parts) whose pictures an AI connection is asked to read.
+    #[serde(default)]
+    read: Vec<String>,
+    /// The connection the pictures are read by: one the person saved. Absent, the default connection.
+    #[serde(default)]
+    connection: Option<String>,
     key: String,
     origin: String,
     #[serde(default)]
@@ -747,6 +1032,8 @@ pub(crate) fn import_selection<C: Clock>(
     let choice = Choice {
         sections: args.sections.as_deref(),
         leave_out: &args.leave_out,
+        read: &args.read,
+        connection: args.connection.as_deref(),
     };
     propose_part(context, tools, &proposing, &kept, choice)
 }

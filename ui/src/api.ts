@@ -119,6 +119,8 @@ export interface PartsChoice {
   readonly sections: readonly string[] | undefined;
   /** The items (a table, a figure, an attachment) of the chosen parts left out by themselves. */
   readonly leaveOut: readonly string[];
+  /** The figures of the chosen parts whose pictures an AI connection is asked to read. */
+  readonly read: readonly string[];
 }
 
 export interface Api {
@@ -324,8 +326,10 @@ export interface Api {
    * The second step: convert, check and propose the parts chosen of a document `readDocument` kept.
    * `choice.sections` are ids of its outline, absent for all of them, and `choice.leaveOut` the ids of
    * items of those parts not taken after all. What is outside the choice is never given to anything and
-   * is not asked about. Refused as `nothing-chosen`, `bad-section`, `bad-block` or `scope-refused`, and as
-   * `key-reused` when the same `key` was used for another choice.
+   * is not asked about. `choice.read` are figures whose pictures the default AI connection is asked to
+   * read; the reply says which were read and which were not, and why. Refused as `nothing-chosen`,
+   * `bad-section`, `bad-block`, `scope-refused` or `read-left-out`, as `reading-unavailable` when the
+   * connection cannot read a picture, and as `key-reused` when the same `key` was used for another choice.
    */
   importSelection(
     id: string,
@@ -590,6 +594,7 @@ export function apiOver(transport: Transport): Api {
         origin: "gui",
         ...(choice.sections === undefined ? {} : { sections: choice.sections }),
         ...(choice.leaveOut.length === 0 ? {} : { leave_out: choice.leaveOut }),
+        ...(choice.read.length === 0 ? {} : { read: choice.read }),
         ...(supersede ? { supersede: true } : {}),
       };
       return parseImportedDocument(await transport.call("import_selection", args));

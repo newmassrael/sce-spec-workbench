@@ -226,12 +226,60 @@ export function pressItem(leftOut: ReadonlySet<string>, id: string): Set<string>
   return next;
 }
 
-/** The items left out of the parts that are chosen, in the document's order: the ones that leave anything out. */
-function itemsLeftOut(chosen: ReadonlySet<string>, leftOut: ReadonlySet<string>, doc: ReadDocument): DocumentItem[] {
+/**
+ * What becomes of a figure: taken as its mark (`[picture: NAME]`), read by an AI connection with what it
+ * read added after the mark, or left out. A table and an attachment are taken or left out.
+ */
+export type FigureChoice = "mark" | "read" | "leave";
+
+/** What the person chose of the items by themselves: the ones left out, and the figures to be read. */
+export interface ItemChoices {
+  readonly leftOut: ReadonlySet<string>;
+  readonly toRead: ReadonlySet<string>;
+}
+
+/** What becomes of figure `id`. */
+export function figureChoice(items: ItemChoices, id: string): FigureChoice {
+  if (items.leftOut.has(id)) return "leave";
+  return items.toRead.has(id) ? "read" : "mark";
+}
+
+/** Figure `id` taken as its mark, read, or left out: one of the three, so a figure is never both. */
+export function chooseFigure(
+  items: ItemChoices,
+  id: string,
+  to: FigureChoice,
+): { leftOut: Set<string>; toRead: Set<string> } {
+  const leftOut = new Set(items.leftOut);
+  const toRead = new Set(items.toRead);
+  leftOut.delete(id);
+  toRead.delete(id);
+  if (to === "leave") leftOut.add(id);
+  if (to === "read") toRead.add(id);
+  return { leftOut, toRead };
+}
+
+/** The items of the parts that are chosen, in the document's order, that `which` holds. */
+function itemsOf(chosen: ReadonlySet<string>, which: ReadonlySet<string>, doc: ReadDocument): DocumentItem[] {
   return doc.outline.sections
     .filter((s) => chosen.has(s.id))
     .flatMap((s) => s.items)
-    .filter((item) => leftOut.has(item.id));
+    .filter((item) => which.has(item.id));
+}
+
+/** The items left out of the parts that are chosen, in the document's order: the ones that leave anything out. */
+function itemsLeftOut(chosen: ReadonlySet<string>, leftOut: ReadonlySet<string>, doc: ReadDocument): DocumentItem[] {
+  return itemsOf(chosen, leftOut, doc);
+}
+
+/** The figures of the chosen parts to be read: a figure left out is not read, and only a figure is. */
+function figuresToRead(
+  chosen: ReadonlySet<string>,
+  leftOut: ReadonlySet<string>,
+  toRead: ReadonlySet<string>,
+  doc: ReadDocument,
+): DocumentItem[] {
+  return itemsOf(chosen, toRead, doc).filter((item) => item.kind === "figure" && !leftOut.has(item.id));
 }
 
 /** What is chosen, in the numbers a person weighs it by. */
@@ -242,12 +290,15 @@ export interface ChosenTotals {
   readonly characters: number;
   /** Items of the chosen parts left out by themselves. */
   readonly itemsOut: number;
+  /** Figures of the chosen parts whose pictures an AI connection is asked to read. */
+  readonly figuresRead: number;
 }
 
 export function chosenTotals(
   chosen: ReadonlySet<string>,
   doc: ReadDocument,
   leftOut: ReadonlySet<string> = new Set(),
+  toRead: ReadonlySet<string> = new Set(),
 ): ChosenTotals {
   const sections = doc.outline.sections;
   const held = sections.filter((s) => chosen.has(s.id));
@@ -260,18 +311,26 @@ export function chosenTotals(
     blocks: held.reduce((sum, s) => sum + s.blocks, 0) - worded.length,
     characters: held.reduce((sum, s) => sum + s.characters, 0) - worded.reduce((sum, i) => sum + i.characters, 0),
     itemsOut: out.length,
+    figuresRead: figuresToRead(chosen, leftOut, toRead, doc).length,
   };
 }
 
 /**
- * The choice to send: the chosen parts in the document's order, or `undefined` for all of them, and the
- * items left out of them. Every part with nothing left out is what the core takes as the whole document
- * and keeps no scope for. An item of a part that is not chosen is not sent: it is out with its part.
+ * The choice to send: the chosen parts in the document's order, or `undefined` for all of them, the
+ * items left out of them, and the figures of them to be read. Every part with nothing left out is what the
+ * core takes as the whole document and keeps no scope for. An item of a part that is not chosen is not
+ * sent: it is out with its part.
  */
-export function choiceToSend(chosen: ReadonlySet<string>, leftOut: ReadonlySet<string>, doc: ReadDocument): PartsChoice {
+export function choiceToSend(
+  chosen: ReadonlySet<string>,
+  leftOut: ReadonlySet<string>,
+  doc: ReadDocument,
+  toRead: ReadonlySet<string> = new Set(),
+): PartsChoice {
   const ids = doc.outline.sections.map((s) => s.id).filter((id) => chosen.has(id));
   return {
     sections: ids.length === doc.outline.sections.length ? undefined : ids,
     leaveOut: itemsLeftOut(chosen, leftOut, doc).map((item) => item.id),
+    read: figuresToRead(chosen, leftOut, toRead, doc).map((item) => item.id),
   };
 }

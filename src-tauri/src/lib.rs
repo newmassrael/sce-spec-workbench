@@ -52,6 +52,9 @@ struct Specs {
     /// the search path, which is looked for each time it is asked about, so that installing it
     /// while the window is open is seen by the next check.
     claude: Option<std::path::PathBuf>,
+    /// What the environment lets one run of Claude Code spend (`SCE_CLAUDE_BUDGET_USD`), for a picture
+    /// read while the person waits as for a request's run.
+    claude_budget_usd: Option<f64>,
     /// The program the environment named as Codex (`SCE_CODEX`), looked for the same way.
     codex: Option<std::path::PathBuf>,
     /// The authoring tools that bring a document in (`SCE_AUTHOR`, else the installer's), or why
@@ -109,6 +112,7 @@ fn sce_call(
     )
     .with_connections(Some(&specs.settings))
     .with_claude(specs.claude.as_deref())
+    .with_claude_budget(specs.claude_budget_usd)
     .with_codex(specs.codex.as_deref())
     .with_import_tools(Some(&specs.import_tools));
     call_in(&context, &name, args.unwrap_or(Value::Null))
@@ -189,6 +193,7 @@ pub fn run() {
                 settings: ConnectionStore::at(settings),
                 policy: Policy::shipped(),
                 claude: named.claude,
+                claude_budget_usd: named.config.max_budget_usd,
                 codex: named.codex,
                 import_tools,
             });

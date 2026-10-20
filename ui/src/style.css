@@ -1360,6 +1360,28 @@ textarea:focus-visible {
   background: none;
 }
 
+/* A picture taken can be read by AI as well: the second choice sits under the picture's row, indented to its name. */
+.imp .item-read {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 4px 52px;
+  font: 400 13px/20px var(--font);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.imp .item-read input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.imp .item-read:has(input:disabled) {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .imp .item-kind {
   padding: 0 8px;
   border: 1px solid var(--line);

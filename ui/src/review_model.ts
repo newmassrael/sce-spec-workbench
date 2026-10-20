@@ -11,7 +11,7 @@
 // This lays them out and says whether the core would take an accept now.
 
 import { ContractError } from "./contract";
-import type { AssembledImport, ProposalDecision, ProposalView, TextChanges } from "./contract";
+import type { AssembledImport, NotRead, ProposalDecision, ProposalView, TextChanges } from "./contract";
 
 /** A block of the Markdown an extraction was written as: its id, its words, and the original blocks it cites. */
 export interface WrittenBlock {
@@ -221,6 +221,11 @@ export interface ReviewPanel {
   readonly view: ProposalView;
   readonly rows: readonly ReviewRow[];
   readonly notCarried: readonly NotCarried[];
+  /**
+   * The pictures the owner asked to be read that were not, as the import that made the proposal said;
+   * empty for a proposal opened later, whose conversion keeps only what was read.
+   */
+  readonly notRead: readonly NotRead[];
   /** The conversion's name for the original (the file's name), for the column's heading; empty when unknown. */
   readonly member: string;
   /** What accepting would save and change, as of the decisions the view holds; `null` until asked. */

@@ -188,6 +188,9 @@ class FakeCore {
   private next = 1;
   /** What the next `import_selection` does: an answer, or a refusal. */
   importWith: (() => Promise<ImportedDocument>) | null = null;
+  /** The figures the last `import_selection` asked to be read, and what the next one says was not read. */
+  readAsked: readonly string[] = [];
+  notRead: ImportedDocument["not_read"] = [];
   /** What the next `read_document` does, when it is not the default one-part document. */
   readWith: (() => Promise<ReadDocument>) | null = null;
   /** The proposals made of part of a document. */
@@ -395,6 +398,7 @@ class FakeCore {
     },
     importSelection: async (id, _document, key, choice, supersede) => {
       this.record("import_selection", id, key, choice.sections, supersede ?? false, choice.leaveOut);
+      this.readAsked = choice.read;
       if (this.importWith !== null) return this.importWith();
       const spec = this.listed.find((s) => s.id === id) ?? { id, title: id, created_at: "" };
       const open = (this.specs.get(id) ?? []).find((s) => (s.ended ?? s.proposal.state) === "pending");
@@ -405,7 +409,14 @@ class FakeCore {
       const stored = this.makeProposal(spec);
       // A choice of some of the parts is a proposal of part of the document, which its documents say.
       if (choice.sections !== undefined || choice.leaveOut.length > 0) this.partial.add(stored.proposal.id);
-      return { proposal: stored.proposal, created: true, complete: this.asks.length === 0, not_carried: [] };
+      return {
+        proposal: stored.proposal,
+        created: true,
+        complete: this.asks.length === 0,
+        not_carried: [],
+        read: choice.read.filter((id) => !this.notRead.some((n) => n.block === id)),
+        not_read: this.notRead,
+      };
     },
     listProposals: async (id) => {
       this.record("list_proposals", id);
@@ -686,7 +697,7 @@ describe("a document that is read", () => {
     r.core.api.importSelection = async () => {
       const stored = r.core.makeProposal(spec);
       stored.text = "The lock opens at once.";
-      return { proposal: stored.proposal, created: true, complete: true, not_carried: [] };
+      return { proposal: stored.proposal, created: true, complete: true, not_carried: [], read: [], not_read: [] };
     };
     r.flow.open({ kind: "spec", spec });
 
@@ -1356,6 +1367,46 @@ describe("a document with parts to choose between", () => {
     await settle();
 
     expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false, ["b9"]]]);
+  });
+
+  it("asks for a picture to be read by AI, never one left out, and says which picture was not read", async () => {
+    r.core.sections = twoFunctions();
+    r.core.sections[2] = {
+      ...section("s3", "Fan"),
+      items: [
+        { id: "b9", kind: "table", label: "speed | rpm", characters: 12 },
+        { id: "b10", kind: "figure", label: "[picture: fan.png]", characters: 18 },
+        { id: "b11", kind: "figure", label: "[picture: wiring.emf]", characters: 20 },
+      ],
+    };
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+    const read = (id: string): HTMLInputElement | null => r.root.querySelector<HTMLInputElement>(`#read-${id}`);
+    // A table is taken or left out; only a picture can be read.
+    expect(read("b9")).toBeNull();
+    expect([read("b10")!.checked, read("b11")!.checked]).toEqual([false, false]);
+
+    read("b10")!.click();
+    await settle();
+    read("b11")!.click();
+    await settle();
+    expect(r.root.textContent).toContain(say("impPartsFiguresRead", { n: "2" }));
+    // Left out, a picture is not read, and taken again it is its mark until reading is asked again.
+    r.root.querySelector<HTMLInputElement>("#item-b10")!.click();
+    await settle();
+    expect([read("b10")!.checked, read("b10")!.disabled]).toEqual([false, true]);
+    r.root.querySelector<HTMLInputElement>("#item-b10")!.click();
+    await settle();
+    expect(read("b10")!.checked).toBe(false);
+
+    r.core.notRead = [{ block: "b11", picture: "wiring.emf", code: "picture-not-showable", why: "its format cannot be shown" }];
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.core.readAsked).toEqual(["b11"]);
+    expect(r.root.textContent).toContain(say("rvwNotReadTitle"));
+    expect(r.root.textContent).toContain(say("rvwNotReadWhat", { picture: "wiring.emf" }));
+    expect(r.root.textContent).toContain("its format cannot be shown");
   });
 
   it("cannot bring in a part whose every block is an item left out, and says so", async () => {

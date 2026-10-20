@@ -25,9 +25,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use common::tool;
-use sce_spec_workbench_core::claude_code::{
-    AuthorServer, ClaudeCode, ClaudeCodeConfig, PictureQuestion,
-};
+use sce_spec_workbench_core::claude_code::{ClaudeCodeConfig, ClaudeReader, PictureQuestion};
 use sce_spec_workbench_core::runner::Cancel;
 use serde_json::Value;
 
@@ -107,14 +105,7 @@ fn the_real_client_reads_a_picture_in_the_form_the_kind_asks_for() {
         serde_json::from_str(&fs::read_to_string(units.join("answer.schema.json")).unwrap())
             .unwrap();
 
-    // No authoring server is reached by a reading; the author is never named in its command line.
-    let author = AuthorServer {
-        command: "/nonexistent".into(),
-        args: vec![],
-        env: vec![],
-    };
-    let client =
-        ClaudeCode::find(author, ClaudeCodeConfig::default()).expect("claude is on the path");
+    let client = ClaudeReader::find(ClaudeCodeConfig::default()).expect("claude is on the path");
     let read = client
         .read_picture(
             &PictureQuestion {

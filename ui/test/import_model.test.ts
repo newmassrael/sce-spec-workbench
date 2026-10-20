@@ -8,10 +8,12 @@ import {
   allSections,
   base64Of,
   carryKey,
+  chooseFigure,
   chosenState,
   chosenTotals,
   divisionKey,
   failureOf,
+  figureChoice,
   importKey,
   isChoosable,
   choiceToSend,
@@ -190,18 +192,18 @@ describe("choosing the parts of a document", () => {
     const everything = chosenTotals(all(doc), doc);
     const leaving = chosenTotals(new Set(["s1", "s3"]), doc);
 
-    expect(everything).toEqual({ parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 0 });
-    expect(leaving).toEqual({ parts: 2, of: 3, blocks: 4, characters: 113, itemsOut: 0 });
+    expect(everything).toEqual({ parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 0, figuresRead: 0 });
+    expect(leaving).toEqual({ parts: 2, of: 3, blocks: 4, characters: 113, itemsOut: 0, figuresRead: 0 });
   });
 
   it("takes an item left out off what is counted, and an item with no words off nothing but the count of items", () => {
     const doc = document();
 
     expect(chosenTotals(all(doc), doc, new Set(["s3-b2"]))).toEqual({
-      parts: 3, of: 3, blocks: 5, characters: 136, itemsOut: 1,
+      parts: 3, of: 3, blocks: 5, characters: 136, itemsOut: 1, figuresRead: 0,
     });
     expect(chosenTotals(all(doc), doc, new Set(["s3-b3"]))).toEqual({
-      parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 1,
+      parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 1, figuresRead: 0,
     });
     // An item of a part that is not chosen is out with its part and is not counted twice.
     expect(chosenTotals(new Set(["s1", "s2"]), doc, new Set(["s3-b2"])).itemsOut).toBe(0);
@@ -215,9 +217,9 @@ describe("choosing the parts of a document", () => {
   it("sends the ids that are chosen, in the document's order, so that a part left out under a chosen one stays out", () => {
     const doc = document();
 
-    expect(choiceToSend(new Set(["s3", "s1"]), new Set(), doc)).toEqual({ sections: ["s1", "s3"], leaveOut: [] });
-    expect(choiceToSend(all(doc), new Set(), doc)).toEqual({ sections: undefined, leaveOut: [] });
-    expect(choiceToSend(new Set(), new Set(), doc)).toEqual({ sections: [], leaveOut: [] });
+    expect(choiceToSend(new Set(["s3", "s1"]), new Set(), doc)).toEqual({ sections: ["s1", "s3"], leaveOut: [], read: [] });
+    expect(choiceToSend(all(doc), new Set(), doc)).toEqual({ sections: undefined, leaveOut: [], read: [] });
+    expect(choiceToSend(new Set(), new Set(), doc)).toEqual({ sections: [], leaveOut: [], read: [] });
   });
 
   it("sends the items left out of chosen parts, in the document's order, and none of a part that is out", () => {
@@ -226,8 +228,34 @@ describe("choosing the parts of a document", () => {
     expect(choiceToSend(all(doc), new Set(["s3-b3", "s3-b2"]), doc)).toEqual({
       sections: undefined,
       leaveOut: ["s3-b2", "s3-b3"],
+      read: [],
     });
-    expect(choiceToSend(new Set(["s1"]), new Set(["s3-b2"]), doc)).toEqual({ sections: ["s1"], leaveOut: [] });
+    expect(choiceToSend(new Set(["s1"]), new Set(["s3-b2"]), doc)).toEqual({ sections: ["s1"], leaveOut: [], read: [] });
+  });
+
+  it("gives a figure one of three choices, and a figure is never both read and left out", () => {
+    const none = { leftOut: new Set<string>(), toRead: new Set<string>() };
+
+    const read = chooseFigure(none, "s3-b3", "read");
+    expect(figureChoice(read, "s3-b3")).toBe("read");
+    const left = chooseFigure(read, "s3-b3", "leave");
+    expect(figureChoice(left, "s3-b3")).toBe("leave");
+    expect([...left.toRead]).toEqual([]);
+    const marked = chooseFigure(left, "s3-b3", "mark");
+    expect(figureChoice(marked, "s3-b3")).toBe("mark");
+    expect([...marked.leftOut, ...marked.toRead]).toEqual([]);
+  });
+
+  it("sends the figures of chosen parts to be read, and none of a part that is out or of an item that is not a figure", () => {
+    const doc = document();
+
+    expect(choiceToSend(all(doc), new Set(), doc, new Set(["s3-b3", "s3-b2"]))).toEqual({
+      sections: undefined,
+      leaveOut: [],
+      read: ["s3-b3"],
+    });
+    expect(choiceToSend(new Set(["s1"]), new Set(), doc, new Set(["s3-b3"])).read).toEqual([]);
+    expect(chosenTotals(all(doc), doc, new Set(), new Set(["s3-b3"])).figuresRead).toBe(1);
   });
 });
 

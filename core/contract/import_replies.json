@@ -19,7 +19,7 @@
         "key": "press-1",
         "origin": "gui",
         "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
-        "report": "7e45bac99ce53457d44dff621b4244d46f19c75c714f970d5728cddd54d08c44",
+        "report": "4b1945f01234f9d9ffafcd6b08d3be03c08d77ba374407640f04f9262c58ae0f",
         "saved": "446def139b8f6469dff0684ab896b0f579cbf22883f9fe4816644bb7552d5835",
         "seq": 1,
         "state": "accepted"
@@ -333,6 +333,7 @@
       "complete": true,
       "created": true,
       "not_carried": [],
+      "not_read": [],
       "proposal": {
         "against": null,
         "asks": [],
@@ -348,15 +349,17 @@
         "key": "press-1",
         "origin": "gui",
         "original": "3832d46a49203146235712f87d4b6334713b10482df8e46bc2a576339d3dbfce",
-        "report": "7e45bac99ce53457d44dff621b4244d46f19c75c714f970d5728cddd54d08c44",
+        "report": "4b1945f01234f9d9ffafcd6b08d3be03c08d77ba374407640f04f9262c58ae0f",
         "seq": 1,
         "state": "pending"
-      }
+      },
+      "read": []
     },
     "import_selection": {
       "complete": true,
       "created": true,
       "not_carried": [],
+      "not_read": [],
       "proposal": {
         "against": null,
         "asks": [],
@@ -372,11 +375,12 @@
         "key": "press-7",
         "origin": "gui",
         "original": "627012e248b20aafca2a7395ed65793a5d78122d48c7794c2150a83d04cde563",
-        "report": "1b3249a68cc1171c62a87c83781d1f964c9c6b3bf1e81296e1b715c549643d54",
+        "report": "15e1f2b6657af98863ae0b08898be5dc7eae065a2701d3c162a0f3c8ab4e93d4",
         "scope": "793bd9e4e38ba7d4204063ac7246cb36fc2acf1646d301108f0750b501f63776",
         "seq": 1,
         "state": "pending"
-      }
+      },
+      "read": []
     },
     "read_division": {
       "division": {

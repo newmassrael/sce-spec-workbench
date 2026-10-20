@@ -164,10 +164,12 @@ fn run() -> Result<(), String> {
     // The same executor the desktop application hosts, so that the screen being developed here
     // can be pressed "generate" on and be answered. Held to the end of the program: it stops
     // a client at work when the server stops, and `SCE_EXECUTOR=off` hosts nothing.
+    let host_settings = HostSettings::from_environment("web-shell");
+    let claude_budget_usd = host_settings.config.max_budget_usd;
     let _executor = host::start_with(
         Arc::new(SpecStore::at(root.clone())),
         Arc::from(default_renderer()),
-        HostSettings::from_environment("web-shell"),
+        host_settings,
         // It runs the requests made for a connection too, when there is a settings folder to
         // read them from.
         settings
@@ -190,8 +192,9 @@ fn run() -> Result<(), String> {
         Err(why) => eprintln!("import tools: none ({why})"),
     }
 
-    let mut shell =
-        Shell::new(SpecStore::at(root), figures, token, assets).with_import_tools(import_tools);
+    let mut shell = Shell::new(SpecStore::at(root), figures, token, assets)
+        .with_import_tools(import_tools)
+        .with_claude_budget(claude_budget_usd);
     if let Some(dir) = settings {
         shell = shell.with_settings(ConnectionStore::at(dir));
     }

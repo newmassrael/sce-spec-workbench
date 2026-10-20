@@ -168,7 +168,7 @@
       "deleted": "main"
     },
     "describe": {
-      "application_command_set_version": 9,
+      "application_command_set_version": 10,
       "command_set_version": 35,
       "commands": [
         "describe",
@@ -266,7 +266,7 @@
       "writes_settings": false
     },
     "describe_desktop": {
-      "application_command_set_version": 9,
+      "application_command_set_version": 10,
       "command_set_version": 35,
       "commands": [
         "describe",
@@ -3078,7 +3078,7 @@
       }
     }
   },
-  "application_command_set_version": 9,
+  "application_command_set_version": 10,
   "command_set_version": 35,
   "refusals": {
     "active-proposal": {

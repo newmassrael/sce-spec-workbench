@@ -158,6 +158,8 @@ fn status_of(kind: &str) -> u16 {
         | "bad-section"
         | "bad-block"
         | "scope-refused"
+        // A figure left out and asked to be read in the same choice.
+        | "read-left-out"
         // A plan the tools would not make into a ledger, and a ledger or the count of it that do not
         // name each other or the document they are of. Refused on their content.
         | "bad-division"
@@ -176,9 +178,13 @@ fn status_of(kind: &str) -> u16 {
         | "sce-refused" => 422,
         // The authoring tools are not installed, did not finish in time, or failed: the shell's, and
         // not the document's.
-        // A connection that cannot be asked a question yet (not a model server, or one this build cannot
-        // reach) is the installation's, as a missing tool is.
-        "busy" | "sce-unavailable" | "import-tool-missing" | "draft-unavailable" => 503,
+        // A connection that cannot be asked a question yet (not a model server, not a client that reads
+        // pictures, or one this build cannot reach) is the installation's, as a missing tool is.
+        "busy"
+        | "sce-unavailable"
+        | "import-tool-missing"
+        | "draft-unavailable"
+        | "reading-unavailable" => 503,
         "sce-timeout" | "import-tool-timeout" => 504,
         // The model server the person runs answered with a failure of its own, or could not be reached.
         "sce-failed" | "import-tool-failed" | "draft-failed" => 502,
@@ -208,6 +214,7 @@ pub struct Shell {
     connections: Option<ConnectionStore>,
     policy: Policy,
     import_tools: Option<Result<ImportTools, String>>,
+    claude_budget_usd: Option<f64>,
 }
 
 impl Shell {
@@ -225,7 +232,15 @@ impl Shell {
             connections: None,
             policy: Policy::shipped(),
             import_tools: None,
+            claude_budget_usd: None,
         }
+    }
+
+    /// The same, with what one run of Claude Code may spend (`SCE_CLAUDE_BUDGET_USD`): a picture read
+    /// while the person waits is bounded by it as a request's run is.
+    pub fn with_claude_budget(mut self, max_budget_usd: Option<f64>) -> Self {
+        self.claude_budget_usd = max_budget_usd;
+        self
     }
 
     /// The same, with the authoring tools that bring a document in, or the reason there are none.
@@ -319,6 +334,7 @@ impl Shell {
             Entrance::Browser,
         )
         .with_connections(self.connections.as_ref())
+        .with_claude_budget(self.claude_budget_usd)
         .with_import_tools(self.import_tools.as_ref());
         match call_in(&context, &envelope.name, envelope.args) {
             Ok(answer) => Reply {
@@ -356,11 +372,13 @@ mod tests {
         ("nothing-chosen", 422),
         ("bad-section", 422),
         ("bad-block", 422),
+        ("read-left-out", 422),
         ("scope-refused", 422),
         ("bad-division", 422),
         ("too-many-parts", 422),
         ("no-connection", 409),
         ("draft-unavailable", 503),
+        ("reading-unavailable", 503),
         ("draft-failed", 502),
         ("bad-ledger", 422),
         ("already-bound", 409),
