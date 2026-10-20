@@ -22,7 +22,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sce_spec_workbench_core::claude_code::{
-    AuthorServer, ClaudeCode, ClaudeCodeConfig, ALLOWED_TOOLS,
+    AuthorServer, ClaudeCode, ClaudeCodeConfig, PictureAnswer, PictureQuestion, ALLOWED_TOOLS,
+    NO_READING,
 };
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job, Trouble};
 use sce_specs::{ModelFiles, Revision, SpecId};
@@ -740,6 +741,147 @@ fn a_great_deal_of_output_does_not_stop_the_client_from_finishing() {
     let draft = generate(&client(&fake), &job());
 
     assert!(draft.is_ok(), "{draft:?}");
+}
+
+// ------------------------------------------------------------------------------- reading a picture
+
+const PICTURE: &[u8] = b"\x89PNG\r\n\x1a\nthe drawing of a state chart";
+
+fn reading_schema() -> Value {
+    json!({"type": "object", "required": ["blocks"], "properties": {"blocks": {"type": "array"}}})
+}
+
+fn read(client: &ClaudeCode, schema: &Value) -> Result<PictureAnswer, GenerateError> {
+    client.read_picture(
+        &PictureQuestion {
+            prompt: "Read the picture. (recipe read-picture 1)",
+            picture: PICTURE,
+            media_type: "image/png",
+            answer_schema: schema,
+        },
+        &Cancel::new(),
+        Duration::from_secs(30),
+    )
+}
+
+/// A stand-in that says which model it is, then answers `answer` as the last line of its stream.
+fn reading_as(label: &str, answer: &Value) -> Fake {
+    let fake = Fake::new(
+        label,
+        "printf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"stand-in-model\"}'\n\
+         cat \"$R/answer.json\"",
+    );
+    fs::write(fake.record.join("answer.json"), answer.to_string()).unwrap();
+    fake
+}
+
+#[test]
+fn a_reading_gives_the_client_no_tool_no_server_and_the_answer_s_form_it_was_handed() {
+    let fake = reading_as("claude-read-flags", &answered(json!({"blocks": []})));
+    let schema = reading_schema();
+
+    read(&client(&fake), &schema).unwrap();
+
+    assert_eq!(fake.value_of("--tools").as_deref(), Some(""));
+    assert_eq!(
+        fake.value_of("--input-format").as_deref(),
+        Some("stream-json")
+    );
+    assert_eq!(fake.value_of("--json-schema").unwrap(), schema.to_string());
+    assert_eq!(fake.value_of("--max-turns").as_deref(), Some("3"));
+    assert_eq!(fake.value_of("--setting-sources").as_deref(), Some(""));
+    let argv = fake.argv();
+    for flag in [
+        "--strict-mcp-config",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+    ] {
+        assert!(argv.iter().any(|a| a == flag), "{flag} missing: {argv:?}");
+    }
+    // Nothing a draft is allowed: no server's tools, and not the system prompt of a draft.
+    for flag in ["--allowedTools", "--append-system-prompt"] {
+        assert!(!argv.iter().any(|a| a == flag), "{flag} given: {argv:?}");
+    }
+    let servers: Value = serde_json::from_str(&fake.read("mcp.json")).unwrap();
+    assert_eq!(servers, json!({"mcpServers": {}}));
+}
+
+#[test]
+fn the_picture_is_handed_over_as_an_image_beside_the_text_on_one_line() {
+    let fake = reading_as("claude-read-stdin", &answered(json!({"blocks": []})));
+
+    read(&client(&fake), &reading_schema()).unwrap();
+
+    let stdin = fake.read("stdin");
+    assert_eq!(stdin.lines().count(), 1, "{stdin}");
+    let message: Value = serde_json::from_str(stdin.trim_end()).unwrap();
+    assert_eq!(message["type"], "user");
+    let content = &message["message"]["content"];
+    assert_eq!(
+        content[0]["text"],
+        "Read the picture. (recipe read-picture 1)"
+    );
+    assert_eq!(content[1]["type"], "image");
+    assert_eq!(content[1]["source"]["media_type"], "image/png");
+    let data = content[1]["source"]["data"].as_str().unwrap();
+    assert_eq!(sce_specs::base64::decode(data).unwrap(), PICTURE);
+}
+
+#[test]
+fn the_answer_in_its_form_and_the_model_the_client_said_are_what_a_reading_returns() {
+    let said = json!({"blocks": [{"kind": "diagram", "markdown": "- a -> b", "unsure": false}]});
+    let fake = reading_as("claude-read-answer", &answered(said.clone()));
+
+    let answer = read(&client(&fake), &reading_schema()).unwrap();
+
+    assert_eq!(
+        answer,
+        PictureAnswer {
+            answer: said,
+            model: Some("stand-in-model".to_string()),
+        }
+    );
+}
+
+#[test]
+fn a_reply_with_no_answer_in_its_form_is_a_reading_that_did_not_come() {
+    let fake = reading_as(
+        "claude-read-prose",
+        &json!({"type": "result", "subtype": "success", "is_error": false,
+                "result": "The picture shows a state chart."}),
+    );
+
+    let Err(GenerateError::Unusable(Trouble { failure, words, .. })) =
+        read(&client(&fake), &reading_schema())
+    else {
+        panic!("expected an unusable reading");
+    };
+    assert_eq!(failure.cause.as_deref(), Some(NO_READING));
+    assert!(words.contains("the reading"), "{words}");
+}
+
+#[test]
+fn a_reading_that_takes_longer_than_it_is_allowed_is_stopped() {
+    let fake = Fake::new("claude-read-slow", "exec sleep 60");
+    let started = Instant::now();
+
+    let failed = client(&fake).read_picture(
+        &PictureQuestion {
+            prompt: "Read it.",
+            picture: PICTURE,
+            media_type: "image/png",
+            answer_schema: &reading_schema(),
+        },
+        &Cancel::new(),
+        Duration::from_millis(300),
+    );
+
+    let Err(GenerateError::Failed(Trouble { failure, words, .. })) = failed else {
+        panic!("expected a failure, got {failed:?}");
+    };
+    assert_eq!(failure.kind.word(), "time");
+    assert!(words.contains("longer than 300 milliseconds"), "{words}");
+    assert!(started.elapsed() < Duration::from_secs(20));
 }
 
 /// Wait for a file the stand-in writes when it has started.

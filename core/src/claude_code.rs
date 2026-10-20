@@ -144,7 +144,21 @@ impl ClaudeCode {
         &self.author
     }
 
+    /// The client as a draft is written: the authoring server's tools of [`ALLOWED_TOOLS`], the
+    /// system prompt, and the draft's form.
     fn command(&self, scratch: &Path) -> Command {
+        let mut command = self.confined(scratch, &schema(), self.config.max_turns);
+        command
+            .args(["--allowedTools", &ALLOWED_TOOLS.join(",")])
+            .args(["--append-system-prompt", SYSTEM_PROMPT]);
+        command
+    }
+
+    /// The client as every run starts it: in `scratch`, with no built-in tool, no server but the ones
+    /// `scratch`'s server list names, nothing from the machine's settings, no session kept, `turns`
+    /// turns at most, and an answer that must take the form of `answer`. What a run adds is what it
+    /// may use beyond that, which a reading adds nothing to.
+    fn confined(&self, scratch: &Path, answer: &Value, turns: u32) -> Command {
         let mut command = Command::new(&self.binary);
         command
             .current_dir(scratch)
@@ -153,20 +167,18 @@ impl ClaudeCode {
             // said as it does it; the last of them is the result a single value used to be.
             .args(["--output-format", "stream-json"])
             .arg("--verbose")
-            .args(["--json-schema", &schema().to_string()])
+            .args(["--json-schema", &answer.to_string()])
             .args(["--tools", ""])
             .arg("--strict-mcp-config")
             .args([
                 "--mcp-config",
                 &scratch.join(MCP_FILE).display().to_string(),
             ])
-            .args(["--allowedTools", &ALLOWED_TOOLS.join(",")])
             .args(["--permission-mode", "dontAsk"])
             .arg("--no-session-persistence")
             .args(["--setting-sources", ""])
             .arg("--disable-slash-commands")
-            .args(["--max-turns", &self.config.max_turns.to_string()])
-            .args(["--append-system-prompt", SYSTEM_PROMPT]);
+            .args(["--max-turns", &turns.to_string()]);
         if let Some(model) = &self.config.model {
             command.args(["--model", model]);
         }
@@ -291,8 +303,161 @@ impl Generator for ClaudeCode {
     }
 }
 
+/// One picture a client that can see is asked to read (ADR 0036): the text it is told, the picture
+/// as it is handed over, and the form its answer must take. All three are the kind's, written by
+/// SCE's `prepare-reading`; this runtime carries them and knows nothing of what they say.
+#[derive(Debug, Clone, Copy)]
+pub struct PictureQuestion<'a> {
+    pub prompt: &'a str,
+    pub picture: &'a [u8],
+    /// The picture's format, as `prepare-reading` named it (`image/png`).
+    pub media_type: &'a str,
+    pub answer_schema: &'a Value,
+}
+
+/// What the client answered of a picture, in the form it was held to, and the model it said it ran.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PictureAnswer {
+    pub answer: Value,
+    pub model: Option<String>,
+}
+
+/// How many turns a reading may take: its reply, and the one the client gives its answer's form
+/// through. A reading that takes more is not reading.
+pub const READING_TURNS: u32 = 3;
+
+/// The cause of a reading whose reply has no answer in the form it was held to. It is not one of a
+/// request's causes ([`cause`]), which are the words the store keeps beside a failed request and the
+/// screen explains: a picture is read while the owner waits, no request is made for it, and what went
+/// wrong is said of that picture in the import's reply.
+pub const NO_READING: &str = "no-reading";
+
+impl ClaudeCode {
+    /// Ask the client to read one picture, and wait at most `allowed` for its answer.
+    ///
+    /// The picture is handed over as an image on standard input (`--input-format stream-json`), the
+    /// way the client takes one natively, and not as a file it could be told to open: the client has
+    /// no tool and reaches no server (an empty server list), so it reads and answers and does nothing
+    /// else. Nothing it writes is read but its answer, and the answer is the kind's to check.
+    pub fn read_picture(
+        &self,
+        question: &PictureQuestion<'_>,
+        cancel: &Cancel,
+        allowed: Duration,
+    ) -> Result<PictureAnswer, GenerateError> {
+        let scratch = Scratch::new("sce-claude-read").map_err(|e| {
+            GenerateError::installation(format!("a folder for the client: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
+        fs::write(
+            scratch.path().join(MCP_FILE),
+            json!({ "mcpServers": {} }).to_string(),
+        )
+        .map_err(|e| {
+            GenerateError::installation(format!("the client's server list: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
+        let mut command = self.confined(
+            scratch.path(),
+            question.answer_schema,
+            READING_TURNS.min(self.config.max_turns),
+        );
+        command.args(["--input-format", "stream-json"]);
+        let child = command.spawn().map_err(|e| {
+            GenerateError::installation(format!(
+                "{} could not be started: {e}",
+                self.binary.display()
+            ))
+            .because(cause::CLIENT_FAULT)
+        })?;
+        let mut model = None;
+        let mut result = None;
+        let ended = supervise_lines(
+            child,
+            Some(picture_message(question)),
+            cancel,
+            allowed,
+            &mut |line| {
+                if let Ok(event) = serde_json::from_str::<Value>(line) {
+                    match (event["type"].as_str(), event["subtype"].as_str()) {
+                        (Some("system"), Some("init")) => {
+                            model = event["model"].as_str().map(str::to_string);
+                        }
+                        (Some("result"), _) => result = Some(line.to_string()),
+                        _ => {}
+                    }
+                }
+                false
+            },
+        )
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
+        match ended {
+            Ended::Cancelled => Err(GenerateError::Cancelled),
+            Ended::Stopped => Err(GenerateError::installation(
+                "the client was stopped by the application".to_string(),
+            )
+            .because(cause::CLIENT_FAULT)),
+            Ended::TimedOut => Err(GenerateError::time(format!(
+                "the client took longer than {} to read the picture and was stopped",
+                span_words(allowed)
+            ))),
+            Ended::Exited {
+                status,
+                stdout,
+                stderr,
+            } => {
+                let said = result.unwrap_or(stdout);
+                let answer = structured_answer(status, &said, &stderr, "the reading", NO_READING)?;
+                Ok(PictureAnswer { answer, model })
+            }
+        }
+    }
+}
+
+/// The one message a reading is: the text, then the picture as an image content block, on one line
+/// of the client's input stream.
+fn picture_message(question: &PictureQuestion<'_>) -> Vec<u8> {
+    let message = json!({
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [
+                { "type": "text", "text": question.prompt },
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": question.media_type,
+                        "data": sce_specs::base64::encode(question.picture),
+                    },
+                },
+            ],
+        },
+    });
+    let mut line = message.to_string().into_bytes();
+    line.push(b'\n');
+    line
+}
+
 /// What the client printed, as a draft or as the reason there is none.
 fn read_answer(status: ExitStatus, stdout: &str, stderr: &str) -> Result<Draft, GenerateError> {
+    let answer = structured_answer(status, stdout, stderr, "the draft", cause::NO_DRAFT)?;
+    draft_from(&answer).map_err(|wrong| GenerateError::unusable(wrong).because(cause::NO_DRAFT))
+}
+
+/// The answer the client gave in the form it was held to (`--json-schema`), or the reason there is
+/// none. `asked` names what was asked for, for the sentence that says it did not come, and `missing`
+/// is the cause that is.
+fn structured_answer(
+    status: ExitStatus,
+    stdout: &str,
+    stderr: &str,
+    asked: &str,
+    missing: &'static str,
+) -> Result<Value, GenerateError> {
     if !status.success() {
         let said = if stderr.trim().is_empty() {
             stdout
@@ -326,7 +491,7 @@ fn read_answer(status: ExitStatus, stdout: &str, stderr: &str) -> Result<Draft, 
     }
     // The answer the schema asked for. A client that did not use the schema's channel may still
     // have answered in the form, as the text of its reply.
-    let answer = result
+    result
         .get("structured_output")
         .filter(|value| !value.is_null())
         .cloned()
@@ -336,12 +501,11 @@ fn read_answer(status: ExitStatus, stdout: &str, stderr: &str) -> Result<Draft, 
                 .and_then(|text| serde_json::from_str(text.trim()).ok())
         })
         .ok_or_else(|| {
-            GenerateError::unusable(
-                "the reply is not the draft asked for: it has no structured answer",
-            )
-            .because(cause::NO_DRAFT)
-        })?;
-    draft_from(&answer).map_err(|wrong| GenerateError::unusable(wrong).because(cause::NO_DRAFT))
+            GenerateError::unusable(format!(
+                "the reply is not {asked} asked for: it has no structured answer"
+            ))
+            .because(missing)
+        })
 }
 
 /// The servers the client may reach: the SCE authoring server, and no other.

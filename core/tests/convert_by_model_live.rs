@@ -30,7 +30,6 @@ mod common;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{Duration, Instant};
 
 use sce_spec_workbench_core::http_client::{send, Endpoint, Request};
@@ -46,29 +45,7 @@ fn required(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("{name} is required: see the top of this file"))
 }
 
-fn tools() -> PathBuf {
-    let launcher = common::sce_root().join("scripts").join("sce_author.sh");
-    assert!(
-        launcher.is_file(),
-        "{} is not in the checkout",
-        launcher.display()
-    );
-    launcher
-}
-
-/// Run the authoring tools with `args` in `dir` and give back the exit code and what they printed.
-fn tool(dir: &Path, args: &[&str]) -> (i32, String, String) {
-    let ran = Command::new(tools())
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("the authoring tools could not be started");
-    (
-        ran.status.code().unwrap_or(-1),
-        String::from_utf8_lossy(&ran.stdout).into_owned(),
-        String::from_utf8_lossy(&ran.stderr).into_owned(),
-    )
-}
+use common::tool;
 
 /// Ask the model one thing, with nothing else in the conversation.
 fn ask(

@@ -44,3 +44,28 @@ pub fn sce_spec() -> PathBuf {
     );
     spec
 }
+
+/// The authoring tools of the SCE checkout, by their launcher.
+pub fn tools() -> PathBuf {
+    let launcher = sce_root().join("scripts").join("sce_author.sh");
+    assert!(
+        launcher.is_file(),
+        "{} is not in the checkout",
+        launcher.display()
+    );
+    launcher
+}
+
+/// Run the authoring tools with `args` in `dir` and give back the exit code and what they printed.
+pub fn tool(dir: &Path, args: &[&str]) -> (i32, String, String) {
+    let ran = std::process::Command::new(tools())
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .expect("the authoring tools could not be started");
+    (
+        ran.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&ran.stdout).into_owned(),
+        String::from_utf8_lossy(&ran.stderr).into_owned(),
+    )
+}
