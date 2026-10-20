@@ -236,6 +236,7 @@
             "blocks": 2,
             "characters": 19,
             "id": "s1",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -253,6 +254,7 @@
             "blocks": 2,
             "characters": 36,
             "id": "s2",
+            "items": [],
             "kind": "heading",
             "level": 2,
             "page_first": null,
@@ -270,6 +272,7 @@
             "blocks": 2,
             "characters": 33,
             "id": "s3",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -437,6 +440,7 @@
             "blocks": 2,
             "characters": 19,
             "id": "s1",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -454,6 +458,7 @@
             "blocks": 2,
             "characters": 36,
             "id": "s2",
+            "items": [],
             "kind": "heading",
             "level": 2,
             "page_first": null,
@@ -471,6 +476,7 @@
             "blocks": 2,
             "characters": 33,
             "id": "s3",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -500,6 +506,7 @@
             "blocks": 2,
             "characters": 19,
             "id": "s1",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -517,6 +524,7 @@
             "blocks": 2,
             "characters": 36,
             "id": "s2",
+            "items": [],
             "kind": "heading",
             "level": 2,
             "page_first": null,
@@ -534,6 +542,7 @@
             "blocks": 2,
             "characters": 33,
             "id": "s3",
+            "items": [],
             "kind": "heading",
             "level": 1,
             "page_first": null,
@@ -603,6 +612,13 @@
       },
       "kind": "assembly-refused",
       "message": "an assembly would leave nothing: every block of the conversion was dropped"
+    },
+    "bad-block": {
+      "detail": {
+        "block": "--out"
+      },
+      "kind": "bad-block",
+      "message": "`--out` is not the id of an item of the document"
     },
     "bad-section": {
       "detail": {

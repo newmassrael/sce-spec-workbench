@@ -9,7 +9,8 @@
 // refuses an accept that would write over something. This only says what the core said in the words
 // the design chose, and picks which of the few things a person can do next is offered.
 
-import { ContractError, type DocumentSection, type ReadDocument, type Spec } from "./contract";
+import type { PartsChoice } from "./api";
+import { ContractError, type DocumentItem, type DocumentSection, type ReadDocument, type Spec } from "./contract";
 import { CommandFailure, TRANSPORT, UNAUTHORIZED } from "./ipc";
 
 /** Where a document is going. A new spec is named after the file; a spec that is kept is replaced. */
@@ -213,30 +214,64 @@ export function pressSection(
   return next;
 }
 
+/**
+ * Press an item (a table, a figure, an attachment) of a part: left out when it was taken, taken again when
+ * it was left out. The items left out are kept apart from the parts, so that leaving a part out and choosing
+ * it again does not bring back an item the person had left out of it.
+ */
+export function pressItem(leftOut: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(leftOut);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** The items left out of the parts that are chosen, in the document's order: the ones that leave anything out. */
+function itemsLeftOut(chosen: ReadonlySet<string>, leftOut: ReadonlySet<string>, doc: ReadDocument): DocumentItem[] {
+  return doc.outline.sections
+    .filter((s) => chosen.has(s.id))
+    .flatMap((s) => s.items)
+    .filter((item) => leftOut.has(item.id));
+}
+
 /** What is chosen, in the numbers a person weighs it by. */
 export interface ChosenTotals {
   readonly parts: number;
   readonly of: number;
   readonly blocks: number;
   readonly characters: number;
+  /** Items of the chosen parts left out by themselves. */
+  readonly itemsOut: number;
 }
 
-export function chosenTotals(chosen: ReadonlySet<string>, doc: ReadDocument): ChosenTotals {
+export function chosenTotals(
+  chosen: ReadonlySet<string>,
+  doc: ReadDocument,
+  leftOut: ReadonlySet<string> = new Set(),
+): ChosenTotals {
   const sections = doc.outline.sections;
   const held = sections.filter((s) => chosen.has(s.id));
+  const out = itemsLeftOut(chosen, leftOut, doc);
+  // A part counts its blocks with words, and an item without words is not one of them.
+  const worded = out.filter((item) => item.characters > 0);
   return {
     parts: held.length,
     of: sections.length,
-    blocks: held.reduce((sum, s) => sum + s.blocks, 0),
-    characters: held.reduce((sum, s) => sum + s.characters, 0),
+    blocks: held.reduce((sum, s) => sum + s.blocks, 0) - worded.length,
+    characters: held.reduce((sum, s) => sum + s.characters, 0) - worded.reduce((sum, i) => sum + i.characters, 0),
+    itemsOut: out.length,
   };
 }
 
 /**
- * The ids to send: the chosen parts in the document's order, or `undefined` for all of them, which is
- * what the core takes as the whole document and keeps no scope for.
+ * The choice to send: the chosen parts in the document's order, or `undefined` for all of them, and the
+ * items left out of them. Every part with nothing left out is what the core takes as the whole document
+ * and keeps no scope for. An item of a part that is not chosen is not sent: it is out with its part.
  */
-export function sectionsToSend(chosen: ReadonlySet<string>, doc: ReadDocument): string[] | undefined {
+export function choiceToSend(chosen: ReadonlySet<string>, leftOut: ReadonlySet<string>, doc: ReadDocument): PartsChoice {
   const ids = doc.outline.sections.map((s) => s.id).filter((id) => chosen.has(id));
-  return ids.length === doc.outline.sections.length ? undefined : ids;
+  return {
+    sections: ids.length === doc.outline.sections.length ? undefined : ids,
+    leaveOut: itemsLeftOut(chosen, leftOut, doc).map((item) => item.id),
+  };
 }

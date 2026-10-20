@@ -50,6 +50,7 @@ function part(id: string, blocks: number, parent: string | null = null): Documen
     page_first: null,
     page_last: null,
     block_ids: Array.from({ length: blocks }, (_, n) => `${id}-b${n + 1}`),
+    items: [],
   };
 }
 

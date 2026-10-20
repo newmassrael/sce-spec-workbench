@@ -14,8 +14,9 @@ import {
   failureOf,
   importKey,
   isChoosable,
+  choiceToSend,
+  pressItem,
   pressSection,
-  sectionsToSend,
   subtree,
   titleOf,
 } from "../src/import_model";
@@ -122,14 +123,23 @@ function document(): ReadDocument {
     page_first: null,
     page_last: null,
     block_ids: Array.from({ length: blocks }, (_, n) => `${id}-b${n + 1}`),
+    items: [],
   });
+  // The fan's part holds a table with words and a picture with none, as SCE lists them.
+  const fan: DocumentSection = {
+    ...part("s3", null, 2, 33),
+    items: [
+      { id: "s3-b2", kind: "table", label: "speed | rpm", characters: 13 },
+      { id: "s3-b3", kind: "figure", label: "", characters: 0 },
+    ],
+  };
   return {
     original: "a".repeat(64),
     extraction: "b".repeat(64),
     not_carried: [],
     outline: {
       by: "headings",
-      sections: [part("s1", null, 2, 80), part("s2", "s1", 2, 36), part("s3", null, 2, 33)],
+      sections: [part("s1", null, 2, 80), part("s2", "s1", 2, 36), fan],
     },
   };
 }
@@ -180,16 +190,44 @@ describe("choosing the parts of a document", () => {
     const everything = chosenTotals(all(doc), doc);
     const leaving = chosenTotals(new Set(["s1", "s3"]), doc);
 
-    expect(everything).toEqual({ parts: 3, of: 3, blocks: 6, characters: 149 });
-    expect(leaving).toEqual({ parts: 2, of: 3, blocks: 4, characters: 113 });
+    expect(everything).toEqual({ parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 0 });
+    expect(leaving).toEqual({ parts: 2, of: 3, blocks: 4, characters: 113, itemsOut: 0 });
+  });
+
+  it("takes an item left out off what is counted, and an item with no words off nothing but the count of items", () => {
+    const doc = document();
+
+    expect(chosenTotals(all(doc), doc, new Set(["s3-b2"]))).toEqual({
+      parts: 3, of: 3, blocks: 5, characters: 136, itemsOut: 1,
+    });
+    expect(chosenTotals(all(doc), doc, new Set(["s3-b3"]))).toEqual({
+      parts: 3, of: 3, blocks: 6, characters: 149, itemsOut: 1,
+    });
+    // An item of a part that is not chosen is out with its part and is not counted twice.
+    expect(chosenTotals(new Set(["s1", "s2"]), doc, new Set(["s3-b2"])).itemsOut).toBe(0);
+  });
+
+  it("leaves an item out and takes it again on the next press", () => {
+    expect([...pressItem(new Set(), "s3-b2")]).toEqual(["s3-b2"]);
+    expect([...pressItem(new Set(["s3-b2"]), "s3-b2")]).toEqual([]);
   });
 
   it("sends the ids that are chosen, in the document's order, so that a part left out under a chosen one stays out", () => {
     const doc = document();
 
-    expect(sectionsToSend(new Set(["s3", "s1"]), doc)).toEqual(["s1", "s3"]);
-    expect(sectionsToSend(all(doc), doc)).toBeUndefined();
-    expect(sectionsToSend(new Set(), doc)).toEqual([]);
+    expect(choiceToSend(new Set(["s3", "s1"]), new Set(), doc)).toEqual({ sections: ["s1", "s3"], leaveOut: [] });
+    expect(choiceToSend(all(doc), new Set(), doc)).toEqual({ sections: undefined, leaveOut: [] });
+    expect(choiceToSend(new Set(), new Set(), doc)).toEqual({ sections: [], leaveOut: [] });
+  });
+
+  it("sends the items left out of chosen parts, in the document's order, and none of a part that is out", () => {
+    const doc = document();
+
+    expect(choiceToSend(all(doc), new Set(["s3-b3", "s3-b2"]), doc)).toEqual({
+      sections: undefined,
+      leaveOut: ["s3-b2", "s3-b3"],
+    });
+    expect(choiceToSend(new Set(["s1"]), new Set(["s3-b2"]), doc)).toEqual({ sections: ["s1"], leaveOut: [] });
   });
 });
 

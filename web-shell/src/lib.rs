@@ -152,10 +152,11 @@ fn status_of(kind: &str) -> u16 {
         // with no words in it), and decisions the assembly could not apply: refused on their content.
         | "unreadable-original"
         | "assembly-refused"
-        // The parts of a document chosen for an import: none, one nobody listed, or a choice the
-        // tools would not make into a scope. Refused on their content.
+        // The parts of a document chosen for an import: none, a part or an item nobody listed, or a
+        // choice the tools would not make into a scope. Refused on their content.
         | "nothing-chosen"
         | "bad-section"
+        | "bad-block"
         | "scope-refused"
         // A plan the tools would not make into a ledger, and a ledger or the count of it that do not
         // name each other or the document they are of. Refused on their content.
@@ -354,6 +355,7 @@ mod tests {
         ("assembly-refused", 422),
         ("nothing-chosen", 422),
         ("bad-section", 422),
+        ("bad-block", 422),
         ("scope-refused", 422),
         ("bad-division", 422),
         ("too-many-parts", 422),

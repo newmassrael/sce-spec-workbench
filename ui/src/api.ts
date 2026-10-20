@@ -113,6 +113,14 @@ import {
 } from "./contract";
 import type { Transport } from "./ipc";
 
+/** What the owner chose of a document, as `import_selection` takes it. */
+export interface PartsChoice {
+  /** The chosen parts in the document's order, or `undefined` for all of them. */
+  readonly sections: readonly string[] | undefined;
+  /** The items (a table, a figure, an attachment) of the chosen parts left out by themselves. */
+  readonly leaveOut: readonly string[];
+}
+
 export interface Api {
   describe(): Promise<Described>;
   listSpecs(): Promise<Listing>;
@@ -312,15 +320,16 @@ export interface Api {
   readDocument(id: string, name: string, data: string): Promise<ReadDocument>;
   /**
    * The second step: convert, check and propose the parts chosen of a document `readDocument` kept.
-   * `sections` are ids of its outline; absent, all of them. What is outside them is never given to
-   * anything and is not asked about. Refused as `nothing-chosen`, `bad-section` or `scope-refused`,
-   * and as `key-reused` when the same `key` was used for another choice.
+   * `choice.sections` are ids of its outline, absent for all of them, and `choice.leaveOut` the ids of
+   * items of those parts not taken after all. What is outside the choice is never given to anything and
+   * is not asked about. Refused as `nothing-chosen`, `bad-section`, `bad-block` or `scope-refused`, and as
+   * `key-reused` when the same `key` was used for another choice.
    */
   importSelection(
     id: string,
     document: ReadDocument,
     key: string,
-    sections?: readonly string[],
+    choice: PartsChoice,
     supersede?: boolean,
   ): Promise<ImportedDocument>;
   /**
@@ -569,14 +578,15 @@ export function apiOver(transport: Transport): Api {
     async readDocument(id, name, data) {
       return parseReadDocument(await transport.call("read_document", { id, name, data }));
     },
-    async importSelection(id, document, key, sections, supersede = false) {
+    async importSelection(id, document, key, choice, supersede = false) {
       const args = {
         id,
         original: document.original,
         extraction: document.extraction,
         key,
         origin: "gui",
-        ...(sections === undefined ? {} : { sections }),
+        ...(choice.sections === undefined ? {} : { sections: choice.sections }),
+        ...(choice.leaveOut.length === 0 ? {} : { leave_out: choice.leaveOut }),
         ...(supersede ? { supersede: true } : {}),
       };
       return parseImportedDocument(await transport.call("import_selection", args));

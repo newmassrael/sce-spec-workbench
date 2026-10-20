@@ -109,7 +109,12 @@ pub const COMMANDS: &[&str] = &[
 /// among the destinations the owner has and reads what it answered as suggestions by part id, the items it
 /// did not take and the parts it left unplaced (ADR 0040). Nothing is placed by it. It is added, so no caller
 /// of 7 misreads it; the version moves because a screen that offers a draft is held to a core that answers it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 8;
+///
+/// 9: `import_selection` takes `leave_out`, the ids of items (a table, a figure, an attachment) of the chosen
+/// parts that are not taken after all, and `read_document`'s outline lists each part's `items` (ADR 0039,
+/// amended). A choice that names none is the choice it was, so no caller of 8 misreads one; the version moves
+/// because a screen that leaves an item out is held to a core that takes it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 9;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {

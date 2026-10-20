@@ -9,7 +9,7 @@
 // Nothing here keeps state or asks the core: each function is given what to draw and what to call when
 // a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
 
-import type { DecisionKind, DocumentSection, Intake, ReadDocument } from "./contract";
+import type { DecisionKind, DocumentItem, DocumentSection, Intake, ReadDocument } from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
@@ -20,6 +20,13 @@ export type Say = (key: Key, values?: Record<string, string>) => string;
 function icon(name: string): HTMLElement {
   return h("span", { class: `ic ic-${name}`, "aria-hidden": "true" });
 }
+
+/** What an item of a part is called beside its label. */
+const ITEM_WORD: Record<DocumentItem["kind"], Key> = {
+  table: "impItemTable",
+  figure: "impItemFigure",
+  attachment: "impItemAttachment",
+};
 
 /** What the readers' own kinds of refusal mean to a person, in the design's words. */
 const UNREADABLE_WORDS: Record<string, Key> = {
@@ -177,7 +184,10 @@ export interface PartsOptions {
   readonly name: string;
   readonly doc: ReadDocument;
   readonly chosen: ReadonlySet<string>;
+  /** Items (a table, a figure, an attachment) left out of their parts by themselves, by block id. */
+  readonly leftOut: ReadonlySet<string>;
   readonly onPress: (id: string) => void;
+  readonly onPressItem: (id: string) => void;
   readonly onAll: () => void;
   readonly onNone: () => void;
   readonly onBring: () => void;
@@ -223,10 +233,42 @@ export function depthOf(sections: readonly DocumentSection[], section: DocumentS
  * read, since a part left out is read by nothing.
  */
 export function partsCard(options: PartsOptions): HTMLElement {
-  const { say, doc, chosen } = options;
+  const { say, doc, chosen, leftOut } = options;
   const sections = doc.outline.sections;
-  const totals = chosenTotals(chosen, doc);
-  const none = totals.parts === 0;
+  const totals = chosenTotals(chosen, doc, leftOut);
+  // Nothing chosen, or parts chosen whose every block with words is an item left out.
+  const emptied = totals.parts > 0 && totals.itemsOut > 0 && totals.blocks === 0;
+  const none = totals.parts === 0 || emptied;
+  const itemRows = (section: DocumentSection): Child => {
+    if (section.items.length === 0) return null;
+    // An item of a part that is not chosen is out with its part, and is shown so: off, and not pressable.
+    const taken = chosen.has(section.id);
+    return h(
+      "ul",
+      { class: "part-items" },
+      ...section.items.map((item) =>
+        h(
+          "li",
+          { class: "part-item" },
+          h(
+            "label",
+            { for: `item-${item.id}`, class: "part-label item-label" },
+            h("input", {
+              type: "checkbox",
+              id: `item-${item.id}`,
+              class: "part-box",
+              "data-focus": `item:${item.id}`,
+              checked: taken && !leftOut.has(item.id),
+              disabled: !taken,
+              onchange: () => options.onPressItem(item.id),
+            }),
+            h("span", { class: "item-kind" }, say(ITEM_WORD[item.kind])),
+            h("span", { class: "part-name item-name" }, item.label),
+          ),
+        ),
+      ),
+    );
+  };
   const rows = sections.map((section) => {
     const state = chosenState(chosen, sections, section.id);
     const box = h("input", {
@@ -249,6 +291,7 @@ export function partsCard(options: PartsOptions): HTMLElement {
         h("span", { class: "part-name" }, partName(say, section)),
         h("span", { class: "part-meta" }, meta),
       ),
+      itemRows(section),
     );
   });
   return h(
@@ -286,6 +329,7 @@ export function partsCard(options: PartsOptions): HTMLElement {
           of: String(totals.of),
           characters: String(totals.characters),
         }),
+        totals.itemsOut > 0 ? ` · ${say("impPartsItemsOut", { n: String(totals.itemsOut) })}` : null,
       ),
     ),
     h("ul", { class: "parts", "aria-label": say("impPartsTitle", { name: options.name }) }, ...rows),
@@ -310,7 +354,9 @@ export function partsCard(options: PartsOptions): HTMLElement {
         icon("check"),
         say("impPartsImport", { parts: String(totals.parts) }),
       ),
-      none ? h("span", { class: "note quiet", id: "parts-nothing" }, say("impPartsNothing")) : null,
+      none
+        ? h("span", { class: "note quiet", id: "parts-nothing" }, say(emptied ? "impPartsNothingLeft" : "impPartsNothing"))
+        : null,
     ),
   );
 }

@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 8;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 9;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2173,6 +2173,27 @@ export function parseImportedDocument(value: unknown): ImportedDocument {
 
 const SECTION_KINDS = ["preamble", "heading", "page", "whole"] as const;
 const OUTLINE_WAYS = ["headings", "pages", "whole"] as const;
+const ITEM_KINDS = ["table", "figure", "attachment"] as const;
+
+/** A table, a figure or an attachment of a part, which the owner can leave out of it by itself. */
+export interface DocumentItem {
+  /** The block's id: what `import_selection` is given in `leave_out`. */
+  id: string;
+  kind: (typeof ITEM_KINDS)[number];
+  /** What SCE calls it: a table's first row, or a mark's own words. */
+  label: string;
+  characters: number;
+}
+
+function parseDocumentItem(value: unknown, where: string): DocumentItem {
+  const r = record(value, where);
+  return {
+    id: text(r, "id", where),
+    kind: oneOf(r, "kind", where, ITEM_KINDS),
+    label: text(r, "label", where),
+    characters: count(r, "characters", where),
+  };
+}
 
 /** One part of a document the owner can choose, with what a person needs to see to choose it. */
 export interface DocumentSection {
@@ -2198,6 +2219,8 @@ export interface DocumentSection {
    * paragraphs, is read back into parts by. The screen does not work out which paragraphs a part holds.
    */
   block_ids: string[];
+  /** Its own tables, figures and attachments, in the document's order. */
+  items: DocumentItem[];
 }
 
 /** How a document is divided into parts the owner can choose between. */
@@ -2234,6 +2257,7 @@ function parseDocumentSection(value: unknown, where: string): DocumentSection {
     page_first: optionalCount(r, "page_first", where),
     page_last: optionalCount(r, "page_last", where),
     block_ids: stringList(r, "block_ids", where),
+    items: list(r, "items", where).map((item, i) => parseDocumentItem(item, `${where}.items[${i}]`)),
   };
 }
 

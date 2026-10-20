@@ -80,6 +80,7 @@ function section(id: string, title: string, parent: string | null = null): Docum
     page_first: null,
     page_last: null,
     block_ids: [`${id}-b1`, `${id}-b2`],
+    items: [],
   };
 }
 
@@ -392,8 +393,8 @@ class FakeCore {
       this.record("list_specs");
       return { specs: this.listed, unreadable: [] };
     },
-    importSelection: async (id, _document, key, sections, supersede) => {
-      this.record("import_selection", id, key, sections, supersede ?? false);
+    importSelection: async (id, _document, key, choice, supersede) => {
+      this.record("import_selection", id, key, choice.sections, supersede ?? false, choice.leaveOut);
       if (this.importWith !== null) return this.importWith();
       const spec = this.listed.find((s) => s.id === id) ?? { id, title: id, created_at: "" };
       const open = (this.specs.get(id) ?? []).find((s) => (s.ended ?? s.proposal.state) === "pending");
@@ -403,7 +404,7 @@ class FakeCore {
       if (open !== undefined) open.ended = "superseded";
       const stored = this.makeProposal(spec);
       // A choice of some of the parts is a proposal of part of the document, which its documents say.
-      if (sections !== undefined) this.partial.add(stored.proposal.id);
+      if (choice.sections !== undefined || choice.leaveOut.length > 0) this.partial.add(stored.proposal.id);
       return { proposal: stored.proposal, created: true, complete: this.asks.length === 0, not_carried: [] };
     },
     listProposals: async (id) => {
@@ -1291,7 +1292,7 @@ describe("a document with parts to choose between", () => {
     button(r.root, say("impPartsImport", { parts: "1" })).click();
     await settle();
 
-    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), ["s3"], false]]);
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), ["s3"], false, []]]);
     expect(r.root.textContent).toContain(say("rvwSave"));
   });
 
@@ -1320,7 +1321,61 @@ describe("a document with parts to choose between", () => {
     button(r.root, say("impPartsImport", { parts: "3" })).click();
     await settle();
 
-    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false, []]]);
+  });
+
+  it("leaves a table out of a part by itself, sends it, and keeps it out when the part is left out and chosen again", async () => {
+    r.core.sections = twoFunctions();
+    r.core.sections[2] = {
+      ...section("s3", "Fan"),
+      items: [
+        { id: "b9", kind: "table", label: "speed | rpm", characters: 12 },
+        { id: "b10", kind: "figure", label: "[picture: fan.png]", characters: 18 },
+      ],
+    };
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("functions.md", "# Lamp\n"));
+    const item = (id: string): HTMLInputElement => r.root.querySelector<HTMLInputElement>(`#item-${id}`)!;
+    expect([item("b9").checked, item("b10").checked]).toEqual([true, true]);
+    expect(r.root.textContent).toContain(say("impItemTable"));
+
+    item("b9").click();
+    await settle();
+    expect(item("b9").checked).toBe(false);
+    expect(r.root.textContent).toContain(say("impPartsItemsOut", { n: "1" }));
+    // The part left out takes its items with it, off and not pressable; chosen again, the table stays out.
+    box(r.root, "s3").click();
+    await settle();
+    expect([item("b9").disabled, item("b10").checked]).toEqual([true, false]);
+    expect(r.root.textContent).not.toContain(say("impPartsItemsOut", { n: "1" }));
+    box(r.root, "s3").click();
+    await settle();
+    expect([item("b9").checked, item("b10").checked]).toEqual([false, true]);
+
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false, ["b9"]]]);
+  });
+
+  it("cannot bring in a part whose every block is an item left out, and says so", async () => {
+    r.core.sections = [
+      { ...section("s1", ""), kind: "page", page_first: 1, page_last: 1, blocks: 1, characters: 18,
+        items: [{ id: "b1", kind: "figure", label: "[picture: scan.png]", characters: 18 }] },
+      { ...section("s2", ""), kind: "page", page_first: 2, page_last: 2 },
+    ];
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("scan.pdf", "x"));
+
+    box(r.root, "s2").click();
+    await settle();
+    r.root.querySelector<HTMLInputElement>("#item-b1")!.click();
+    await settle();
+
+    expect(r.root.textContent).toContain(say("impPartsNothingLeft"));
+    button(r.root, say("impPartsImport", { parts: "1" })).click();
+    await settle();
+    expect(r.core.callsOf("import_selection")).toEqual([]);
   });
 
   it("cannot bring in nothing, and says why in words, and keeps the keyboard where it is", async () => {
@@ -1461,7 +1516,7 @@ describe("a document with one part", () => {
     await chooseFile(r, file("door.md", "# Door lock\n"));
 
     expect(r.root.textContent).not.toContain(say("impPartsLead"));
-    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false]]);
+    expect(r.core.callsOf("import_selection")).toEqual([["spec-1", expect.any(String), undefined, false, []]]);
     expect(r.root.textContent).toContain(say("rvwSave"));
   });
 

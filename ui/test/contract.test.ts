@@ -733,7 +733,7 @@ describe("the replies the core gives", () => {
     // The proposal of a part names the scope it was made under; the one of a whole document does not.
     expect(chosen.proposal.scope).toMatch(/^[0-9a-f]{64}$/);
     expect(parseImportedDocument(importReplies.answers["import_document"]).proposal.scope).toBeNull();
-    for (const kind of ["nothing-chosen", "bad-section", "scope-refused"]) {
+    for (const kind of ["nothing-chosen", "bad-section", "bad-block", "scope-refused"]) {
       expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
     }
   });

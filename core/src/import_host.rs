@@ -441,12 +441,35 @@ struct Proposing<'a> {
     expect: Value,
 }
 
-/// The ids of the parts of a document, as `outline` gave them: a letter and a number, so that one
-/// can never be taken by the tools for a flag.
-fn valid_section(id: &str) -> bool {
-    id.strip_prefix('s').is_some_and(|rest| {
-        (1..=6).contains(&rest.len()) && rest.bytes().all(|b| b.is_ascii_digit())
+/// An id `outline` gave: a letter and a number, so that one can never be taken by the tools for a
+/// flag. A part is `s` and up to six digits, a block (an item of a part) `b` and up to nine.
+fn valid_id(id: &str, letter: char, digits: usize) -> bool {
+    id.strip_prefix(letter).is_some_and(|rest| {
+        (1..=digits).contains(&rest.len()) && rest.bytes().all(|b| b.is_ascii_digit())
     })
+}
+
+fn valid_section(id: &str) -> bool {
+    valid_id(id, 's', 6)
+}
+
+fn valid_block(id: &str) -> bool {
+    valid_id(id, 'b', 9)
+}
+
+/// What the owner chose of a document: the parts (all of them when none is named), and the items of
+/// them (a table, a figure, an attachment) left out by themselves.
+#[derive(Clone, Copy, Default)]
+struct Choice<'a> {
+    sections: Option<&'a [String]>,
+    leave_out: &'a [String],
+}
+
+impl Choice<'_> {
+    /// Every part with nothing left out: the whole document, for which no scope is made.
+    fn is_whole(&self) -> bool {
+        self.sections.is_none() && self.leave_out.is_empty()
+    }
 }
 
 /// Convert the part of a kept document the owner chose (all of it when none is named), check the
@@ -456,7 +479,7 @@ fn propose_part<C: Clock>(
     tools: &ImportTools,
     args: &Proposing<'_>,
     kept: &Kept,
-    sections: Option<&[String]>,
+    choice: Choice<'_>,
 ) -> Result<Value, CommandError> {
     let original = &kept.original;
     let extraction_digest = &kept.extraction;
@@ -468,19 +491,27 @@ fn propose_part<C: Clock>(
     // A choice of every part is no scope: the specs folder refuses one, and the tools say when a
     // choice is that, so that this does not work the rule out. It is then an import of the whole.
     let mut scope_text: Option<String> = None;
-    if let Some(chosen) = sections {
-        if chosen.is_empty() {
+    if !choice.is_whole() {
+        if choice.sections.is_some_and(<[String]>::is_empty) {
             return Err(refuse(
                 "nothing-chosen",
                 "nothing is chosen: an import of nothing is not an import",
                 Value::Null,
             ));
         }
+        let chosen = choice.sections.unwrap_or_default();
         if let Some(stranger) = chosen.iter().find(|id| !valid_section(id)) {
             return Err(refuse(
                 "bad-section",
                 format!("`{stranger}` is not the id of a part of the document"),
                 json!({ "section": stranger }),
+            ));
+        }
+        if let Some(stranger) = choice.leave_out.iter().find(|id| !valid_block(id)) {
+            return Err(refuse(
+                "bad-block",
+                format!("`{stranger}` is not the id of an item of the document"),
+                json!({ "block": stranger }),
             ));
         }
         let mut run = vec![
@@ -491,8 +522,14 @@ fn propose_part<C: Clock>(
             "scope.json",
             "--json",
         ];
+        if choice.sections.is_none() {
+            run.push("--all");
+        }
         for id in chosen {
             run.extend(["--section", id.as_str()]);
+        }
+        for id in choice.leave_out {
+            run.extend(["--leave-out", id.as_str()]);
         }
         let made = tools.run_to_success(&dir, &run, tools.quick_timeout, "scope-refused", &[2])?;
         let said: Value = serde_json::from_str(made.stdout.trim())
@@ -595,7 +632,7 @@ pub(crate) fn import_document<C: Clock>(
         supersede: args.supersede,
         expect,
     };
-    propose_part(context, tools, &proposing, &kept, None)
+    propose_part(context, tools, &proposing, &kept, Choice::default())
 }
 
 pub(crate) fn head_of<C: Clock>(context: &Context<'_, C>, id: &str) -> Result<Value, CommandError> {
@@ -668,6 +705,9 @@ pub(crate) struct ImportSelection {
     /// The ids of the parts `read_document` listed; absent for all of them.
     #[serde(default)]
     sections: Option<Vec<String>>,
+    /// The ids of items (`items` of a part `read_document` listed) left out of the chosen parts.
+    #[serde(default)]
+    leave_out: Vec<String>,
     key: String,
     origin: String,
     #[serde(default)]
@@ -699,7 +739,11 @@ pub(crate) fn import_selection<C: Clock>(
         supersede: args.supersede,
         expect,
     };
-    propose_part(context, tools, &proposing, &kept, args.sections.as_deref())
+    let choice = Choice {
+        sections: args.sections.as_deref(),
+        leave_out: &args.leave_out,
+    };
+    propose_part(context, tools, &proposing, &kept, choice)
 }
 
 /// What `assemble_import` and `accept_import` are given.

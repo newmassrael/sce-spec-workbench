@@ -281,6 +281,12 @@ fn replies() -> Value {
             ),
         );
     }
+    let mut not_an_item = select("press-bad-block", json!(["s3"]));
+    not_an_item["leave_out"] = json!(["--out"]);
+    refusals.insert(
+        "bad-block".into(),
+        refused(Some(&tools), "import_selection", not_an_item),
+    );
 
     // A document divided among specs: begun from the spec that holds it, a plan that leaves a part
     // without a place (SCE's count is the answer), a plan that leaves none (the walk), and a plan after

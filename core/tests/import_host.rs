@@ -691,6 +691,83 @@ fn a_choice_that_is_nothing_or_not_a_part_is_refused_and_a_part_is_not() {
         .unwrap();
 }
 
+const WITH_TABLE: &str = "# Lamp\n\nThe lamp is on.\n\n| state | lamp |\n| --- | --- |\n| on | lit |\n\n# Fan\n\nThe fan runs above 40 degrees.\n";
+
+#[test]
+fn a_table_is_an_item_of_its_part_and_is_left_out_by_itself() {
+    let rig = Rig::real("part-item");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "lamp.md", WITH_TABLE);
+    let items = &read["outline"]["sections"][0]["items"];
+    assert_eq!(items[0]["kind"], "table");
+    assert_eq!(items[0]["label"], "state | lamp");
+    let table = items[0]["id"].clone();
+
+    let text_of = |key: &str, sections: Option<Value>| {
+        let mut args = json!({
+            "id": spec, "original": read["original"], "extraction": read["extraction"],
+            "leave_out": [table], "key": key, "origin": "gui", "supersede": true,
+        });
+        if let Some(sections) = sections {
+            args["sections"] = sections;
+        }
+        let imported = rig.try_ask("import_selection", args).unwrap();
+        rig.ask(
+            "assemble_import",
+            json!({"id": spec, "proposal": proposal_id(&imported)}),
+        )["text"]
+            .clone()
+    };
+
+    // The part without its table, and every part without it: neither is the whole document.
+    assert_eq!(
+        text_of("lamp-less", Some(json!(["s1"]))),
+        "# Lamp\n\nThe lamp is on.\n"
+    );
+    assert_eq!(
+        text_of("all-less", None),
+        "# Lamp\n\nThe lamp is on.\n\n# Fan\n\nThe fan runs above 40 degrees.\n"
+    );
+}
+
+#[test]
+fn an_item_that_is_not_one_or_is_outside_the_choice_is_refused() {
+    let rig = Rig::real("part-item-refused");
+    let spec = rig.spec();
+    let read = rig.read(&spec, "lamp.md", WITH_TABLE);
+    let table = read["outline"]["sections"][0]["items"][0]["id"].clone();
+
+    for (name, sections, leave_out, kind) in [
+        ("a flag", json!(["s1"]), json!(["--out"]), "bad-block"),
+        (
+            "outside the choice",
+            json!(["s2"]),
+            json!([table]),
+            "scope-refused",
+        ),
+    ] {
+        let refused = rig
+            .try_ask(
+                "import_selection",
+                json!({
+                    "id": spec, "original": read["original"], "extraction": read["extraction"],
+                    "sections": sections, "leave_out": leave_out, "key": name, "origin": "gui",
+                }),
+            )
+            .expect_err(name);
+        assert_eq!(refused.kind, kind, "{name}");
+    }
+    // The nearest that must pass: the same table left out of the part that holds it.
+    rig.try_ask(
+        "import_selection",
+        json!({
+            "id": spec, "original": read["original"], "extraction": read["extraction"],
+            "sections": ["s1"], "leave_out": [table], "key": "good", "origin": "gui",
+        }),
+    )
+    .unwrap();
+}
+
 #[test]
 fn the_same_press_with_another_part_is_another_input() {
     let rig = Rig::real("part-key");

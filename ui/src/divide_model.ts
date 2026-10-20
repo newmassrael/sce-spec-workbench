@@ -423,6 +423,7 @@ function aPart(id: string): DocumentSection {
     page_first: null,
     page_last: null,
     block_ids: [id],
+    items: [],
   };
 }
 

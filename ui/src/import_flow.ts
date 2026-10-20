@@ -10,7 +10,7 @@
 // may be saved and refuses when something moved. This asks, shows the answer in the design's words,
 // and offers the few things a refusal leaves.
 
-import type { Api } from "./api";
+import type { Api, PartsChoice } from "./api";
 import { CommandFailure } from "./ipc";
 import type { AssembledImport, DecisionKind, DocumentSection, Intake, ReadDocument, Spec } from "./contract";
 import { restoreDraft, startRevision, type Draft } from "./divide_model";
@@ -24,9 +24,10 @@ import {
   divisionKey,
   failureOf,
   importKey,
+  choiceToSend,
   isChoosable,
+  pressItem,
   pressSection,
-  sectionsToSend,
   titleOf,
   type ImportFailure,
   type ImportStage,
@@ -126,6 +127,8 @@ export class ImportFlow {
   private readonly made = new Set<string>();
   /** The parts of the document that are chosen while the person is choosing, by the outline's ids. */
   private chosen = new Set<string>();
+  /** The items (a table, a figure, an attachment) left out of the parts by themselves, by block id. */
+  private leftOut = new Set<string>();
   /** Whether the document being brought in replaces the open proposal of the spec. */
   private replacing = false;
   private panel: ReviewPanel | null = null;
@@ -354,10 +357,11 @@ export class ImportFlow {
       // be carried to it: a document with no headings is as much a new version as one with many, and the choice
       // of carrying is made on the screen it would otherwise skip.
       if (!isChoosable(doc) && this.divided.length === 0) {
-        await this.bringParts(spec, name, doc, undefined, supersede, ticket);
+        await this.bringParts(spec, name, doc, { sections: undefined, leaveOut: [] }, supersede, ticket);
         return;
       }
       this.chosen = allSections(doc);
+      this.leftOut = new Set();
       this.replacing = supersede;
       this.enter({ kind: "parts", name, spec, doc });
       this.host.redraw();
@@ -371,7 +375,7 @@ export class ImportFlow {
     spec: Spec,
     name: string,
     doc: ReadDocument,
-    sections: readonly string[] | undefined,
+    choice: PartsChoice,
     supersede: boolean,
     ticket: number,
   ): Promise<void> {
@@ -382,7 +386,7 @@ export class ImportFlow {
       spec.id,
       doc,
       importKey(this.host.now(), this.press),
-      sections,
+      choice,
       supersede,
     );
     if (ticket !== this.ticket) return;
@@ -393,11 +397,11 @@ export class ImportFlow {
   private async bringChosen(): Promise<void> {
     const stage = this.stage;
     if (stage === null || stage.kind !== "parts") return;
-    const sections = sectionsToSend(this.chosen, stage.doc);
-    if (sections !== undefined && sections.length === 0) return;
+    const choice = choiceToSend(this.chosen, this.leftOut, stage.doc);
+    if (choice.sections !== undefined && choice.sections.length === 0) return;
     const ticket = ++this.ticket;
     try {
-      await this.bringParts(stage.spec, stage.name, stage.doc, sections, this.replacing, ticket);
+      await this.bringParts(stage.spec, stage.name, stage.doc, choice, this.replacing, ticket);
     } catch (error) {
       await this.refuse(stage.name, new Refusal(error, stage.spec), ticket);
     }
@@ -558,6 +562,14 @@ export class ImportFlow {
     this.host.redraw();
   }
 
+  private pressPartItem(id: string): void {
+    const stage = this.stage;
+    if (stage === null || stage.kind !== "parts") return;
+    this.leftOut = pressItem(this.leftOut, id);
+    this.focusRequest = `item:${id}`;
+    this.host.redraw();
+  }
+
   /**
    * Say why the core would not take the document, and take away the spec that was made for it and
    * got nothing, so a refused file leaves no empty spec in the list.
@@ -708,9 +720,13 @@ export class ImportFlow {
                 name: stage.name,
                 doc: stage.doc,
                 chosen: this.chosen,
+                leftOut: this.leftOut,
                 onPress: (id) => this.pressPart(id),
+                onPressItem: (id) => this.pressPartItem(id),
                 onAll: () => {
+                  // Everything is everything: the items left out are taken again too.
                   this.chosen = allSections(stage.doc);
+                  this.leftOut = new Set();
                   this.host.redraw();
                 },
                 onNone: () => {
