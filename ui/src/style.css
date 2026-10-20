@@ -1631,7 +1631,32 @@ textarea:focus-visible {
 }
 
 .imp .imp-notes li {
-  padding: 4px 0;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--attn-tint);
+  color: var(--ink);
+}
+
+.imp .imp-notes li .ic {
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  color: var(--attn);
+}
+
+.imp .imp-notes .note-what,
+.imp .imp-notes .note-why {
+  overflow-wrap: anywhere;
+}
+
+.imp .imp-notes .note-why {
+  color: var(--ink-2);
 }
 
 /* A phone: the two columns become one, each cell under the one it is compared with. The headings are

@@ -90,13 +90,28 @@ export function parseExtraction(source: string): {
       howRead: typeof block["how_read"] === "string" ? block["how_read"] : "text-layer",
     };
   });
-  const carried = root["not_carried"] === undefined ? [] : array(root, "not_carried", where);
-  const notCarried = carried.map((item, i): NotCarried => {
+  const notCarried = root["not_carried"] === undefined ? [] : notCarriedIn(root, where);
+  return { blocks, notCarried, member: typeof root["member"] === "string" ? root["member"] : "" };
+}
+
+function notCarriedIn(root: Record<string, unknown>, where: string): NotCarried[] {
+  return array(root, "not_carried", where).map((item, i): NotCarried => {
     const at = `${where}.not_carried[${i}]`;
     const entry = record(item, at);
     return { what: text(entry, "what", at), why: typeof entry["why"] === "string" ? entry["why"] : null };
   });
-  return { blocks, notCarried, member: typeof root["member"] === "string" ? root["member"] : "" };
+}
+
+/**
+ * What could not be carried of the part a proposal is of, as SCE's check said it when the proposal was made:
+ * a picture left out of the part is not one the owner is told to look at (ADR 0039 of SCE). A report made by
+ * tools older than that says nothing of it, and `whole`, what the extraction lists of the whole document, is
+ * what such a proposal was always shown with.
+ */
+export function notCarriedOf(report: string, whole: readonly NotCarried[]): NotCarried[] {
+  const where = "report";
+  const root = record(parseJson(report, where), where);
+  return root["not_carried"] === undefined ? [...whole] : notCarriedIn(root, where);
 }
 
 function parseJson(source: string, where: string): unknown {

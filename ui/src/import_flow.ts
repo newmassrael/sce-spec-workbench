@@ -49,6 +49,7 @@ import {
 import {
   changeRows,
   changedLines,
+  notCarriedOf,
   parseConversion,
   parseExtraction,
   partOf,
@@ -263,7 +264,7 @@ export class ImportFlow {
       this.parts = {
         written: parseConversion(documents.conversion),
         original: read.blocks,
-        notCarried: read.notCarried,
+        notCarried: notCarriedOf(documents.report, read.notCarried),
         member: read.member,
         part: partOf(documents.scope, documents.report),
       };

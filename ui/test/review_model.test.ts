@@ -8,6 +8,7 @@ import type { AssembledImport, Proposal, ProposalDecision, ProposalView, TextCha
 import {
   changeRows,
   changedLines,
+  notCarriedOf,
   parseConversion,
   parseExtraction,
   partOf,
@@ -340,5 +341,27 @@ describe("whether a proposal is of part of its document", () => {
   it("refuses a report that is not one, when there is a part to count", () => {
     expect(() => partOf("{}", "not json")).toThrow(ContractError);
     expect(partOf(null, "not json")).toBeNull();
+  });
+});
+
+describe("what could not be carried of a proposal", () => {
+  const whole = [
+    { what: "1 picture(s) were not read", why: null },
+    { what: "a footer", why: "page furniture" },
+  ];
+
+  it("is what SCE's check said of the part, so a picture left out of it is not listed", () => {
+    const report = JSON.stringify({ not_carried: [{ what: "a footer", why: "page furniture" }] });
+    expect(notCarriedOf(report, whole)).toEqual([{ what: "a footer", why: "page furniture" }]);
+    expect(notCarriedOf(JSON.stringify({ not_carried: [] }), whole)).toEqual([]);
+  });
+
+  it("is the whole document's for a report made before the check said it", () => {
+    expect(notCarriedOf("{}", whole)).toEqual(whole);
+  });
+
+  it("refuses a report whose list is not one", () => {
+    expect(() => notCarriedOf(JSON.stringify({ not_carried: "a footer" }), whole)).toThrow(ContractError);
+    expect(() => notCarriedOf("not json", whole)).toThrow(ContractError);
   });
 });

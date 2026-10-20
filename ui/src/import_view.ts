@@ -757,7 +757,16 @@ export function notCarriedList(say: Say, items: readonly { what: string; why: st
     h(
       "ul",
       {},
-      ...items.map((item) => h("li", {}, h("span", { class: "tag" }, icon("alert"), item.what), item.why === null ? null : ` ${item.why}`)),
+      // A note is sentences, not a label: it is set as a paragraph beside its mark, and wraps as one.
+      ...items.map((item) =>
+        h(
+          "li",
+          {},
+          icon("alert"),
+          h("span", { class: "note-what" }, item.what),
+          item.why === null ? null : h("span", { class: "note-why" }, item.why),
+        ),
+      ),
     ),
   );
 }

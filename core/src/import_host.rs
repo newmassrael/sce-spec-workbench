@@ -586,10 +586,15 @@ fn propose_part<C: Clock>(
         .get("complete")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    let not_carried = serde_json::from_str::<Value>(extraction_text)
-        .ok()
-        .and_then(|e| e.get("not_carried").cloned())
-        .unwrap_or_else(|| json!([]));
+    // What could not be carried of the part converted, as the check said it: a picture left out of the
+    // part is not one the owner is told to look at (ADR 0039 of SCE). A report of tools older than that
+    // says nothing, and what the extraction lists of the whole document is said instead.
+    let not_carried = report.get("not_carried").cloned().unwrap_or_else(|| {
+        serde_json::from_str::<Value>(extraction_text)
+            .ok()
+            .and_then(|e| e.get("not_carried").cloned())
+            .unwrap_or_else(|| json!([]))
+    });
 
     let mut proposing = json!({
         "id": args.id,
