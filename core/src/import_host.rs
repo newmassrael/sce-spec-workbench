@@ -391,9 +391,10 @@ fn keep_document<C: Clock>(
 ) -> Result<Kept, CommandError> {
     let spec = SpecId::parse(&args.id)?;
     // A name the original cannot hold (empty, or one that climbs out) is refused by the store as
-    // `bad-original` before anything is run.
-    let member = json!({ "path": args.name, "role": "document", "data": args.data });
-    let mut adding = json!({ "id": args.id, "members": [member] });
+    // `bad-original`.
+    let mut members = vec![json!({ "path": args.name, "role": "document", "data": args.data })];
+    members.extend(renditions_of(tools, &args.name, &args.data)?);
+    let mut adding = json!({ "id": args.id, "members": members });
     if let Some(label) = &args.label {
         adding["label"] = json!(label);
     }
@@ -435,6 +436,71 @@ fn keep_document<C: Clock>(
         extraction: text_of(&extraction, "digest")?,
         extraction_text,
     })
+}
+
+/// The renditions of the pictures a PDF holds, as members to keep beside it in its original (ADR 0032 of
+/// SCE): each image the tools can draw and hand over is a PNG in a `renditions` folder next to the PDF,
+/// naming the PDF as the member it was made from and what drew it. What the model is shown of such a
+/// picture, and what the review shows beside what it read, is then this file and not a new drawing of
+/// the PDF, which is what the owner decided about.
+///
+/// A document that is not a PDF has none. A PDF the tools cannot draw (the pack that reads it is not
+/// installed, or it is not readable) has none either, and that is not said here: the extraction that is
+/// made of it next is refused or carries the reason, and a picture is drawn from the document if it is
+/// ever read.
+fn renditions_of(tools: &ImportTools, name: &str, data: &str) -> Result<Vec<Value>, CommandError> {
+    if !name.to_ascii_lowercase().ends_with(".pdf") {
+        return Ok(Vec::new());
+    }
+    // Bytes that are not base64 are the store's to refuse, in its words, when the original is added.
+    let Ok(bytes) = sce_specs::base64::decode(data) else {
+        return Ok(Vec::new());
+    };
+    let scratch = Scratch::new()?;
+    fs::create_dir(scratch.path("in"))
+        .map_err(|e| failed(format!("a folder to work in could not be made: {e}")))?;
+    let file = Path::new(name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty())
+        .unwrap_or("document.pdf");
+    scratch.write(&format!("in/{file}"), &bytes)?;
+    let ran = tools.run(
+        &scratch.path("in"),
+        &["render-pictures", "--document", file, "--out-dir", "../r"],
+        tools.extract_timeout,
+    )?;
+    if ran.code != 0 {
+        return Ok(Vec::new());
+    }
+    let listing: Value = serde_json::from_str(&scratch.read("r/renditions.json")?)
+        .map_err(|e| failed(format!("`render-pictures` did not list its pictures: {e}")))?;
+    let renderer = listing["renderer"].as_str().unwrap_or_default();
+    // The renditions sit in the folder the document is in, so a picture is a file beside its document
+    // wherever the original puts the document.
+    let folder = Path::new(name)
+        .parent()
+        .and_then(|p| p.to_str())
+        .filter(|p| !p.is_empty())
+        .map(|p| format!("{p}/"))
+        .unwrap_or_default();
+    let mut members = Vec::new();
+    for picture in listing["pictures"].as_array().into_iter().flatten() {
+        let Some(picture_name) = picture["name"].as_str() else {
+            continue;
+        };
+        let path = scratch.path(&format!("r/{picture_name}"));
+        let png = fs::read(&path)
+            .map_err(|e| failed(format!("the tool did not write {}: {e}", path.display())))?;
+        members.push(json!({
+            "path": format!("{folder}renditions/{picture_name}"),
+            "role": "rendition",
+            "data": sce_specs::base64::encode(&png),
+            "of": name,
+            "renderer": renderer,
+        }));
+    }
+    Ok(members)
 }
 
 /// What is asked to be proposed, apart from the document.
