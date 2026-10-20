@@ -134,7 +134,9 @@ export interface Api {
   /**
    * What SCE draws of the spec's model (the current one, or `revision`'s): its own
    * pictures, then the table of every value it states. Refused with `sce-refused`
-   * when SCE will not draw it, in the product's own words.
+   * when SCE will not draw it, in the product's own words. A screen has no paper, so
+   * SCE is asked for the smallest of its pages that holds the drawing at its type
+   * size (`page: "fit"`): only a drawing no page holds is refused for its size.
    */
   figures(id: string, revision?: Revision, lexicon?: string): Promise<Figures>;
   /**
@@ -455,6 +457,7 @@ export function apiOver(transport: Transport): Api {
         id,
         ...(revision === undefined ? {} : { revision }),
         ...(lexicon === undefined ? {} : { lexicon }),
+        page: "fit",
       };
       return parseFigures(await transport.call("figures", args));
     },

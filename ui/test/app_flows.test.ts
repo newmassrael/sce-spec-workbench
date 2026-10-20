@@ -1473,6 +1473,13 @@ describe("the model panel", () => {
     expect(images()).toHaveLength(2);
   });
 
+  it("asks SCE for the page that holds the drawing, since a screen has no paper", async () => {
+    core.setModel("alpha", "<scxml/>", core.revision("alpha two"));
+    await click("Alpha");
+
+    expect(core.callsOf("figures").map((args) => args["page"])).toEqual(["fit"]);
+  });
+
   it("says a model written for an earlier text is behind, with both revisions", async () => {
     core.setModel("alpha", "<scxml/>", core.revision("alpha one"));
     await click("Alpha");
