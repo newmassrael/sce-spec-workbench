@@ -96,9 +96,38 @@ with zipfile.ZipFile(out, 'w') as z:
 /// byte into `dir`. Its image is a figure the authoring tools place and draw, and the PDF library they read
 /// it with is a pack (`pypdfium2`) that a test which reads this file needs installed.
 pub fn lamp_pdf(dir: &Path) -> PathBuf {
-    let text = b"BT /F1 12 Tf 72 720 Td (The lamp is dark until it is switched on.) Tj ET\n\
-                 q 80 0 0 80 100 600 cm /Im1 Do Q\n";
     let samples: [u8; 12] = [255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255];
+    pdf_of_one_image(
+        dir,
+        "/Width 2 /Height 2 /ColorSpace /DeviceRGB /BitsPerComponent 8",
+        &samples,
+        (80, 80),
+    )
+}
+
+/// [`lamp_pdf`] holding the lamp states drawing, as the JPEG the document would store it: the picture a
+/// model is asked to read in a PDF, whose words every reading has to carry.
+pub fn lamp_states_pdf(dir: &Path) -> PathBuf {
+    let jpeg =
+        std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lamp-states.jpg"))
+            .expect("the JPEG of the drawing is in fixtures/");
+    pdf_of_one_image(
+        dir,
+        "/Width 560 /Height 240 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode",
+        &jpeg,
+        (420, 180),
+    )
+}
+
+/// A PDF of one page that says a sentence and draws one image under it, `placed` points wide and high.
+/// `image_entries` are the image dictionary's entries that say how `image` is to be read.
+fn pdf_of_one_image(dir: &Path, image_entries: &str, image: &[u8], placed: (u32, u32)) -> PathBuf {
+    let text = format!(
+        "BT /F1 12 Tf 72 720 Td (The lamp is dark until it is switched on.) Tj ET\n\
+         q {} 0 0 {} 100 500 cm /Im1 Do Q\n",
+        placed.0, placed.1
+    )
+    .into_bytes();
     let bodies: Vec<Vec<u8>> = vec![
         b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
@@ -107,16 +136,18 @@ pub fn lamp_pdf(dir: &Path) -> PathBuf {
             .to_vec(),
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec(),
         [
-            b"<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceRGB \
-              /BitsPerComponent 8 /Length 12 >>\nstream\n"
-                .to_vec(),
-            samples.to_vec(),
+            format!(
+                "<< /Type /XObject /Subtype /Image {image_entries} /Length {} >>\nstream\n",
+                image.len()
+            )
+            .into_bytes(),
+            image.to_vec(),
             b"\nendstream".to_vec(),
         ]
         .concat(),
         [
             format!("<< /Length {} >>\nstream\n", text.len()).into_bytes(),
-            text.to_vec(),
+            text,
             b"endstream".to_vec(),
         ]
         .concat(),

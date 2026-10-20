@@ -10,7 +10,8 @@
 //! (ADR 0036: a runtime says it reads pictures only once its live test passes).
 //!
 //! The picture is `fixtures/lamp-states.png`, drawn from `lamp-states.svg` beside it: three states and
-//! three labelled transitions, every word of which the reading has to carry.
+//! three labelled transitions, every word of which the reading has to carry. A second test holds the same
+//! drawing stored as the JPEG of a PDF's image, which needs the PDF pack (`pypdfium2`) as well.
 //!
 //! ```text
 //! cargo test -p sce-spec-workbench-core --test claude_reads_a_picture_live -- --ignored --nocapture
@@ -65,7 +66,22 @@ fn the_real_client_reads_a_picture_in_the_form_the_kind_asks_for() {
         work.join("lamp-states.png"),
     )
     .unwrap();
-    run(&work, &["extract", "lamp.md", "--out", "x.json"]);
+    read_the_first_figure_of(&work, "lamp.md");
+}
+
+/// The same drawing, stored in a PDF as the JPEG a document holds: the picture the model is shown is the
+/// PNG the authoring tools draw from the page's image, and it has to carry every word as the file does.
+#[test]
+#[ignore = "runs the real claude: seconds and money"]
+fn the_real_client_reads_an_image_drawn_from_a_pdf() {
+    let work = common::scratch("claude-reads-a-pdf-picture");
+    fs::copy(common::lamp_states_pdf(&work), work.join("spec.pdf")).unwrap();
+    read_the_first_figure_of(&work, "spec.pdf");
+}
+
+fn read_the_first_figure_of(work: &Path, document: &str) {
+    let work = work.to_path_buf();
+    run(&work, &["extract", document, "--out", "x.json"]);
     run(
         &work,
         &["convert", "--extraction", "x.json", "--out", "c.json"],
@@ -87,7 +103,7 @@ fn the_real_client_reads_a_picture_in_the_form_the_kind_asks_for() {
             "--extraction",
             "x.json",
             "--document",
-            "lamp.md",
+            document,
             "--block",
             &figure,
             "--out-dir",
