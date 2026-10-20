@@ -18,6 +18,8 @@ export interface WrittenBlock {
   readonly id: string;
   readonly markdown: string;
   readonly cites: readonly string[];
+  /** The NAME of the picture a model read this block from, when it did; `null` for words of the original. */
+  readonly picture: string | null;
 }
 
 /** A block of the original as it was read out of it. */
@@ -65,7 +67,16 @@ export function parseConversion(source: string): WrittenBlock[] {
     if (!cites.every((c): c is string => typeof c === "string")) {
       throw new ContractError(`${at}.cites`, "a list of block ids");
     }
-    return { id: text(block, "id", at), markdown: text(block, "markdown", at), cites };
+    const picture = block["picture"];
+    if (picture !== undefined && (typeof picture !== "string" || picture === "")) {
+      throw new ContractError(`${at}.picture`, "the name of a picture");
+    }
+    return {
+      id: text(block, "id", at),
+      markdown: text(block, "markdown", at),
+      cites,
+      picture: picture ?? null,
+    };
   });
 }
 
@@ -132,6 +143,8 @@ export interface ReviewRow {
   readonly original: string | null;
   /** The Markdown the conversion wrote; `null` for a block of the original it left out. */
   readonly written: string | null;
+  /** The NAME of the picture the words were read from by a model, so the review can show the picture. */
+  readonly picture: string | null;
   /** Why the check asked about this row, in the check's word (`check`, `recognised`, `not-in-original`, `missing`). */
   readonly why: string | null;
   /** What the owner last said of it. */
@@ -176,6 +189,7 @@ export function rowsOf(
     of: "left-out",
     original: block.text,
     written: null,
+    picture: null,
     why: whys.get(block.id) ?? null,
     decision: standing.get(block.id) ?? null,
   });
@@ -187,6 +201,7 @@ export function rowsOf(
       of: "written",
       original: cited.length === 0 ? null : cited.join("\n"),
       written: block.markdown,
+      picture: block.picture,
       why: whys.get(block.id) ?? null,
       decision: standing.get(block.id) ?? null,
     });
@@ -226,6 +241,11 @@ export interface ReviewPanel {
    * empty for a proposal opened later, whose conversion keeps only what was read.
    */
   readonly notRead: readonly NotRead[];
+  /**
+   * The pictures a model read blocks from, as an address an `img` can show, by the picture's NAME. A picture
+   * a screen cannot show (a format, or one the original no longer holds) has none, and its rows show the mark.
+   */
+  readonly pictures: ReadonlyMap<string, string>;
   /** The conversion's name for the original (the file's name), for the column's heading; empty when unknown. */
   readonly member: string;
   /** What accepting would save and change, as of the decisions the view holds; `null` until asked. */

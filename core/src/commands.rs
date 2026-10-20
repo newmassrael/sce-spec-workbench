@@ -59,6 +59,7 @@ pub const COMMANDS: &[&str] = &[
     "confirm_division",
     "assemble_import",
     "accept_import",
+    "read_picture",
 ];
 
 /// The version of the application's own commands and of what `describe` adds to the specs'
@@ -120,7 +121,11 @@ pub const COMMANDS: &[&str] = &[
 /// reply says which figures were `read` and which pictures were `not_read`, and why. A choice that reads
 /// nothing is the choice it was, so no caller of 9 misreads one; the version moves because a screen that
 /// asks for a reading is held to a core that does it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 10;
+///
+/// 11: `read_picture`, which gives a picture a document marks `[picture: NAME]` as it is in the original
+/// the specs folder keeps, so that a review shows it beside what was read of it. It is added, so no caller
+/// of 10 misreads it; the version moves because a screen that shows a picture is held to a core that gives it.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 11;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -168,6 +173,7 @@ pub const IMPORT_COMMANDS: &[&str] = &[
     "confirm_division",
     "assemble_import",
     "accept_import",
+    "read_picture",
 ];
 
 /// Which door a command came in by. Who is asking decides what may be changed, so it is said
@@ -554,6 +560,7 @@ fn call_import<C: Clock>(
         "confirm_division" => divide_host::confirm_division(context, arguments(args)?),
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),
+        "read_picture" => import_host::read_picture(context, arguments(args)?),
         other => Err(unknown_command(other, &all_commands())),
     }
 }

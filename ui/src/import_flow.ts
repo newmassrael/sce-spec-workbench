@@ -86,6 +86,7 @@ export interface ImportHost {
     | "readProposal"
     | "readProposalDocuments"
     | "readExtraction"
+    | "readPicture"
     | "decideBlock"
     | "assembleImport"
     | "acceptImport"
@@ -113,6 +114,8 @@ interface Parts {
   readonly notCarried: readonly NotCarried[];
   /** The pictures asked to be read that were not, as the import said; empty for a proposal opened later. */
   readonly notRead: readonly NotRead[];
+  /** The pictures the written blocks were read from, as an address an `img` shows, by the picture's NAME. */
+  readonly pictures: ReadonlyMap<string, string>;
   readonly member: string;
   /** Set when the proposal is of part of its document. */
   readonly part: PartialImport | null;
@@ -272,8 +275,12 @@ export class ImportFlow {
       const extraction = await this.host.api.readExtraction(spec.id, view.proposal.extraction);
       if (ticket !== this.ticket) return;
       const read = parseExtraction(extraction.text);
+      const written = parseConversion(documents.conversion);
+      const pictures = await this.picturesRead(spec, view.proposal.original, view.proposal.extraction, written);
+      if (ticket !== this.ticket) return;
       this.parts = {
-        written: parseConversion(documents.conversion),
+        written,
+        pictures,
         original: read.blocks,
         notCarried: notCarriedOf(documents.report, read.notCarried),
         notRead,
@@ -285,6 +292,34 @@ export class ImportFlow {
       if (ticket !== this.ticket) return;
       this.fail(error);
     }
+  }
+
+  /**
+   * The pictures the blocks read by a model came from, to be shown beside them. A picture that cannot be
+   * had or shown (a format a screen cannot draw, a name the original no longer holds) is left out, and its
+   * rows show the mark alone: the review does not wait on a picture and does not fail for one.
+   */
+  private async picturesRead(
+    spec: Spec,
+    original: string,
+    extraction: string,
+    written: readonly WrittenBlock[],
+  ): Promise<Map<string, string>> {
+    const names = [...new Set(written.map((block) => block.picture).filter((name): name is string => name !== null))];
+    const shown = new Map<string, string>();
+    await Promise.all(
+      names.map(async (name) => {
+        try {
+          const picture = await this.host.api.readPicture(spec.id, original, extraction, name);
+          if (picture.media_type !== null && picture.data !== null) {
+            shown.set(name, `data:${picture.media_type};base64,${picture.data}`);
+          }
+        } catch {
+          // The mark stays where the picture would be.
+        }
+      }),
+    );
+    return shown;
   }
 
   /**
@@ -317,6 +352,7 @@ export class ImportFlow {
       rows: rowsOf(view, parts.written, parts.original),
       notCarried: parts.notCarried,
       notRead: parts.notRead,
+      pictures: parts.pictures,
       member: parts.member,
       assembled,
     };
@@ -899,6 +935,7 @@ export class ImportFlow {
               left: say("rvwColOriginal", { name }),
               right: say("rvwColWritten"),
               rows: panel.rows,
+              pictures: panel.pictures,
               editing: this.editing,
               reopened: this.reopened,
               busy: this.busy !== null,

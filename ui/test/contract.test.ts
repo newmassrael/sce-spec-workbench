@@ -41,6 +41,7 @@ import {
   parseAssembledImport,
   parseImportAccepted,
   parseImportedDocument,
+  parsePictureRead,
   parseProposalAccepted,
   parseProposalDecided,
   parseProposalDocuments,
@@ -118,6 +119,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   describe: parseDescribed,
   import_document: parseImportedDocument,
   read_document: parseReadDocument,
+  read_picture: parsePictureRead,
   import_selection: parseImportedDocument,
   assemble_import: parseAssembledImport,
   accept_import: parseImportAccepted,
@@ -736,6 +738,18 @@ describe("the replies the core gives", () => {
     for (const kind of ["nothing-chosen", "bad-section", "bad-block", "scope-refused"]) {
       expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
     }
+  });
+
+  it("give the picture a mark names as the original holds it, and refuse a name it does not hold", () => {
+    const shown = parsePictureRead(importReplies.answers["read_picture"]);
+    expect(shown).toMatchObject({ name: "lamp-states.png", media_type: "image/png" });
+    expect(shown.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(shown.data).not.toBeNull();
+    expect(asCommandError(importReplies.refusals["no-picture"])?.kind).toBe("no-picture");
+    // Data and format go together: a format with no bytes, or bytes with no format, is not a picture.
+    const bare = importReplies.answers["read_picture"] as Record<string, unknown>;
+    expect(() => parsePictureRead({ ...bare, data: null })).toThrow(/read_picture\.data/);
+    expect(() => parsePictureRead({ ...bare, media_type: null })).toThrow(/read_picture\.data/);
   });
 
   it("say the parts of a document being divided, SCE's count of a plan and what became of each spec", () => {

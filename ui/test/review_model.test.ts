@@ -90,8 +90,16 @@ describe("reading the tools' texts", () => {
   it("reads the blocks of a conversion in order, with what each cites", () => {
     const blocks = parseConversion(CONVERSION);
     expect(blocks.map((b) => b.id)).toEqual(["m1", "m2", "m3", "m4"]);
-    expect(blocks[0]).toEqual({ id: "m1", markdown: "# Lamp controller", cites: ["b1"] });
+    expect(blocks[0]).toEqual({ id: "m1", markdown: "# Lamp controller", cites: ["b1"], picture: null });
     expect(blocks[3]?.cites).toEqual([]);
+  });
+
+  it("reads which picture a block was read from, and refuses a picture with no name", () => {
+    const made = (picture: unknown): string =>
+      JSON.stringify({ blocks: [{ id: "m1-r1", markdown: "- a -> b", cites: ["b1"], picture }] });
+    expect(parseConversion(made("lamp.png"))[0]?.picture).toBe("lamp.png");
+    expect(() => parseConversion(made(""))).toThrow(ContractError);
+    expect(() => parseConversion(made(3))).toThrow(ContractError);
   });
 
   it("reads an extraction's blocks, what was not carried, and where it was read from", () => {
@@ -179,7 +187,16 @@ function assembled(decisions: number, changes: Partial<TextChanges> = {}): Assem
 }
 
 function panel(v: ProposalView, assembledText: AssembledImport | null): ReviewPanel {
-  return { part: null, view: v, rows: [], notCarried: [], notRead: [], member: "", assembled: assembledText };
+  return {
+    part: null,
+    view: v,
+    rows: [],
+    notCarried: [],
+    notRead: [],
+    pictures: new Map(),
+    member: "",
+    assembled: assembledText,
+  };
 }
 
 describe("when the save is offered", () => {

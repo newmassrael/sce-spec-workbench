@@ -45,6 +45,53 @@ pub fn sce_spec() -> PathBuf {
     spec
 }
 
+/// The picture of three lamp states in `fixtures/`, drawn from `lamp-states.svg` beside it.
+pub fn lamp_states_png() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lamp-states.png")
+}
+
+/// A word document of a heading, a sentence, the lamp picture in a paragraph of its own, and a
+/// caption, written by Python's `zipfile` into `dir`: no zip writer is in the tests, and the authoring
+/// tools a test that reads one runs need Python already.
+pub fn lamp_docx(dir: &Path) -> PathBuf {
+    lamp_docx_with(dir, &lamp_states_png())
+}
+
+/// [`lamp_docx`] holding the picture at `png`: a contract file that records a reply wants a few bytes of
+/// picture in it and not the drawing's thousands.
+pub fn lamp_docx_with(dir: &Path, png: &Path) -> PathBuf {
+    let out = dir.join("lamp.docx");
+    let script = r#"
+import sys, zipfile
+out, png = sys.argv[1], sys.argv[2]
+ns = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+def p(text, style=None):
+    props = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ''
+    return f'<w:p>{props}<w:r><w:t>{text}</w:t></w:r></w:p>'
+picture = ('<w:p><w:r><w:drawing><wp:inline xmlns:wp="x"><a:graphic><a:blip r:embed="rId5"/>'
+           '</a:graphic></wp:inline></w:drawing></w:r></w:p>')
+body = p('Lamp', 'Heading1') + p('The lamp is dark until it is switched on.') + picture + p('Figure 2. Lamp states')
+rels = ('<?xml version="1.0" encoding="UTF-8"?><Relationships '
+        'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+        'Target="media/lamp-states.png"/></Relationships>')
+with zipfile.ZipFile(out, 'w') as z:
+    z.writestr('word/document.xml', f'<?xml version="1.0" encoding="UTF-8"?><w:document {ns}><w:body>{body}</w:body></w:document>')
+    z.writestr('word/_rels/document.xml.rels', rels)
+    z.write(png, 'word/media/lamp-states.png')
+"#;
+    let made = std::process::Command::new("python3")
+        .args(["-I", "-c", script])
+        .arg(&out)
+        .arg(png)
+        .status()
+        .expect("python3 could not be started");
+    assert!(made.success(), "the word document was not written");
+    out
+}
+
 /// The authoring tools of the SCE checkout, by their launcher.
 pub fn tools() -> PathBuf {
     let launcher = sce_root().join("scripts").join("sce_author.sh");

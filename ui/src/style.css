@@ -1360,6 +1360,16 @@ textarea:focus-visible {
   background: none;
 }
 
+/* The picture a block was read from, in the original's column: as wide as the column, never wider. */
+.imp .read-picture {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
 /* A picture taken can be read by AI as well: the second choice sits under the picture's row, indented to its name. */
 .imp .item-read {
   display: flex;

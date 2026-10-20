@@ -601,6 +601,8 @@ export interface RowsOptions {
   readonly left: string;
   readonly right: string;
   readonly rows: readonly ReviewRow[];
+  /** The pictures blocks were read from, as an address an `img` shows, by NAME; a row of one not here shows the mark. */
+  readonly pictures: ReadonlyMap<string, string>;
   readonly editing: { readonly block: string; readonly text: string } | null;
   readonly reopened: ReadonlySet<string>;
   readonly busy: boolean;
@@ -630,14 +632,24 @@ const DONE_WORDS: Record<DecisionKind, Key> = {
 /** The original beside what was written of it, one row each, and a choice for every row that is asked about. */
 export function rowsGrid(options: RowsOptions): HTMLElement {
   const { say } = options;
-  const drawn = options.rows.map((row): Child => {
+  const drawn = options.rows.map((row, at): Child => {
     const asked = row.why !== null;
     const open = asked && (row.decision === null || options.reopened.has(row.id));
     // The row stays flagged while it is asked about, and is quiet once the owner has answered.
+    // A block a model read from a picture is shown beside that picture, so that what it says is compared
+    // with what was drawn; with no picture to show, the original's mark stands where it was. The several
+    // blocks read from one picture follow each other, and the picture is drawn once, at the first of them.
+    const continued = row.picture !== null && options.rows[at - 1]?.picture === row.picture;
+    const drawing = row.picture === null || continued ? undefined : options.pictures.get(row.picture);
     const left =
       row.original === null
         ? cell("empty" + (open ? " flag" : ""), say("rvwWhyNotInOriginal"))
-        : cell(open ? "flag" : "", row.original);
+        : drawing !== undefined
+          ? cell(
+              open ? "flag" : "",
+              h("img", { class: "read-picture", src: drawing, alt: say("rvwPictureAlt", { name: row.picture ?? "" }) }),
+            )
+          : cell(open ? "flag" : "", row.original);
     const right = rightCell(options, row, open);
     return pairOf({ "data-block": row.id }, options.left, options.right, left, right);
   });

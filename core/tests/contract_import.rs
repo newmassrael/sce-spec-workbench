@@ -288,6 +288,40 @@ fn replies() -> Value {
         refused(Some(&tools), "import_selection", not_an_item),
     );
 
+    // A picture a document marks, as the review shows it, and one the document does not hold.
+    let lamp = ask("create_spec", json!({"title": "Lamp"}));
+    let lamp_id = lamp["id"].as_str().unwrap().to_string();
+    // The smallest picture there is (one pixel), so that the file records a reply and not a drawing.
+    let lamp_dir = scratch("contract-import-lamp");
+    let pixel = lamp_dir.join("pixel.png");
+    std::fs::write(
+        &pixel,
+        sce_specs::base64::decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let docx = std::fs::read(common::lamp_docx_with(&lamp_dir, &pixel)).unwrap();
+    let held_lamp = ask(
+        "read_document",
+        json!({"id": lamp_id, "name": "lamp.docx", "data": base64(&docx)}),
+    );
+    let picture = |name: &str| {
+        json!({
+            "id": lamp_id, "original": held_lamp["original"], "extraction": held_lamp["extraction"],
+            "name": name,
+        })
+    };
+    answers.insert(
+        "read_picture".into(),
+        ask("read_picture", picture("lamp-states.png")),
+    );
+    refusals.insert(
+        "no-picture".into(),
+        refused(Some(&tools), "read_picture", picture("nowhere.png")),
+    );
+
     // A document divided among specs: begun from the spec that holds it, a plan that leaves a part
     // without a place (SCE's count is the answer), a plan that leaves none (the walk), and a plan after
     // that, whose first spec already waits on a document (a step the walk could not take).

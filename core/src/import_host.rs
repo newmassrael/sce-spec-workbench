@@ -1119,6 +1119,77 @@ pub(crate) fn assemble_import<C: Clock>(
     Ok(json!({ "text": made.text, "report": made.report }))
 }
 
+/// What `read_picture` is given: a document the specs folder keeps, and the NAME of a `[picture: NAME]`
+/// mark its extraction holds.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadPicture {
+    id: String,
+    original: String,
+    extraction: String,
+    name: String,
+}
+
+/// The picture a mark names, as it is in the original the specs folder keeps, for a review to show
+/// beside what was read of it (ADR 0036 of SCE).
+///
+/// The tools take it out of the document as they would to hand it to a model, so what is shown is what
+/// was read. Its format is said; one a screen cannot show (a metafile, a TIFF) comes with no data, and is
+/// said as a picture that cannot be shown rather than refused. A name the document does not hold, or a
+/// picture too heavy to hand over, is refused as `no-picture` in the tools' words.
+pub(crate) fn read_picture<C: Clock>(
+    context: &Context<'_, C>,
+    args: ReadPicture,
+) -> Result<Value, CommandError> {
+    let tools = tools(context)?;
+    let spec = SpecId::parse(&args.id)?;
+    let extraction_text = context
+        .specs
+        .read_extraction(&spec, &revision_of(&args.extraction)?)?;
+    let kept = Kept {
+        original: args.original,
+        extraction: args.extraction,
+        extraction_text,
+    };
+    let scratch = Scratch::new()?;
+    let document = place_original(context, &scratch, &args.id, &kept)?;
+    let ran = tools.run_to_success(
+        &scratch.path("."),
+        &[
+            "picture",
+            "--prose",
+            document.as_str(),
+            "--name",
+            args.name.as_str(),
+            "--out",
+            "picture",
+            "--json",
+        ],
+        tools.quick_timeout,
+        "no-picture",
+        &[2],
+    )?;
+    let said: Value = serde_json::from_str(ran.stdout.trim())
+        .map_err(|e| failed(format!("`picture` did not say what it wrote: {e}")))?;
+    let media_type = said["media_type"].as_str().map(str::to_string);
+    let data = match &media_type {
+        Some(_) => {
+            let path = scratch.path("picture");
+            let bytes = fs::read(&path)
+                .map_err(|e| failed(format!("the tool did not write {}: {e}", path.display())))?;
+            json!(sce_specs::base64::encode(&bytes))
+        }
+        None => Value::Null,
+    };
+    Ok(json!({
+        "name": args.name,
+        "media_type": media_type,
+        "bytes": said["bytes"],
+        "sha256": said["sha256"],
+        "data": data,
+    }))
+}
+
 /// Accept a proposal: the text its decisions make is the spec's, in one step the store holds to
 /// everything that has moved since it was made.
 pub(crate) fn accept_import<C: Clock>(

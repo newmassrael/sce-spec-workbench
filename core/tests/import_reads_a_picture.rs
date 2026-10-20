@@ -19,8 +19,7 @@
 mod common;
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 
 use sce_spec_workbench_core::connection::{AdapterKind, AuthSource, Connection, Limits};
 use sce_spec_workbench_core::connection_store::ConnectionStore;
@@ -28,7 +27,7 @@ use sce_spec_workbench_core::{call_in, Context, Entrance, ImportTools, Policy};
 use sce_specs::{CommandError, ConnectionId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
-use common::{scratch, write_program, FakeRenderer};
+use common::{lamp_docx, lamp_states_png, scratch, write_program, FakeRenderer};
 
 const SIGNED_IN: &str = r#"{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}"#;
 
@@ -176,42 +175,6 @@ impl Rig {
     }
 }
 
-/// A word document of a heading, a sentence, the lamp picture in a paragraph of its own, and a
-/// caption, written by Python's `zipfile` into `dir`.
-fn lamp_docx(dir: &Path) -> PathBuf {
-    let out = dir.join("lamp.docx");
-    let png = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lamp-states.png");
-    let script = r#"
-import sys, zipfile
-out, png = sys.argv[1], sys.argv[2]
-ns = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
-      'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
-      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
-def p(text, style=None):
-    props = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ''
-    return f'<w:p>{props}<w:r><w:t>{text}</w:t></w:r></w:p>'
-picture = ('<w:p><w:r><w:drawing><wp:inline xmlns:wp="x"><a:graphic><a:blip r:embed="rId5"/>'
-           '</a:graphic></wp:inline></w:drawing></w:r></w:p>')
-body = p('Lamp', 'Heading1') + p('The lamp is dark until it is switched on.') + picture + p('Figure 2. Lamp states')
-rels = ('<?xml version="1.0" encoding="UTF-8"?><Relationships '
-        'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
-        'Target="media/lamp-states.png"/></Relationships>')
-with zipfile.ZipFile(out, 'w') as z:
-    z.writestr('word/document.xml', f'<?xml version="1.0" encoding="UTF-8"?><w:document {ns}><w:body>{body}</w:body></w:document>')
-    z.writestr('word/_rels/document.xml.rels', rels)
-    z.write(png, 'word/media/lamp-states.png')
-"#;
-    let made = Command::new("python3")
-        .args(["-I", "-c", script])
-        .arg(&out)
-        .arg(&png)
-        .status()
-        .expect("python3 could not be started");
-    assert!(made.success(), "the word document was not written");
-    out
-}
-
 fn read_of(diagram: &str) -> Value {
     json!({
         "blocks": [{"kind": "diagram", "markdown": diagram, "unsure": false}],
@@ -292,6 +255,39 @@ fn a_connection_that_cannot_read_a_picture_is_said_before_anything_is_made() {
     assert!(!fake.was_asked());
     let proposals = rig.ask("list_proposals", json!({"id": spec}));
     assert_eq!(proposals["proposals"], json!([]), "{proposals}");
+}
+
+#[test]
+fn the_picture_a_mark_names_is_given_as_the_original_holds_it_for_the_review_to_show() {
+    let fake = Fake::answering("import-picture", &read_of("unused"));
+    let rig = Rig::new("import-picture", &fake);
+    let (spec, read, _) = rig.read_lamp();
+    let asked = |name: &str| {
+        rig.try_ask(
+            "read_picture",
+            json!({
+                "id": spec, "original": read["original"], "extraction": read["extraction"], "name": name,
+            }),
+        )
+    };
+
+    let shown = asked("lamp-states.png").unwrap();
+
+    let png = fs::read(lamp_states_png()).unwrap();
+    assert_eq!(shown["media_type"], "image/png");
+    assert_eq!(shown["bytes"], json!(png.len()));
+    assert_eq!(
+        sce_specs::base64::decode(shown["data"].as_str().unwrap()).unwrap(),
+        png
+    );
+    let refused = asked("nowhere.png").unwrap_err();
+    assert_eq!(refused.kind, "no-picture");
+    assert!(
+        refused.message.contains("lamp-states.png"),
+        "{}",
+        refused.message
+    );
+    assert!(!fake.was_asked(), "a picture shown is not read by anything");
 }
 
 #[test]

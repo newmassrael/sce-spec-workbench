@@ -25,6 +25,7 @@ import {
   parseImportedDocument,
   parseJudgment,
   parseListing,
+  parsePictureRead,
   parseProposalDecided,
   parseProposalDocuments,
   parseProposalList,
@@ -95,6 +96,7 @@ import {
   type ProposalView,
   type DecisionKind,
   type ExtractionRead,
+  type PictureRead,
   type Queue,
   type ReadRevisionReport,
   type RegisteredRequest,
@@ -389,6 +391,11 @@ export interface Api {
   readProposalDocuments(id: string, proposal: string): Promise<ProposalDocuments>;
   /** An extraction as it was saved. */
   readExtraction(id: string, digest: Revision): Promise<ExtractionRead>;
+  /**
+   * The picture a `[picture: NAME]` mark of a kept document names, as the original holds it, so that a review
+   * shows it beside what was read of it. Refused as `no-picture` for a name the document does not hold.
+   */
+  readPicture(id: string, original: Revision, extraction: Revision, name: string): Promise<PictureRead>;
   /** Say what the owner does with a block; `text` is the owner's words, for `correct` only. */
   decideBlock(
     id: string,
@@ -639,6 +646,9 @@ export function apiOver(transport: Transport): Api {
     },
     async readExtraction(id, digest) {
       return parseExtractionRead(await transport.call("read_extraction", { id, digest }));
+    },
+    async readPicture(id, original, extraction, name) {
+      return parsePictureRead(await transport.call("read_picture", { id, original, extraction, name }));
     },
     async decideBlock(id, proposal, block, what, text) {
       const args = { id, proposal, block, what, ...(text === undefined ? {} : { text }) };

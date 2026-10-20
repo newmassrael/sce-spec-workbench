@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 10;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 11;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2120,6 +2120,34 @@ export interface NotRead {
   /** What went wrong, in the word the tools or the client gave (`picture-not-showable`, `no-reading`, ...). */
   code: string;
   why: string;
+}
+
+/**
+ * `read_picture`: a picture a document marks, as the original holds it. `data` is its bytes as base64 and
+ * `media_type` its format, both `null` for one a screen cannot show (a metafile, a TIFF), which is still
+ * named and measured.
+ */
+export interface PictureRead {
+  name: string;
+  media_type: string | null;
+  bytes: number;
+  sha256: string;
+  data: string | null;
+}
+
+export function parsePictureRead(value: unknown): PictureRead {
+  const where = "read_picture";
+  const r = record(value, where);
+  const bytes = r["bytes"];
+  if (typeof bytes !== "number" || !Number.isInteger(bytes) || bytes < 0) {
+    throw new ContractError(`${where}.bytes`, "a count");
+  }
+  const mediaType = nullableText(r, "media_type", where);
+  const data = nullableText(r, "data", where);
+  if ((mediaType === null) !== (data === null)) {
+    throw new ContractError(`${where}.data`, "present exactly when the picture has a format a screen can show");
+  }
+  return { name: text(r, "name", where), media_type: mediaType, bytes, sha256: text(r, "sha256", where), data };
 }
 
 function parseNotRead(value: unknown, where: string): NotRead {

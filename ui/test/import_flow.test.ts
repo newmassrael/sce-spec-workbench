@@ -25,6 +25,7 @@ import type {
   IntakeView,
   LedgerCount,
   Listing,
+  PictureRead,
   PlannedAllotment,
   ReadDocument,
   Proposal,
@@ -191,6 +192,10 @@ class FakeCore {
   /** The figures the last `import_selection` asked to be read, and what the next one says was not read. */
   readAsked: readonly string[] = [];
   notRead: ImportedDocument["not_read"] = [];
+  /** The conversion every proposal is read as, when it is not the default two-paragraph one. */
+  conversion: unknown = CONVERSION_TEXT;
+  /** The pictures a document holds, by NAME, as `read_picture` gives them; a name not here is refused. */
+  pictures = new Map<string, PictureRead>();
   /** What the next `read_document` does, when it is not the default one-part document. */
   readWith: (() => Promise<ReadDocument>) | null = null;
   /** The proposals made of part of a document. */
@@ -430,8 +435,14 @@ class FakeCore {
       this.record("read_proposal_documents", id, proposal);
       this.find(id, proposal);
       return this.partial.has(proposal)
-        ? { conversion: JSON.stringify(CONVERSION_TEXT), report: JSON.stringify({ out_of_scope: 4 }), scope: "{}" }
-        : { conversion: JSON.stringify(CONVERSION_TEXT), report: "{}", scope: null };
+        ? { conversion: JSON.stringify(this.conversion), report: JSON.stringify({ out_of_scope: 4 }), scope: "{}" }
+        : { conversion: JSON.stringify(this.conversion), report: "{}", scope: null };
+    },
+    readPicture: async (id, _original, _extraction, name): Promise<PictureRead> => {
+      this.record("read_picture", id, name);
+      const held = this.pictures.get(name);
+      if (held === undefined) throw new CommandFailure("no-picture", `the document holds no picture ${name}`);
+      return held;
     },
     readExtraction: async (id, digest) => {
       this.record("read_extraction", id, digest);
@@ -529,6 +540,7 @@ class FakeCore {
     | "readProposal"
     | "readProposalDocuments"
     | "readExtraction"
+    | "readPicture"
     | "decideBlock"
     | "assembleImport"
     | "acceptImport"
@@ -1407,6 +1419,41 @@ describe("a document with parts to choose between", () => {
     expect(r.root.textContent).toContain(say("rvwNotReadTitle"));
     expect(r.root.textContent).toContain(say("rvwNotReadWhat", { picture: "wiring.emf" }));
     expect(r.root.textContent).toContain("its format cannot be shown");
+  });
+
+  it("shows the picture a block was read from beside it, and the mark alone when the picture cannot be shown", async () => {
+    r.core.conversion = {
+      ...CONVERSION_TEXT,
+      blocks: [
+        ...CONVERSION_TEXT.blocks,
+        { id: "b3-r1", markdown: "- dark -> lit", cites: ["b3"], picture: "lamp.png" },
+        { id: "b3-r2", markdown: "- lit -> dark", cites: ["b3"], picture: "lamp.png" },
+        { id: "b3-r3", markdown: "- lit -> fault", cites: ["b3"], picture: "wiring.emf" },
+      ],
+    };
+    r.core.pictures.set("lamp.png", {
+      name: "lamp.png", media_type: "image/png", bytes: 3, sha256: hex(9), data: "AAEC",
+    });
+    // A picture a screen cannot draw is named and measured, and has no data.
+    r.core.pictures.set("wiring.emf", {
+      name: "wiring.emf", media_type: null, bytes: 8, sha256: hex(8), data: null,
+    });
+    r.core.asks = [["read-from-picture", "b3-r1"], ["read-from-picture", "b3-r2"], ["read-from-picture", "b3-r3"]];
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+    button(r.root, say("impPartsImport", { parts: "3" })).click();
+    await settle();
+
+    const row = (id: string): HTMLElement => r.root.querySelector<HTMLElement>(`[data-block="${id}"]`)!;
+    const drawn = row("b3-r1").querySelector<HTMLImageElement>("img.read-picture");
+    expect(drawn?.getAttribute("src")).toBe("data:image/png;base64,AAEC");
+    expect(row("b3-r1").textContent).toContain(say("rvwWhyReadFromPicture"));
+    // The blocks read from one picture follow each other, and the picture is drawn once, at the first;
+    // the next keeps the mark. A picture that cannot be drawn leaves the mark in its row.
+    expect(row("b3-r2").querySelector("img")).toBeNull();
+    expect(row("b3-r3").querySelector("img")).toBeNull();
+    expect(r.root.querySelectorAll("img.read-picture")).toHaveLength(1);
+    expect(r.core.callsOf("read_picture").map((call) => call[1]).sort()).toEqual(["lamp.png", "wiring.emf"]);
   });
 
   it("cannot bring in a part whose every block is an item left out, and says so", async () => {
