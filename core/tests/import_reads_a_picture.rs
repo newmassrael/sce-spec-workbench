@@ -27,7 +27,7 @@ use sce_spec_workbench_core::{call_in, Context, Entrance, ImportTools, Policy};
 use sce_specs::{CommandError, ConnectionId, SpecStore, SystemClock};
 use serde_json::{json, Value};
 
-use common::{lamp_docx, lamp_states_png, scratch, write_program, FakeRenderer};
+use common::{lamp_docx, lamp_pdf, lamp_states_png, scratch, write_program, FakeRenderer};
 
 const SIGNED_IN: &str = r#"{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}"#;
 
@@ -128,15 +128,23 @@ impl Rig {
 
     /// A spec, and the lamp document read into it: what `read_document` said, and the figure's id.
     fn read_lamp(&self) -> (String, Value, String) {
+        self.read_lamp_from(&lamp_docx(&scratch("lamp-docx")))
+    }
+
+    /// [`Rig::read_lamp`] for the lamp as a PDF: its image is the figure.
+    fn read_lamp_pdf(&self) -> (String, Value, String) {
+        self.read_lamp_from(&lamp_pdf(&scratch("lamp-pdf")))
+    }
+
+    fn read_lamp_from(&self, document: &PathBuf) -> (String, Value, String) {
         let spec = self.ask("create_spec", json!({"title": "Lamp"}))["id"]
             .as_str()
             .unwrap()
             .to_string();
-        let document = lamp_docx(&scratch("lamp-docx"));
         let read = self.ask(
             "read_document",
             json!({
-                "id": spec, "name": "lamp.docx",
+                "id": spec, "name": document.file_name().unwrap().to_str().unwrap(),
                 "data": sce_specs::base64::encode(&fs::read(document).unwrap()),
             }),
         );
@@ -216,6 +224,55 @@ fn a_figure_asked_to_be_read_is_read_by_the_connection_and_asked_about() {
         .unwrap()
         .iter()
         .any(|ask| ask["why"] == "read-from-picture"));
+}
+
+#[test]
+fn an_image_in_a_pdf_is_read_by_the_connection_as_a_picture_drawn_from_the_document() {
+    let fake = Fake::answering("import-read-pdf", &read_of("- dark -> lit: switch.on"));
+    let rig = Rig::new("import-read-pdf", &fake);
+    rig.connect(AdapterKind::ClaudeCode);
+    let (spec, read, figure) = rig.read_lamp_pdf();
+
+    let imported = rig.select(&spec, &read, json!({"read": [figure]})).unwrap();
+
+    assert_eq!(imported["read"], json!([figure]));
+    assert_eq!(imported["not_read"], json!([]), "{imported}");
+    let asked = fs::read_to_string(fake.record.join("stdin")).expect("the client was not asked");
+    assert!(
+        asked.contains("image/png"),
+        "the client was not given a PNG: {asked}"
+    );
+    let (_, conversion) = rig.proposal(&spec, &imported["proposal"]);
+    assert_eq!(
+        conversion["readings"][0]["picture"]["name"],
+        "page-0001-image-01.png"
+    );
+    assert_eq!(
+        conversion["readings"][0]["picture"]["media_type"],
+        "image/png"
+    );
+}
+
+#[test]
+fn the_image_a_pdf_mark_names_is_given_drawn_as_a_picture_for_the_review_to_show() {
+    let fake = Fake::answering("import-pdf-picture", &read_of("unused"));
+    let rig = Rig::new("import-pdf-picture", &fake);
+    let (spec, read, _) = rig.read_lamp_pdf();
+
+    let shown = rig
+        .try_ask(
+            "read_picture",
+            json!({
+                "id": spec, "original": read["original"], "extraction": read["extraction"],
+                "name": "page-0001-image-01.png",
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(shown["media_type"], "image/png");
+    let png = sce_specs::base64::decode(shown["data"].as_str().unwrap()).unwrap();
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+    assert!(!fake.was_asked(), "a picture shown is not read by anything");
 }
 
 #[test]

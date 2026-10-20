@@ -679,7 +679,7 @@
         "tool": "picture"
       },
       "kind": "no-picture",
-      "message": "no specification file holds a picture named 'nowhere.png'. The word documents hold: in/lamp.docx: lamp-states.png."
+      "message": "no specification file holds a picture named 'nowhere.png'. The documents hold: in/lamp.docx: lamp-states.png."
     },
     "nothing-chosen": {
       "kind": "nothing-chosen",
