@@ -246,16 +246,7 @@ impl Connections {
         let ready = self
             .codex_ready(&launch, binary, stored.connection.auth)
             .map_err(Unrunnable::new)?;
-        let defaults = CodexConfig::default();
-        Ok(ready.with_config(CodexConfig {
-            model: run.model.clone(),
-            effort: run.effort.clone(),
-            timeout: run
-                .limits
-                .seconds
-                .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
-            places: run.limits.places.map_or(defaults.places, |p| p as usize),
-        }))
+        Ok(ready.with_config(codex_config(run)))
     }
 
     /// The model server that runs for `pin`, or why it cannot. Every sentence of a reason names the
@@ -317,25 +308,7 @@ impl Connections {
         if let Some(why) = codex.why_not() {
             return Err(why);
         }
-        // A key from the environment is the credential whatever a stored login says, so nobody is
-        // asked who is signed in.
-        let observed = if auth == AuthSource::EnvApiKey {
-            None
-        } else {
-            codex.observe_login().map_err(|_| {
-                "Codex could not be asked who is signed in: check it, then ask again".to_string()
-            })?
-        };
-        let Some(route) = Route::of(AdapterKind::Codex, auth, observed) else {
-            return Err(
-                "nobody is signed in to Codex: run `codex login` in a terminal (a ChatGPT plan, or \
-                 an API key), then ask again"
-                    .to_string(),
-            );
-        };
-        if let Decision::Refuse { reason, .. } = self.policy.decide(route) {
-            return Err(refusal_words(AdapterKind::Codex, route, reason));
-        }
+        codex_allowed(&self.policy, auth, || codex.observe_login())?;
         Ok(codex)
     }
 
@@ -548,7 +521,49 @@ pub(crate) fn claude_config(run: &PinnedRun, max_budget_usd: Option<f64>) -> Cla
     }
 }
 
-fn codex_not_found() -> Unrunnable {
+/// Whether Codex may be run with the credential `auth`, by who `observe` says is signed in and what the
+/// build's policy says of that way in: one set of rules for a draft and for a reading. A key from the
+/// environment is the credential whatever a stored login says, so nobody is asked who is signed in.
+pub(crate) fn codex_allowed(
+    policy: &Policy,
+    auth: AuthSource,
+    observe: impl FnOnce() -> Result<Option<Observed>, String>,
+) -> Result<(), String> {
+    let observed = if auth == AuthSource::EnvApiKey {
+        None
+    } else {
+        observe().map_err(|_| {
+            "Codex could not be asked who is signed in: check it, then ask again".to_string()
+        })?
+    };
+    let Some(route) = Route::of(AdapterKind::Codex, auth, observed) else {
+        return Err(
+            "nobody is signed in to Codex: run `codex login` in a terminal (a ChatGPT plan, or \
+             an API key), then ask again"
+                .to_string(),
+        );
+    };
+    if let Decision::Refuse { reason, .. } = policy.decide(route) {
+        return Err(refusal_words(AdapterKind::Codex, route, reason));
+    }
+    Ok(())
+}
+
+/// How a run of Codex is bounded: what `run` asked of it and the client's defaults for the rest.
+pub(crate) fn codex_config(run: &PinnedRun) -> CodexConfig {
+    let defaults = CodexConfig::default();
+    CodexConfig {
+        model: run.model.clone(),
+        effort: run.effort.clone(),
+        timeout: run
+            .limits
+            .seconds
+            .map_or(defaults.timeout, |s| Duration::from_secs(u64::from(s))),
+        places: run.limits.places.map_or(defaults.places, |p| p as usize),
+    }
+}
+
+pub(crate) fn codex_not_found() -> Unrunnable {
     Unrunnable::new(
         "Codex was not found on this computer: install it, or set SCE_CODEX to its path",
     )

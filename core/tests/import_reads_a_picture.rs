@@ -75,6 +75,8 @@ struct Rig {
     policy: Policy,
     tools: Result<ImportTools, String>,
     claude: PathBuf,
+    /// The program the shell was told is Codex, when the test names one.
+    codex: Option<PathBuf>,
 }
 
 impl Rig {
@@ -85,6 +87,7 @@ impl Rig {
             policy: Policy::shipped(),
             tools: Ok(ImportTools::new(common::tools())),
             claude: fake.binary.clone(),
+            codex: None,
         }
     }
 
@@ -92,6 +95,7 @@ impl Rig {
         Context::new(&self.specs, &FakeRenderer, &self.policy, Entrance::Desktop)
             .with_connections(Some(&self.settings))
             .with_claude(Some(&self.claude))
+            .with_codex(self.codex.as_deref())
             .with_import_tools(Some(&self.tools))
     }
 
@@ -310,6 +314,43 @@ fn a_connection_that_cannot_read_a_picture_is_said_before_anything_is_made() {
 
     assert_eq!(refused.kind, "reading-unavailable");
     assert!(!fake.was_asked());
+    let proposals = rig.ask("list_proposals", json!({"id": spec}));
+    assert_eq!(proposals["proposals"], json!([]), "{proposals}");
+}
+
+#[test]
+fn a_codex_connection_is_asked_to_read_and_is_held_to_what_a_draft_by_codex_is_held_to() {
+    // The connection is Codex, so the reading is Codex's to take and not refused as "only Claude Code
+    // reads". The stand-in says it is Codex and nothing of the sandbox it derives, which the build
+    // asks of every release before it is run, so the reading is not started and the reason is said.
+    let fake = Fake::answering("import-read-codex", &read_of("unused"));
+    let mut rig = Rig::new("import-read-codex", &fake);
+    let program = scratch("import-read-codex-program").join("codex");
+    write_program(
+        &program,
+        "#!/bin/sh\n\
+         if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.163.0'; exit 0; fi\n\
+         if [ \"$1\" = \"features\" ]; then exit 0; fi\n\
+         if [ \"$1\" = \"exec\" ]; then touch \"$0.exec\"; fi\n\
+         exit 3\n",
+    );
+    rig.codex = Some(program.clone());
+    rig.connect(AdapterKind::Codex);
+    let (spec, read, figure) = rig.read_lamp();
+
+    let refused = rig
+        .select(&spec, &read, json!({"read": [figure]}))
+        .unwrap_err();
+
+    assert_eq!(refused.kind, "reading-unavailable");
+    assert!(
+        !refused.message.contains("only Claude Code"),
+        "{}",
+        refused.message
+    );
+    assert!(refused.message.contains("Codex"), "{}", refused.message);
+    assert!(!fake.was_asked());
+    assert!(!program.with_extension("exec").exists());
     let proposals = rig.ask("list_proposals", json!({"id": spec}));
     assert_eq!(proposals["proposals"], json!([]), "{proposals}");
 }

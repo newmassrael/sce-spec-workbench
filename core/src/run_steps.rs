@@ -255,6 +255,24 @@ pub fn codex_forbidden(line: &str) -> Option<String> {
     }
 }
 
+/// What a reading of a picture is stopped for: it has no server to call and no command to run, so of
+/// the items the client reports only its own words, its reasoning, a plan and an error pass. Anything
+/// else, a call of any server included, stops the run and says what it was. The same stop as
+/// [`codex_forbidden`], with the authoring server taken out of what a run may do.
+pub fn codex_reading_forbidden(line: &str) -> Option<String> {
+    let event: Value = serde_json::from_str(line).ok()?;
+    let item = event.get("item")?;
+    match item["type"].as_str().unwrap_or("") {
+        "agent_message" | "reasoning" | "todo_list" | "error" => None,
+        "mcp_tool_call" => Some(format!(
+            "called `{}` of `{}`, which a reading is not given",
+            item["tool"].as_str().unwrap_or(""),
+            item["server"].as_str().unwrap_or("")
+        )),
+        other => Some(format!("reported an item of the kind `{other}`")),
+    }
+}
+
 /// The name of a tool of the authoring server as the server calls it, for a tool Claude Code names
 /// `mcp__<server>__<tool>`; `None` for a tool that is the client's own or another server's.
 fn claude_tool(name: &str) -> Option<&str> {

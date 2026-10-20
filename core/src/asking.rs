@@ -12,19 +12,25 @@
 //! or a program, so a caller that may ask a question may ask for no more than one that may request a
 //! generation.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde_json::{json, Value};
 
 use sce_specs::{Clock, CommandError, ConnectionId};
 
-use crate::claude_code::{locate, observe_auth, ClaudeReader};
+use crate::claude_code::{locate, observe_auth, ClaudeReader, PictureAnswer, PictureQuestion};
+use crate::codex::{self, CodexReader, HOME_DIR as CODEX_HOME_DIR};
+use crate::codex_support::Support;
 use crate::commands::Context;
 use crate::connection::{AdapterKind, PinnedRun};
 use crate::connection_store::StoredConnection;
-use crate::directory::{claude_allowed, claude_binary, claude_config, claude_not_found, run_of};
+use crate::directory::{
+    claude_allowed, claude_binary, claude_config, claude_not_found, codex_allowed, codex_config,
+    codex_not_found, run_of,
+};
 use crate::import_host::refuse;
-use crate::runner::Unrunnable;
+use crate::runner::{Cancel, GenerateError, Unrunnable};
 
 /// How long one picture may take to be read. A reading is one reply of a few seconds; one that has not
 /// come in this long is not coming, and the owner is waiting for it.
@@ -91,26 +97,100 @@ pub(crate) fn unrunnable(kind: &'static str, why: Unrunnable) -> CommandError {
 /// The refusal of a picture that cannot be read by the connection chosen.
 pub(crate) const READING_UNAVAILABLE: &str = "reading-unavailable";
 
+/// A client that reads a picture: the runtime's own way of taking one, behind one question.
+pub(crate) enum PictureReader {
+    Claude(ClaudeReader),
+    Codex(CodexReader),
+}
+
+impl PictureReader {
+    /// The word a reading records of who read: the runtime's name.
+    pub(crate) fn runtime(&self) -> &'static str {
+        match self {
+            PictureReader::Claude(_) => "claude-code",
+            PictureReader::Codex(_) => "codex",
+        }
+    }
+
+    pub(crate) fn version(&self) -> Option<&str> {
+        match self {
+            PictureReader::Claude(reader) => reader.version(),
+            PictureReader::Codex(reader) => reader.version(),
+        }
+    }
+
+    pub(crate) fn read_picture(
+        &self,
+        question: &PictureQuestion<'_>,
+        cancel: &Cancel,
+        allowed: Duration,
+    ) -> Result<PictureAnswer, GenerateError> {
+        match self {
+            PictureReader::Claude(reader) => reader.read_picture(question, cancel, allowed),
+            PictureReader::Codex(reader) => reader.read_picture(question, cancel, allowed),
+        }
+    }
+}
+
 /// The reader of pictures `chosen` is, or why it cannot read one.
 ///
-/// Only Claude Code reads a picture so far: its way of taking one is held by a live test against the
-/// real client, and a runtime that has not been tried says it cannot (ADR 0036 of SCE).
+/// Claude Code and Codex read a picture: each one's way of taking one is held by a live test against
+/// the real client, and a runtime that has not been tried says it cannot (ADR 0036 of SCE).
 pub(crate) fn reader_for<C: Clock>(
     context: &Context<'_, C>,
     chosen: &Chosen,
-) -> Result<ClaudeReader, CommandError> {
-    let adapter = chosen.stored.connection.adapter;
-    if adapter != AdapterKind::ClaudeCode {
-        return Err(refuse(
+) -> Result<PictureReader, CommandError> {
+    match chosen.stored.connection.adapter {
+        AdapterKind::ClaudeCode => claude_reader(context, chosen).map(PictureReader::Claude),
+        AdapterKind::Codex => codex_reader(context, chosen).map(PictureReader::Codex),
+        adapter => Err(refuse(
             READING_UNAVAILABLE,
             format!(
-                "`{}` cannot read a picture yet: only Claude Code reads one so far. Choose it under AI \
-                 connection, or keep the picture as its mark",
+                "`{}` cannot read a picture yet: only Claude Code and Codex read one so far. Choose \
+                 one of them under AI connection, or keep the picture as its mark",
                 chosen.called
             ),
             json!({ "adapter": adapter.word() }),
-        ));
+        )),
     }
+}
+
+/// A Codex that may be run for the connection, held to what a draft by Codex is held to: it is Codex,
+/// it derives the sandbox a run needs once what nobody reviewed is switched off, a credential is there
+/// to give it, and the build's policy allows signing in that way.
+fn codex_reader<C: Clock>(
+    context: &Context<'_, C>,
+    chosen: &Chosen,
+) -> Result<CodexReader, CommandError> {
+    let unavailable = |why: String| refuse(READING_UNAVAILABLE, why, Value::Null);
+    let connection = &chosen.stored.connection;
+    let binary = match connection.executable.as_deref() {
+        Some(named) => PathBuf::from(named),
+        None => codex::locate(context.codex, &context.places())
+            .ok_or_else(|| unrunnable(READING_UNAVAILABLE, codex_not_found()))?,
+    };
+    let settings = context
+        .connections
+        .ok_or_else(|| unavailable("this application keeps no AI connection to ask".to_string()))?;
+    let reader = CodexReader::new(
+        binary,
+        codex_config(&chosen.run),
+        connection.auth,
+        settings.root().join(CODEX_HOME_DIR),
+        Support::shipped(),
+    );
+    if let Some(why) = reader.why_not() {
+        return Err(unavailable(why));
+    }
+    codex_allowed(context.policy, connection.auth, || reader.observe_login())
+        .map_err(unavailable)?;
+    Ok(reader)
+}
+
+fn claude_reader<C: Clock>(
+    context: &Context<'_, C>,
+    chosen: &Chosen,
+) -> Result<ClaudeReader, CommandError> {
     let found = locate(context.claude, &context.places())
         .ok_or_else(|| unrunnable(READING_UNAVAILABLE, claude_not_found()))?;
     let binary = claude_binary(&chosen.stored, &found)

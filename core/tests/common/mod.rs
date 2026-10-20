@@ -177,6 +177,150 @@ fn pdf_of_one_image(dir: &Path, image_entries: &str, image: &[u8], placed: (u32,
     path
 }
 
+/// The words the lamp states picture shows, each of which a reading that copies what is legible carries.
+pub const DRAWN: [&str; 6] = [
+    "dark",
+    "lit",
+    "fault",
+    "switch.on",
+    "after 30s",
+    "bulb.broken",
+];
+
+/// A Markdown specification in `work` that marks the lamp states picture beside it: the document a live
+/// test of a reader reads the picture of.
+pub fn lamp_markdown(work: &Path) -> &'static str {
+    std::fs::write(
+        work.join("lamp.md"),
+        "# Lamp\n\nThe lamp is dark until it is switched on.\n\n[picture: lamp-states.png]\n\nFigure 2. Lamp states\n",
+    )
+    .unwrap();
+    std::fs::copy(lamp_states_png(), work.join("lamp-states.png")).unwrap();
+    "lamp.md"
+}
+
+/// Run the authoring tools in `dir` and give back what they printed; a failure is the test's.
+fn run_tool(dir: &Path, args: &[&str]) -> String {
+    let (code, out, err) = tool(dir, args);
+    assert_eq!(code, 0, "{args:?} failed:\n{out}\n{err}");
+    out
+}
+
+/// The whole path of a live test of a reader: `document` in `work` is extracted, its first figure is
+/// prepared for reading, `ask` (the real client) reads the picture, the tools add what it read, and the
+/// check asks about it. Every word of the drawing has to be in what was read.
+pub fn read_the_first_figure_of(
+    work: &Path,
+    document: &str,
+    runtime: &str,
+    ask: &dyn Fn(
+        &sce_spec_workbench_core::claude_code::PictureQuestion<'_>,
+    ) -> sce_spec_workbench_core::claude_code::PictureAnswer,
+) {
+    let work = work.to_path_buf();
+    run_tool(&work, &["extract", document, "--out", "x.json"]);
+    run_tool(
+        &work,
+        &["convert", "--extraction", "x.json", "--out", "c.json"],
+    );
+    let extraction: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(work.join("x.json")).unwrap()).unwrap();
+    let figure = extraction["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|block| block["kind"] == "figure")
+        .and_then(|block| block["id"].as_str())
+        .expect("the mark is read as a figure")
+        .to_string();
+    run_tool(
+        &work,
+        &[
+            "prepare-reading",
+            "--extraction",
+            "x.json",
+            "--document",
+            document,
+            "--block",
+            &figure,
+            "--out-dir",
+            "units",
+        ],
+    );
+    let units = work.join("units");
+    let listing: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(units.join("units.json")).unwrap()).unwrap();
+    let unit = &listing["units"][0];
+    let file = |field: &str| units.join(unit[field].as_str().unwrap());
+    let prompt = std::fs::read_to_string(file("prompt")).unwrap();
+    let picture = std::fs::read(file("file")).unwrap();
+    let schema: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(units.join("answer.schema.json")).unwrap())
+            .unwrap();
+
+    let read = ask(&sce_spec_workbench_core::claude_code::PictureQuestion {
+        prompt: &prompt,
+        picture: &picture,
+        media_type: unit["picture"]["media_type"].as_str().unwrap(),
+        answer_schema: &schema,
+    });
+    std::fs::write(file("answer"), read.answer.to_string()).unwrap();
+    let model = read.model.clone().unwrap_or_default();
+    println!("model: {model}");
+
+    let finished = run_tool(
+        &work,
+        &[
+            "finish-reading",
+            "--extraction",
+            "x.json",
+            "--conversion",
+            "c.json",
+            "--dir",
+            "units",
+            "--runtime",
+            runtime,
+            "--model",
+            &model,
+            "--out",
+            "c2.json",
+            "--json",
+        ],
+    );
+    println!("finish-reading: {finished}");
+    let checked = run_tool(
+        &work,
+        &[
+            "check-conversion",
+            "--extraction",
+            "x.json",
+            "--conversion",
+            "c2.json",
+            "--json",
+        ],
+    );
+    let report: serde_json::Value = serde_json::from_str(&checked).unwrap();
+    let asked = report["read_from_picture"].as_array().unwrap();
+    assert!(!asked.is_empty(), "nothing read was asked about: {report}");
+
+    let conversion: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(work.join("c2.json")).unwrap()).unwrap();
+    let read_text: String = conversion["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|block| block.get("picture").is_some())
+        .map(|block| block["markdown"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    for word in DRAWN {
+        assert!(
+            read_text.contains(word),
+            "`{word}` is not in what was read:\n{read_text}"
+        );
+    }
+}
+
 /// The authoring tools of the SCE checkout, by their launcher.
 pub fn tools() -> PathBuf {
     let launcher = sce_root().join("scripts").join("sce_author.sh");

@@ -37,7 +37,7 @@ use sce_specs::Revision;
 use serde_json::Value;
 
 use crate::auth_policy::Observed;
-use crate::claude_code::AuthorServer;
+use crate::claude_code::{AuthorServer, PictureAnswer, PictureQuestion, NO_READING};
 use crate::client_find::{find_programs, Candidate, Search};
 use crate::client_run::{
     blank_job, capture, draft_from, prompt, schema, scoped_to, span_words, supervise_lines, tail,
@@ -47,7 +47,7 @@ use crate::codex_environment::environment_for;
 use crate::codex_sandbox::{self, Refusal};
 use crate::codex_support::{enabled_features, Support};
 use crate::connection::AuthSource;
-use crate::run_steps::{codex_forbidden, Steps};
+use crate::run_steps::{codex_forbidden, codex_reading_forbidden, Steps};
 use crate::runner::{cause, Cancel, Draft, GenerateError, Generator, Job};
 
 // The authoring server's tools a client may use, said once for every client that has them
@@ -170,15 +170,14 @@ impl Codex {
     /// verified, with nothing switched on that nobody looked at, and a credential to give it.
     /// A refusal is a sentence that names no path: it is said where the specs folder is.
     fn preflight(&self) -> Result<Run, String> {
-        let version = self
-            .version
-            .as_deref()
-            .ok_or("the program did not say it is Codex, so it is not run")?;
-        let disabled =
-            support_verdict(&self.binary, version, &self.support).map_err(|e| e.to_string())?;
-        let mut run = run_environment(self.auth, &self.app_home, &self.environment)?;
-        run.disabled = disabled;
-        Ok(run)
+        preflight_of(
+            &self.binary,
+            self.version.as_deref(),
+            &self.support,
+            self.auth,
+            &self.app_home,
+            &self.environment,
+        )
     }
 
     /// Why this Codex cannot be run now, or `None` when it can: for the request that waits.
@@ -192,6 +191,24 @@ impl Codex {
     pub fn observe_login(&self) -> Result<Option<Observed>, String> {
         login_of(&self.binary, self.auth, &self.app_home, &self.environment)
     }
+}
+
+/// Everything that must be true before a Codex is started, for a draft and for a reading alike: it
+/// says it is Codex, it derives the sandbox a run needs once every feature nobody reviewed is switched
+/// off, and there is a credential to give it. A refusal is a sentence that names no path.
+fn preflight_of(
+    binary: &Path,
+    version: Option<&str>,
+    support: &Support,
+    auth: AuthSource,
+    app_home: &Path,
+    environment: &[(String, String)],
+) -> Result<Run, String> {
+    let version = version.ok_or("the program did not say it is Codex, so it is not run")?;
+    let disabled = support_verdict(binary, version, support).map_err(|e| e.to_string())?;
+    let mut run = run_environment(auth, app_home, environment)?;
+    run.disabled = disabled;
+    Ok(run)
 }
 
 /// The arguments of `codex exec` for a run. A free function and not a method so that what a person
@@ -270,6 +287,21 @@ pub fn permission_settings() -> Vec<String> {
     ]
 }
 
+/// What every run is given whatever it is for: the sandbox, no question to a person who is not there,
+/// no web search, no other agents and no instructions read from the folder, and where the login is.
+/// Said once, because a draft and a reading are confined by the same settings and a person who
+/// verified the one has verified the other's.
+fn confined_settings() -> Vec<String> {
+    let mut settings = permission_settings();
+    settings.extend([
+        "approval_policy=\"never\"".to_string(),
+        "web_search=\"disabled\"".to_string(),
+        "agents.enabled=false".to_string(),
+        "project_doc_max_bytes=0".to_string(),
+    ]);
+    settings
+}
+
 /// The configuration a run is given on the command line, as `key=value` with a TOML value.
 fn run_settings(author: &AuthorServer) -> Vec<String> {
     let key = |name: &str| format!("mcp_servers.{SERVER}.{name}");
@@ -278,12 +310,8 @@ fn run_settings(author: &AuthorServer) -> Vec<String> {
         .iter()
         .map(|(name, value)| format!("{}={}", toml_string(name), toml_string(value)))
         .collect();
-    let mut settings = permission_settings();
+    let mut settings = confined_settings();
     settings.extend([
-        "approval_policy=\"never\"".to_string(),
-        "web_search=\"disabled\"".to_string(),
-        "agents.enabled=false".to_string(),
-        "project_doc_max_bytes=0".to_string(),
         format!("developer_instructions={}", toml_string(SYSTEM_PROMPT)),
         auth_store_override(),
         format!(
@@ -715,6 +743,285 @@ pub(crate) fn version_within(binary: &Path, timeout: Duration) -> Option<String>
         return None;
     }
     first.split_whitespace().last().map(str::to_string)
+}
+
+/// The arguments of `codex exec` for a reading: the same confinement as a draft's and none of its
+/// server. The client is given no server to reach, the picture as the one image of its first message,
+/// and the form its answer must take; of what it does it may only speak (`codex_reading_forbidden`).
+///
+/// The image is named with `=`, because `--image` takes every value up to the next flag and the `-`
+/// that says the prompt is standard input would be taken for a second picture.
+fn reading_arguments(
+    disabled: &[String],
+    model: Option<&str>,
+    effort: Option<&str>,
+    scratch: &Path,
+    schema_file: &Path,
+    image: &Path,
+    last: &Path,
+) -> Vec<String> {
+    let mut args: Vec<String> = vec!["exec".into(), "--json".into()];
+    args.extend(["--output-schema".into(), schema_file.display().to_string()]);
+    args.extend(["-o".into(), last.display().to_string()]);
+    args.extend([
+        "--ephemeral".into(),
+        "--ignore-user-config".into(),
+        "--ignore-rules".into(),
+        "--strict-config".into(),
+        "--skip-git-repo-check".into(),
+        "-C".into(),
+        scratch.display().to_string(),
+        format!("--image={}", image.display()),
+    ]);
+    if let Some(model) = model {
+        args.extend(["-m".into(), model.to_string()]);
+    }
+    if let Some(effort) = effort {
+        args.extend([
+            "-c".into(),
+            format!("model_reasoning_effort={}", toml_string(effort)),
+        ]);
+    }
+    for feature in disabled {
+        args.extend(["--disable".into(), feature.clone()]);
+    }
+    for setting in confined_settings() {
+        args.extend(["-c".into(), setting]);
+    }
+    args.extend(["-c".into(), auth_store_override()]);
+    // The prompt is standard input.
+    args.push("-".into());
+    args
+}
+
+/// The file suffix a picture of `media_type` is written under for the client, or `None` for a format
+/// it is not handed in.
+fn picture_suffix(media_type: &str) -> Option<&'static str> {
+    match media_type {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/gif" => Some("gif"),
+        "image/webp" => Some("webp"),
+        _ => None,
+    }
+}
+
+/// What a reading records as its model when the connection pinned none and the client does not say.
+pub const DEFAULT_MODEL: &str = "codex-default";
+
+/// Codex as a reader of pictures: the program and the credential it is given, as a draft's are, and
+/// none of the authoring server, which a draft is written through and a reading never reaches. It is
+/// asked one question while a person waits, and no request is made for it.
+#[derive(Debug, Clone)]
+pub struct CodexReader {
+    binary: PathBuf,
+    config: CodexConfig,
+    auth: AuthSource,
+    app_home: PathBuf,
+    support: Support,
+    version: Option<String>,
+    environment: Vec<(String, String)>,
+}
+
+impl CodexReader {
+    /// A reader that runs `binary` with the credential `auth` names, `app_home` being the
+    /// application's own home for the client. Its version is asked once, now.
+    pub fn new(
+        binary: PathBuf,
+        config: CodexConfig,
+        auth: AuthSource,
+        app_home: PathBuf,
+        support: Support,
+    ) -> Self {
+        let version = version_of(&binary);
+        CodexReader {
+            binary,
+            config,
+            auth,
+            app_home,
+            support,
+            version,
+            environment: std::env::vars().collect(),
+        }
+    }
+
+    /// The same, started with `environment` as the process's own, as [`Codex::with_environment`].
+    pub fn with_environment(mut self, environment: Vec<(String, String)>) -> Self {
+        self.environment = environment;
+        self
+    }
+
+    /// What the program says its version is, when it says.
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
+    }
+
+    /// Why this Codex cannot be run now, or `None` when it can: the judgement a draft is held to.
+    pub fn why_not(&self) -> Option<String> {
+        self.preflight().err()
+    }
+
+    /// Who is signed in to Codex for this connection, asked the way a run is started.
+    pub fn observe_login(&self) -> Result<Option<Observed>, String> {
+        login_of(&self.binary, self.auth, &self.app_home, &self.environment)
+    }
+
+    fn preflight(&self) -> Result<Run, String> {
+        preflight_of(
+            &self.binary,
+            self.version.as_deref(),
+            &self.support,
+            self.auth,
+            &self.app_home,
+            &self.environment,
+        )
+    }
+
+    /// Ask the client to read one picture, and wait at most `allowed` for its answer.
+    ///
+    /// The picture is a file in the run's own folder, named to the client as its image. The client
+    /// reaches no server and its sandbox reads that folder and writes nothing, with no network; a
+    /// run that reports anything but its words (a command, a file, a call) is stopped. What it
+    /// answers is the last message it wrote, and the kind checks it.
+    pub fn read_picture(
+        &self,
+        question: &PictureQuestion<'_>,
+        cancel: &Cancel,
+        allowed: Duration,
+    ) -> Result<PictureAnswer, GenerateError> {
+        let suffix = picture_suffix(question.media_type).ok_or_else(|| {
+            GenerateError::unusable(format!(
+                "a picture of `{}` is not one the client is handed",
+                question.media_type
+            ))
+            .because(NO_READING)
+        })?;
+        let Run {
+            kept,
+            home,
+            disabled,
+        } = self
+            .preflight()
+            .map_err(|why| GenerateError::installation(why).because(cause::CLIENT_FAULT))?;
+        let scratch = Scratch::new("sce-codex-read").map_err(|e| {
+            GenerateError::installation(format!("a folder for the client: {e}"))
+                .because(cause::WORK_FOLDER)
+        })?;
+        let schema_file = scratch.path().join("schema.json");
+        let image = scratch.path().join(format!("picture.{suffix}"));
+        let last = scratch.path().join("last.json");
+        for (path, bytes) in [
+            (
+                &schema_file,
+                question.answer_schema.to_string().into_bytes(),
+            ),
+            (&image, question.picture.to_vec()),
+        ] {
+            fs::write(path, bytes).map_err(|e| {
+                GenerateError::installation(format!("a file for the client: {e}"))
+                    .because(cause::WORK_FOLDER)
+            })?;
+        }
+        let mut command = Command::new(&self.binary);
+        command
+            .current_dir(scratch.path())
+            .args(reading_arguments(
+                &disabled,
+                self.config.model.as_deref(),
+                self.config.effort.as_deref(),
+                scratch.path(),
+                &schema_file,
+                &image,
+                &last,
+            ))
+            .env_clear()
+            .envs(kept)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        give_home(&mut command, home.as_deref())
+            .map_err(|why| GenerateError::installation(why).because(cause::CLIENT_FAULT))?;
+        let child = command.spawn().map_err(|e| {
+            GenerateError::installation(format!(
+                "{} could not be started: {e}",
+                self.binary.display()
+            ))
+            .because(cause::CLIENT_FAULT)
+        })?;
+        let mut forbidden: Option<String> = None;
+        let ended = supervise_lines(
+            child,
+            Some(question.prompt.as_bytes().to_vec()),
+            cancel,
+            allowed,
+            &mut |line| match codex_reading_forbidden(line) {
+                Some(what) => {
+                    forbidden.get_or_insert(what);
+                    true
+                }
+                None => false,
+            },
+        )
+        .map_err(|e| {
+            GenerateError::installation(format!("the client could not be read: {e}"))
+                .because(cause::CLIENT_FAULT)
+        })?;
+        match ended {
+            Ended::Cancelled => Err(GenerateError::Cancelled),
+            Ended::Stopped => Err(GenerateError::installation(format!(
+                "the client was stopped because it {}: a reading may only speak",
+                forbidden.unwrap_or_else(|| "did something that is not allowed".to_string())
+            ))
+            .because(cause::CLIENT_FAULT)),
+            Ended::TimedOut => Err(GenerateError::time(format!(
+                "the client took longer than {} to read the picture and was stopped",
+                span_words(allowed)
+            ))),
+            Ended::Exited {
+                status,
+                stdout,
+                stderr,
+            } => {
+                if !status.success() {
+                    let said = if stderr.trim().is_empty() {
+                        &stdout
+                    } else {
+                        &stderr
+                    };
+                    return Err(GenerateError::installation(format!(
+                        "the client stopped with {status}: {}",
+                        tail(said.trim(), 2000)
+                    ))
+                    .because(cause::CLIENT_FAULT));
+                }
+                let text = fs::read_to_string(&last).map_err(|_| {
+                    GenerateError::unusable(
+                        "the client did not write a last message, so there is no reading",
+                    )
+                    .because(NO_READING)
+                })?;
+                let answer: Value = serde_json::from_str(text.trim()).map_err(|_| {
+                    GenerateError::unusable(format!(
+                        "the last message is not the reading asked for: it is not JSON: {}",
+                        tail(text.trim(), 2000)
+                    ))
+                    .because(NO_READING)
+                })?;
+                // The client does not say which model answered: of its output, none carries one. The
+                // model the connection pinned is recorded, and a connection that pinned none is
+                // recorded as the client's own default, which is what it was.
+                Ok(PictureAnswer {
+                    answer,
+                    model: Some(
+                        self.config
+                            .model
+                            .clone()
+                            .unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+                    ),
+                })
+            }
+        }
+    }
 }
 
 impl Generator for Codex {

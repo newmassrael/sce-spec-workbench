@@ -23,8 +23,12 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sce_spec_workbench_core::claude_code::{AuthorServer, ALLOWED_TOOLS};
-use sce_spec_workbench_core::codex::{Codex, CodexConfig, AUTHOR_TOOLS};
+use sce_spec_workbench_core::claude_code::{
+    AuthorServer, PictureAnswer, PictureQuestion, ALLOWED_TOOLS,
+};
+use sce_spec_workbench_core::codex::{
+    Codex, CodexConfig, CodexReader, AUTHOR_TOOLS, DEFAULT_MODEL,
+};
 use sce_spec_workbench_core::codex_support::Support;
 use sce_spec_workbench_core::runner::{Cancel, GenerateError, Generator, Job, Trouble};
 use sce_spec_workbench_core::AuthSource;
@@ -1039,4 +1043,217 @@ fn the_instructions_are_named_by_what_the_client_is_told_and_what_is_reviewed() 
     assert_eq!(again.instructions(), one.instructions());
     // Another list of what was reviewed is another set of instructions.
     assert_ne!(other.instructions(), one.instructions());
+}
+
+// ---- Codex as a reader of pictures --------------------------------------------------------------
+
+fn reader_with(fake: &Fake, model: Option<&str>, support: Support) -> CodexReader {
+    CodexReader::new(
+        fake.binary.clone(),
+        CodexConfig {
+            model: model.map(str::to_string),
+            timeout: Duration::from_secs(20),
+            ..CodexConfig::default()
+        },
+        AuthSource::AppStore,
+        fake.home(),
+        support,
+    )
+    .with_environment(vec![(
+        "PATH".to_string(),
+        std::env::var("PATH").unwrap_or_default(),
+    )])
+}
+
+fn reader(fake: &Fake) -> CodexReader {
+    reader_with(fake, None, stand_in_support())
+}
+
+fn reading() -> Value {
+    json!({ "blocks": [{ "kind": "paragraph", "markdown": "dark -> lit", "unsure": false }],
+            "unreadable": [], "nothing_to_read": false })
+}
+
+fn read(client: &CodexReader, picture: &[u8]) -> Result<PictureAnswer, GenerateError> {
+    let schema = json!({ "type": "object" });
+    client.read_picture(
+        &PictureQuestion {
+            prompt: "Copy what the picture shows.",
+            picture,
+            media_type: "image/png",
+            answer_schema: &schema,
+        },
+        &Cancel::new(),
+        Duration::from_secs(15),
+    )
+}
+
+#[test]
+fn a_reading_is_started_with_the_confinement_of_a_draft_and_no_server_at_all() {
+    let fake = Fake::answering("codex-read-arguments", &reading());
+
+    read(&reader(&fake), b"\x89PNG-bytes").unwrap();
+
+    let args = fake.argv();
+    let settings: Vec<&str> = args
+        .windows(2)
+        .filter(|pair| pair[0] == "-c")
+        .map(|pair| pair[1].as_str())
+        .collect();
+    // The sandbox, no question to nobody, no web, no other agents and nothing read from the folder.
+    for held in [
+        "approval_policy=\"never\"",
+        "web_search=\"disabled\"",
+        "agents.enabled=false",
+        "project_doc_max_bytes=0",
+        "default_permissions=\"sce_run\"",
+    ] {
+        assert!(settings.contains(&held), "{held} is not in {settings:?}");
+    }
+    assert!(
+        settings.iter().all(|s| !s.starts_with("mcp_servers")),
+        "a reading reaches no server: {settings:?}"
+    );
+    for flag in [
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--strict-config",
+    ] {
+        assert!(args.iter().any(|a| a == flag), "{flag} is not in {args:?}");
+    }
+    assert!(after(&args, "--output-schema").is_some());
+    // What is switched off is what the stand-in has on and nobody reviewed.
+    assert!(args.windows(2).any(|p| p == ["--disable", "shell_tool"]));
+    assert!(!args.windows(2).any(|p| p == ["--disable", "fast_mode"]));
+    // The prompt is standard input, and the picture is one image named with `=`.
+    assert_eq!(args.last().map(String::as_str), Some("-"));
+    let image = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--image="))
+        .expect("the picture is named as an image");
+    assert!(image.ends_with("picture.png"), "{image}");
+    assert_eq!(
+        fs::read_to_string(fake.record.join("stdin")).unwrap(),
+        "Copy what the picture shows."
+    );
+}
+
+#[test]
+fn the_picture_is_in_the_runs_folder_as_it_was_given_and_the_last_message_is_the_answer() {
+    // The stand-in copies the file it is told to attach before it answers.
+    let fake = Fake::new(
+        "codex-read-copy",
+        "for a in \"$@\"; do case \"$a\" in --image=*) cp \"${a#--image=}\" \"$R/seen\";; esac; done",
+    );
+    fs::write(fake.record.join("answer.json"), reading().to_string()).unwrap();
+
+    let answered = read(&reader(&fake), b"\x89PNG-bytes").unwrap();
+
+    assert_eq!(answered.answer, reading());
+    assert_eq!(
+        fs::read(fake.record.join("seen")).unwrap(),
+        b"\x89PNG-bytes"
+    );
+}
+
+#[test]
+fn a_reading_records_the_model_the_connection_pinned_and_else_says_it_was_the_clients_default() {
+    let fake = Fake::answering("codex-read-model", &reading());
+
+    let default = read(&reader(&fake), b"png").unwrap();
+    let pinned = read(
+        &reader_with(&fake, Some("gpt-test"), stand_in_support()),
+        b"png",
+    )
+    .unwrap();
+
+    assert_eq!(default.model.as_deref(), Some(DEFAULT_MODEL));
+    assert_eq!(pinned.model.as_deref(), Some("gpt-test"));
+    assert!(after(&fake.argv(), "-m") == Some("gpt-test"));
+}
+
+#[test]
+fn a_reading_that_reports_anything_but_its_words_is_stopped_even_a_call_a_draft_would_be_allowed() {
+    // A draft may call the authoring server's tools; a reading is given no server, so the same call
+    // stops it, as a command does.
+    for (label, item) in [
+        (
+            "codex-read-command",
+            "{\"type\":\"command_execution\",\"command\":\"cat /etc/passwd\"}",
+        ),
+        (
+            "codex-read-author",
+            "{\"type\":\"mcp_tool_call\",\"server\":\"sce-author\",\"tool\":\"specs_read\"}",
+        ),
+    ] {
+        let fake = Fake::new(
+            label,
+            &format!("echo '{{\"type\":\"item.started\",\"item\":{item}}}'; exec sleep 60"),
+        );
+        fs::write(fake.record.join("answer.json"), reading().to_string()).unwrap();
+
+        let begun = Instant::now();
+        let refused = read(&reader(&fake), b"png").unwrap_err();
+
+        let GenerateError::Failed(Trouble { words: said, .. }) = refused else {
+            panic!("expected a failure, got {refused:?}");
+        };
+        assert!(said.contains("stopped"), "{said}");
+        assert!(begun.elapsed() < Duration::from_secs(15));
+    }
+}
+
+#[test]
+fn a_reading_whose_last_message_is_not_the_form_asked_for_is_a_reading_that_did_not_come() {
+    let fake = Fake::new("codex-read-prose", "exit 0");
+    fs::write(fake.record.join("answer.json"), "a lamp, three states").unwrap();
+
+    let refused = read(&reader(&fake), b"png").unwrap_err();
+
+    let GenerateError::Unusable(Trouble {
+        words: said,
+        failure,
+        ..
+    }) = refused
+    else {
+        panic!("expected an unusable reading, got {refused:?}");
+    };
+    assert!(said.contains("not JSON"), "{said}");
+    assert_eq!(failure.cause.as_deref(), Some("no-reading"));
+}
+
+#[test]
+fn a_picture_in_a_format_the_client_is_not_handed_is_not_started() {
+    let fake = Fake::answering("codex-read-format", &reading());
+    let schema = json!({});
+
+    let refused = reader(&fake)
+        .read_picture(
+            &PictureQuestion {
+                prompt: "Copy what the picture shows.",
+                picture: b"tiff",
+                media_type: "image/tiff",
+                answer_schema: &schema,
+            },
+            &Cancel::new(),
+            Duration::from_secs(15),
+        )
+        .unwrap_err();
+
+    assert!(matches!(refused, GenerateError::Unusable(_)), "{refused:?}");
+    assert!(!fake.started());
+}
+
+#[test]
+fn a_reading_is_not_started_on_a_sandbox_the_release_does_not_say_it_derives() {
+    let fake = Fake::answering("codex-read-sandbox", &reading());
+    // The stand-in answers nothing to `debug`, so what it derives is not known.
+    let client = reader_with(&fake, None, asking_support());
+
+    let refused = read(&client, b"png").unwrap_err();
+
+    assert!(matches!(refused, GenerateError::Failed(_)), "{refused:?}");
+    assert!(!fake.started());
+    assert!(client.why_not().is_some());
 }

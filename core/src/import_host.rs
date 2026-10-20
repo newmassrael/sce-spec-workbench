@@ -40,8 +40,10 @@ use serde_json::{json, Value};
 use sce_specs::commands::{call_with, NoPins};
 use sce_specs::{Clock, CommandError, Revision, SpecId, StoreError};
 
-use crate::asking::{chosen_connection, reader_for, READING_TIME, READING_UNAVAILABLE};
-use crate::claude_code::{ClaudeReader, PictureQuestion};
+use crate::asking::{
+    chosen_connection, reader_for, PictureReader, READING_TIME, READING_UNAVAILABLE,
+};
+use crate::claude_code::PictureQuestion;
 use crate::client_run::capture;
 use crate::commands::Context;
 use crate::installed::Installed;
@@ -702,7 +704,7 @@ fn read_chosen_pictures<C: Clock>(
     kept: &Kept,
     read: &[String],
     scope_flags: &[&str],
-    reader: &ClaudeReader,
+    reader: &PictureReader,
 ) -> Result<PicturesRead, CommandError> {
     let dir = scratch.path(".");
     let document = place_original(context, scratch, id, kept)?;
@@ -801,7 +803,7 @@ fn read_chosen_pictures<C: Clock>(
             "--dir",
             "reading",
             "--runtime",
-            "claude-code",
+            reader.runtime(),
             "--runtime-version",
             &version,
             "--model",
