@@ -554,3 +554,42 @@ fn a_figure_left_out_and_asked_to_be_read_is_refused() {
     assert_eq!(refused.kind, "read-left-out");
     assert!(!fake.was_asked());
 }
+
+/// What the check says could not be carried of the part, as one text.
+fn not_carried_words(report: &Value) -> String {
+    report["not_carried"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["what"].as_str().unwrap_or_default().to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn a_picture_left_out_is_not_listed_among_what_could_not_be_carried_and_one_kept_is() {
+    let fake = Fake::answering("import-not-carried", &read_of("unused"));
+    let rig = Rig::new("import-not-carried", &fake);
+    let (spec, read, figure) = rig.read_lamp();
+
+    let kept = rig.select(&spec, &read, json!({})).unwrap();
+    let (kept_report, _) = rig.proposal(&spec, &kept["proposal"]);
+    let left_out = rig
+        .select(
+            &spec,
+            &read,
+            json!({"leave_out": [figure], "key": "press-2", "supersede": true}),
+        )
+        .unwrap();
+    let (left_out_report, _) = rig.proposal(&spec, &left_out["proposal"]);
+
+    // The control: a picture that stays is said not to be carried, so the assertion below can fail.
+    assert!(
+        not_carried_words(&kept_report).contains("picture"),
+        "{kept_report}"
+    );
+    assert!(
+        !not_carried_words(&left_out_report).contains("picture"),
+        "{left_out_report}"
+    );
+}
