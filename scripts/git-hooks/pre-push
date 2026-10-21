@@ -29,28 +29,14 @@ fi
 # shellcheck source=/dev/null
 source "$gate"
 
-if ! declare -F restricted_term_gate_range >/dev/null; then
-    printf '\nERROR pre-push: %s cannot read a range of commits.\n' "$gate" >&2
-    printf '  The pinned sce is older than the push gate: git submodule update --remote sce\n' >&2
+if ! declare -F restricted_term_gate_pushed_refs >/dev/null; then
+    printf '\nERROR pre-push: %s cannot read what a push publishes.\n' "$gate" >&2
+    printf '  The pinned sce is older than the push check: git submodule update --remote sce\n' >&2
     exit 1
 fi
 
-failed=0
-while read -r _local_ref local_sha _remote_ref remote_sha; do
-    [[ -z "${local_sha:-}" || "$local_sha" =~ ^0+$ ]] && continue   # a deletion publishes nothing
-    if [[ -z "${remote_sha:-}" || "$remote_sha" =~ ^0+$ ]] \
-        || ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
-        # A new ref, or a remote commit this clone does not hold (a force push): what is new is
-        # what no remote-tracking ref reaches.
-        restricted_term_gate_range "pre-push" "$local_sha" --not --remotes || failed=1
-    else
-        restricted_term_gate_range "pre-push" "${remote_sha}..${local_sha}" || failed=1
-    fi
-done
-
-if (( failed )); then
-    printf '\npre-push: take the text out of the commits above (amend or rebase) and push\n' >&2
-    printf 'pre-push: again — the remote is public and a push does not un-publish.\n' >&2
-    exit 1
-fi
+# What a push publishes is read by the gate, from the refs git hands this hook, and by nothing
+# written here: the one reading of the refs is SCE's, so this hook and SCE's own cannot disagree
+# about what a push publishes.
+restricted_term_gate_pushed_refs "pre-push" || exit 1
 exit 0

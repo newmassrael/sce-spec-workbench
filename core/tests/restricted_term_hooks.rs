@@ -280,6 +280,37 @@ fn a_commit_made_past_the_hooks_is_warned_about_at_once_and_refused_at_the_push(
 }
 
 #[test]
+fn a_pinned_gate_too_old_to_read_what_a_push_publishes_refuses_the_push_and_says_so() {
+    // A gate that reads a commit and a range but not the refs of a push is the one an older pin carries.
+    // A push it cannot read is a check that was not made, so it is refused and the way out is named.
+    let sandbox = Sandbox::new("hooks-push-old-gate", false);
+    sandbox.remote();
+    let gate = sandbox.dir.join("sce/tools/git-hooks");
+    std::fs::create_dir_all(&gate).unwrap();
+    std::fs::write(
+        gate.join("restricted-term-gate.sh"),
+        "restricted_term_gate_range() { return 0; }\n",
+    )
+    .unwrap();
+    sandbox.stage("notes.txt", "nothing restricted\n");
+    let made = sandbox.commit_past_the_hooks("a plain message");
+    assert!(made.status.success(), "{}", said(&made));
+
+    let pushed = sandbox.push();
+
+    assert!(!pushed.status.success(), "an unreadable push is not passed");
+    let refused = said(&pushed);
+    assert!(
+        refused.contains("cannot read what a push publishes"),
+        "{refused}"
+    );
+    assert!(
+        refused.contains("git submodule update --remote sce"),
+        "{refused}"
+    );
+}
+
+#[test]
 fn a_checkout_without_the_gate_refuses_the_push_and_the_override_leaves_a_row() {
     let sandbox = Sandbox::new("hooks-push-no-gate", false);
     sandbox.remote();
