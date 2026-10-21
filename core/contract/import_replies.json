@@ -613,6 +613,39 @@
       "ledger": "{\"allotments\":[{\"blocks\":[\"b0001\",\"b0002\",\"b0003\"],\"to\":{\"kind\":\"new\",\"title\":\"Lamp control\"}}],\"extraction\":\"fcbbb15beb2fef03e5cfc6106f26da6a161b82f61c7686d0fba668ab855a8448\",\"v\":1}",
       "not_carried": [],
       "saved": true
+    },
+    "say_notes": {
+      "notes": [
+        {
+          "code": "pdf-pages-without-text",
+          "facts": {
+            "blank": [
+              2,
+              3
+            ],
+            "pages": 3
+          },
+          "said": {
+            "ko": {
+              "what": "3쪽 중 2쪽에 글이 없어요: 2, 3",
+              "why": "각 쪽은 그림이거나 비어 있어요. 픽셀을 읽는 일은 읽기 도구의 몫이고 이 추출기의 몫이 아니에요. 쪽에 있는 이미지는 그림 블록이 되고, 선과 도형으로 그린 그림은 자리를 정하지 않아요"
+            }
+          },
+          "what": "2 of 3 page(s) carry no text: 2, 3",
+          "why": "each is a picture or empty"
+        },
+        {
+          "what": "a footer",
+          "why": "page furniture"
+        },
+        {
+          "code": "a-code-from-a-newer-tool",
+          "facts": {
+            "n": 1
+          },
+          "what": "from a newer tool"
+        }
+      ]
     }
   },
   "refusals": {
@@ -630,6 +663,14 @@
       },
       "kind": "bad-block",
       "message": "`--out` is not the id of an item of the document"
+    },
+    "bad-notes": {
+      "detail": {
+        "kind": null,
+        "tool": "render-notes"
+      },
+      "kind": "bad-notes",
+      "message": "an extraction has what was not carried that is not non-empty text"
     },
     "bad-section": {
       "detail": {
@@ -692,6 +733,13 @@
       },
       "kind": "scope-refused",
       "message": "the extraction has no section s9"
+    },
+    "too-many-notes": {
+      "detail": {
+        "most": 500
+      },
+      "kind": "too-many-notes",
+      "message": "501 entries are more than the 500 that are said at once"
     },
     "unreadable-original": {
       "detail": {

@@ -162,6 +162,10 @@ fn status_of(kind: &str) -> u16 {
         // document does not hold (or one too heavy to hand over).
         | "read-left-out"
         | "no-picture"
+        // What could not be carried, sent to be said in a language: a list the tools cannot read as one, or
+        // one longer than is said at once.
+        | "bad-notes"
+        | "too-many-notes"
         // A plan the tools would not make into a ledger, and a ledger or the count of it that do not
         // name each other or the document they are of. Refused on their content.
         | "bad-division"
@@ -376,6 +380,8 @@ mod tests {
         ("bad-block", 422),
         ("read-left-out", 422),
         ("no-picture", 422),
+        ("bad-notes", 422),
+        ("too-many-notes", 422),
         ("scope-refused", 422),
         ("bad-division", 422),
         ("too-many-parts", 422),

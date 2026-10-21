@@ -322,6 +322,36 @@ fn replies() -> Value {
         refused(Some(&tools), "read_picture", picture("nowhere.png")),
     );
 
+    // What could not be carried, said in every language the tools write: an entry with a code (a sentence
+    // for each other language beside the English), one an older tool wrote (as it was), and one whose code
+    // these tools do not know (as it was). A list that is not one, and one too long, are refused.
+    answers.insert(
+        "say_notes".into(),
+        ask(
+            "say_notes",
+            json!({"notes": [
+                {
+                    "what": "2 of 3 page(s) carry no text: 2, 3", "why": "each is a picture or empty",
+                    "code": "pdf-pages-without-text", "facts": {"blank": [2, 3], "pages": 3},
+                },
+                {"what": "a footer", "why": "page furniture"},
+                {"what": "from a newer tool", "code": "a-code-from-a-newer-tool", "facts": {"n": 1}},
+            ]}),
+        ),
+    );
+    refusals.insert(
+        "bad-notes".into(),
+        refused(Some(&tools), "say_notes", json!({"notes": [{"what": 1}]})),
+    );
+    refusals.insert(
+        "too-many-notes".into(),
+        refused(
+            Some(&tools),
+            "say_notes",
+            json!({"notes": vec![json!({"what": "w"}); 501]}),
+        ),
+    );
+
     // A document divided among specs: begun from the spec that holds it, a plan that leaves a part
     // without a place (SCE's count is the answer), a plan that leaves none (the walk), and a plan after
     // that, whose first spec already waits on a document (a step the walk could not take).

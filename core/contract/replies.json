@@ -168,7 +168,7 @@
       "deleted": "main"
     },
     "describe": {
-      "application_command_set_version": 11,
+      "application_command_set_version": 12,
       "command_set_version": 35,
       "commands": [
         "describe",
@@ -258,7 +258,8 @@
         "confirm_division",
         "assemble_import",
         "accept_import",
-        "read_picture"
+        "read_picture",
+        "say_notes"
       ],
       "entrance": "browser",
       "root": "<root>",
@@ -267,7 +268,7 @@
       "writes_settings": false
     },
     "describe_desktop": {
-      "application_command_set_version": 11,
+      "application_command_set_version": 12,
       "command_set_version": 35,
       "commands": [
         "describe",
@@ -357,7 +358,8 @@
         "confirm_division",
         "assemble_import",
         "accept_import",
-        "read_picture"
+        "read_picture",
+        "say_notes"
       ],
       "entrance": "desktop",
       "root": "<root>",
@@ -3080,7 +3082,7 @@
       }
     }
   },
-  "application_command_set_version": 11,
+  "application_command_set_version": 12,
   "command_set_version": 35,
   "refusals": {
     "active-proposal": {
@@ -3441,7 +3443,7 @@
     },
     "unknown-command": {
       "kind": "unknown-command",
-      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, propose_import, read_proposal, list_proposals, read_proposal_documents, decide_block, accept_proposal, reject_proposal, rebase_proposal, start_intake, start_intake_from_spec, read_intake, read_intake_extraction, list_intakes, save_ledger, bind_new_spec, give_intake_to_spec, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection, import_document, read_document, import_selection, divide_document, read_division, revise_division, draft_division, confirm_division, assemble_import, accept_import, read_picture"
+      "message": "`nope` is not a command; the commands are describe, list_specs, create_spec, read_spec, read_source, save_source, history, save_model, read_model, model_history, figures, remove_spec, review, read_answers, save_answers, save_requirements, read_requirements, requirements_report, accept, read_acceptance, read_acceptance_delta, read_revision_report, read_judgment, read_spec_snapshot, read_spec_heads, request_generation, read_request, list_requests, list_open_requests, claim_request, heartbeat_request, save_request_candidate, read_request_candidate, complete_request, fail_request, cancel_request, report_adapter, read_adapter_status, read_host_status, read_queue, record_request_event, read_request_journal, read_bundle, bundle_history, add_original, read_original, list_originals, read_original_member, save_extraction, read_extraction, list_extractions, propose_import, read_proposal, list_proposals, read_proposal_documents, decide_block, accept_proposal, reject_proposal, rebase_proposal, start_intake, start_intake_from_spec, read_intake, read_intake_extraction, list_intakes, save_ledger, bind_new_spec, give_intake_to_spec, list_connections, read_connection, read_auth_policy, read_claude_status, read_codex_status, find_clients, read_server_status, save_connection, delete_connection, set_default_connection, import_document, read_document, import_selection, divide_document, read_division, revise_division, draft_division, confirm_division, assemble_import, accept_import, read_picture, say_notes"
     },
     "wrong-connection": {
       "detail": {

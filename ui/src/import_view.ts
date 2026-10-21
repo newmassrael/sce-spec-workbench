@@ -9,7 +9,15 @@
 // Nothing here keeps state or asks the core: each function is given what to draw and what to call when
 // a button is pressed, so the state lives in one place (`import_flow.ts`) and a redraw loses nothing.
 
-import type { DecisionKind, DocumentItem, DocumentSection, Intake, NotRead, ReadDocument } from "./contract";
+import type {
+  DecisionKind,
+  DocumentItem,
+  DocumentSection,
+  Intake,
+  NotCarried,
+  NotRead,
+  ReadDocument,
+} from "./contract";
 import { h, type Child } from "./dom";
 import type { Key } from "./i18n";
 import { chosenState, chosenTotals, type ImportFailure } from "./import_model";
@@ -782,8 +790,15 @@ function rightCell(options: RowsOptions, row: ReviewRow, open: boolean): HTMLEle
 }
 
 /** What the reader could not carry out of the original: said, so that nobody believes it was saved. */
-export function notCarriedList(say: Say, items: readonly { what: string; why: string | null }[]): HTMLElement | null {
-  return notesList(say, "rvwNotCarriedTitle", items);
+export function notCarriedList(say: Say, items: readonly NotCarried[], language: string): HTMLElement | null {
+  // The sentence of the reader's language is the tools': the screen picks it and writes none. An entry the
+  // tools have no sentence in that language for (an older tool's, a code they do not know, English itself) is
+  // shown as the English it was stored with.
+  return notesList(
+    say,
+    "rvwNotCarriedTitle",
+    items.map((item) => item.said?.[language] ?? item),
+  );
 }
 
 /**

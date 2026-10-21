@@ -1187,6 +1187,56 @@ pub(crate) fn assemble_import<C: Clock>(
     Ok(json!({ "text": made.text, "report": made.report }))
 }
 
+/// What `say_notes` is given: what an extractor could not carry, as an extraction or a check lists it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SayNotes {
+    notes: Vec<Value>,
+}
+
+/// The most entries one `say_notes` is given. A document that could not be carried in this many ways is a
+/// defect of its extractor, and a request that long is not a review a person reads.
+const MOST_NOTES: usize = 500;
+
+/// What could not be carried, said in every language the authoring tools write (ADR 0026 of SCE).
+///
+/// The sentences are the tools' and the screen writes none: it asks once and shows the one of its own language,
+/// so that changing language is not another request and a language the tools add reaches it with no change here.
+/// Each entry comes back as the tools hold it with `said` beside it, the sentences of each other language its
+/// code has; an entry that has none (an older tool's, a code the tools do not know) has no `said`, and is shown
+/// as the English it was stored with.
+pub(crate) fn say_notes<C: Clock>(
+    context: &Context<'_, C>,
+    args: SayNotes,
+) -> Result<Value, CommandError> {
+    if args.notes.len() > MOST_NOTES {
+        return Err(refuse(
+            "too-many-notes",
+            format!(
+                "{} entries are more than the {MOST_NOTES} that are said at once",
+                args.notes.len()
+            ),
+            json!({ "most": MOST_NOTES }),
+        ));
+    }
+    if args.notes.is_empty() {
+        return Ok(json!({ "notes": [] }));
+    }
+    let tools = tools(context)?;
+    let scratch = Scratch::new()?;
+    scratch.write("n.json", Value::Array(args.notes).to_string().as_bytes())?;
+    let ran = tools.run_to_success(
+        &scratch.path("."),
+        &["render-notes", "--notes", "n.json", "--all"],
+        tools.quick_timeout,
+        "bad-notes",
+        &[2],
+    )?;
+    let said: Value = serde_json::from_str(ran.stdout.trim())
+        .map_err(|e| failed(format!("`render-notes` did not print the entries: {e}")))?;
+    Ok(json!({ "notes": said }))
+}
+
 /// What `read_picture` is given: a document the specs folder keeps, and the NAME of a `[picture: NAME]`
 /// mark its extraction holds.
 #[derive(Deserialize)]

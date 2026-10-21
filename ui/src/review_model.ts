@@ -10,8 +10,17 @@
 // answered is the core's (`undecided`), and the text that would be saved is the tools' (`assemble`).
 // This lays them out and says whether the core would take an accept now.
 
-import { ContractError } from "./contract";
-import type { AssembledImport, NotRead, ProposalDecision, ProposalView, TextChanges } from "./contract";
+import { ContractError, parseNotCarried } from "./contract";
+import type {
+  AssembledImport,
+  NotCarried,
+  NotRead,
+  ProposalDecision,
+  ProposalView,
+  TextChanges,
+} from "./contract";
+
+export type { NotCarried };
 
 /** A block of the Markdown an extraction was written as: its id, its words, and the original blocks it cites. */
 export interface WrittenBlock {
@@ -29,12 +38,6 @@ export interface OriginalBlock {
   readonly text: string;
   /** `text-layer` for what the document carries as text; `ocr` or `vision` for what was recognised. */
   readonly howRead: string;
-}
-
-/** Something of the original that the reader could not carry, and why when it says. */
-export interface NotCarried {
-  readonly what: string;
-  readonly why: string | null;
 }
 
 function record(value: unknown, where: string): Record<string, unknown> {
@@ -106,11 +109,7 @@ export function parseExtraction(source: string): {
 }
 
 function notCarriedIn(root: Record<string, unknown>, where: string): NotCarried[] {
-  return array(root, "not_carried", where).map((item, i): NotCarried => {
-    const at = `${where}.not_carried[${i}]`;
-    const entry = record(item, at);
-    return { what: text(entry, "what", at), why: typeof entry["why"] === "string" ? entry["why"] : null };
-  });
+  return array(root, "not_carried", where).map((item, i) => parseNotCarried(item, `${where}.not_carried[${i}]`));
 }
 
 /**

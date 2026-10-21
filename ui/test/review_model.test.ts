@@ -107,7 +107,10 @@ describe("reading the tools' texts", () => {
     expect(read.blocks.map((b) => b.id)).toEqual(["b1", "b2", "b3", "b4", "b5"]);
     expect(read.blocks[0]).toMatchObject({ kind: "heading", howRead: "text-layer" });
     expect(read.member).toBe("spec.md");
-    expect(read.notCarried).toEqual([{ what: "a header", why: "page furniture" }, { what: "a footer", why: null }]);
+    expect(read.notCarried).toMatchObject([
+      { what: "a header", why: "page furniture", code: null, facts: null, said: null },
+      { what: "a footer", why: null, code: null, facts: null, said: null },
+    ]);
   });
 
   it("refuses what is not the form, naming the place", () => {
@@ -362,15 +365,41 @@ describe("whether a proposal is of part of its document", () => {
 });
 
 describe("what could not be carried of a proposal", () => {
-  const whole = [
-    { what: "1 picture(s) were not read", why: null },
-    { what: "a footer", why: "page furniture" },
-  ];
+  /** An entry as the screen holds it: what the tools wrote of it, with no code and no other language. */
+  const plain = (what: string, why: string | null) => ({ what, why, code: null, facts: null, said: null });
+  const whole = [plain("1 picture(s) were not read", null), plain("a footer", "page furniture")];
 
   it("is what SCE's check said of the part, so a picture left out of it is not listed", () => {
     const report = JSON.stringify({ not_carried: [{ what: "a footer", why: "page furniture" }] });
-    expect(notCarriedOf(report, whole)).toEqual([{ what: "a footer", why: "page furniture" }]);
+    expect(notCarriedOf(report, whole)).toEqual([plain("a footer", "page furniture")]);
     expect(notCarriedOf(JSON.stringify({ not_carried: [] }), whole)).toEqual([]);
+  });
+
+  it("keeps the code and the facts an entry was written with, which are what a sentence is written from", () => {
+    const report = JSON.stringify({
+      not_carried: [
+        {
+          what: "2 of 3 page(s) carry no text: 2, 3",
+          why: "each is a picture",
+          count: 2,
+          code: "pdf-pages-without-text",
+          facts: { blank: [2, 3], pages: 3 },
+        },
+      ],
+    });
+
+    const [entry] = notCarriedOf(report, whole);
+
+    expect(entry?.code).toBe("pdf-pages-without-text");
+    expect(entry?.facts).toEqual({ blank: [2, 3], pages: 3 });
+    expect(entry?.said).toBeNull();
+  });
+
+  it("refuses facts that are not an object, a said that is not one, and a code that is not a word", () => {
+    for (const bad of [{ facts: [1] }, { facts: "x" }, { said: [] }, { said: { ko: "no" } }, { code: 3 }]) {
+      const report = JSON.stringify({ not_carried: [{ what: "w", ...bad }] });
+      expect(() => notCarriedOf(report, whole), JSON.stringify(bad)).toThrow(ContractError);
+    }
   });
 
   it("is the whole document's for a report made before the check said it", () => {

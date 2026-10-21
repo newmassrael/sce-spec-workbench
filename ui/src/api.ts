@@ -26,6 +26,7 @@ import {
   parseJudgment,
   parseListing,
   parsePictureRead,
+  parseSaidNotes,
   parseProposalDecided,
   parseProposalDocuments,
   parseProposalList,
@@ -96,6 +97,7 @@ import {
   type ProposalView,
   type DecisionKind,
   type ExtractionRead,
+  type NotCarried,
   type PictureRead,
   type Queue,
   type ReadRevisionReport,
@@ -396,6 +398,13 @@ export interface Api {
    * shows it beside what was read of it. Refused as `no-picture` for a name the document does not hold.
    */
   readPicture(id: string, original: Revision, extraction: Revision, name: string): Promise<PictureRead>;
+  /**
+   * What an extractor could not carry, said in every language the authoring tools write: each entry comes back,
+   * in the order it was given, with `said` beside it. The screen shows the sentence of its own language and
+   * writes none (ADR 0026 of SCE). Refused as `bad-notes` for a list the tools cannot read as one and as
+   * `too-many-notes` for one too long to be said at once.
+   */
+  sayNotes(notes: readonly NotCarried[]): Promise<NotCarried[]>;
   /** Say what the owner does with a block; `text` is the owner's words, for `correct` only. */
   decideBlock(
     id: string,
@@ -649,6 +658,17 @@ export function apiOver(transport: Transport): Api {
     },
     async readPicture(id, original, extraction, name) {
       return parsePictureRead(await transport.call("read_picture", { id, original, extraction, name }));
+    },
+    async sayNotes(notes) {
+      // What the tools write the sentences from is the code and its facts; the English is sent with them, as it
+      // is stored, for an entry that has no code. What the screen added (`said`) is not sent back.
+      const sent = notes.map((entry) => ({
+        what: entry.what,
+        ...(entry.why === null ? {} : { why: entry.why }),
+        ...(entry.code === null ? {} : { code: entry.code }),
+        ...(entry.facts === null ? {} : { facts: entry.facts }),
+      }));
+      return parseSaidNotes(await transport.call("say_notes", { notes: sent }));
     },
     async decideBlock(id, proposal, block, what, text) {
       const args = { id, proposal, block, what, ...(text === undefined ? {} : { text }) };

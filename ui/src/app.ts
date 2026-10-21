@@ -325,6 +325,7 @@ export class App {
     this.importFlow = new ImportFlow({
       api: this.api,
       t: (key, values) => this.t(key, values),
+      locale: () => this.locale,
       redraw: () => this.render(),
       handled: (error) => this.askForToken(error),
       explain: (error) => this.explain(error),

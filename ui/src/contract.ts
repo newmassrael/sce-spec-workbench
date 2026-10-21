@@ -17,7 +17,7 @@ export const SUPPORTED_COMMAND_SET_VERSION = 35;
  * The application's own command set this screen was written for (`APPLICATION_COMMAND_SET_VERSION`
  * in the core): the settings, the programs of a person's, and what `describe` says of who asked.
  */
-export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 11;
+export const SUPPORTED_APPLICATION_COMMAND_SET_VERSION = 12;
 
 /** A revision: the SHA-256 of a saved text, as 64 lowercase hex digits. */
 export type Revision = string;
@@ -2093,10 +2093,67 @@ export function parseProposalRejected(value: unknown): Proposal {
   return parseProposal(record(value, where)["proposal"], `${where}.proposal`);
 }
 
-/** Something the document had that the extractor could not carry, and why when it says. */
+/** What an entry of `NotCarried` says in one language: the sentence the authoring tools wrote, and why when it says. */
+export interface SaidNote {
+  what: string;
+  why: string | null;
+}
+
+/**
+ * Something the document had that the extractor could not carry, and why when it says.
+ *
+ * `what` and `why` are the English the extractor kept. `code` and `facts` are what happened, in no language,
+ * and `said` is the sentences the tools wrote from them in each other language, which `say_notes` adds: the
+ * screen shows the one of its own language and writes none (ADR 0026 of SCE). An entry with no `code` is an
+ * older tool's, and an entry with no `said` for a language is shown as the English it was stored with.
+ */
 export interface NotCarried {
   what: string;
   why: string | null;
+  code: string | null;
+  facts: Readonly<Record<string, unknown>> | null;
+  said: Readonly<Record<string, SaidNote>> | null;
+}
+
+/** An entry of `not_carried` as an extraction, a check or `say_notes` gives it. */
+export function parseNotCarried(value: unknown, where: string): NotCarried {
+  const r = record(value, where);
+  const facts = r["facts"];
+  if (facts !== undefined && (typeof facts !== "object" || facts === null || Array.isArray(facts))) {
+    throw new ContractError(`${where}.facts`, "an object");
+  }
+  const said = r["said"];
+  if (said !== undefined && (typeof said !== "object" || said === null || Array.isArray(said))) {
+    throw new ContractError(`${where}.said`, "an object");
+  }
+  return {
+    what: text(r, "what", where),
+    why: r["why"] === undefined ? null : nullableText(r, "why", where),
+    code: r["code"] === undefined ? null : nullableText(r, "code", where),
+    facts: facts === undefined ? null : (facts as Record<string, unknown>),
+    said:
+      said === undefined
+        ? null
+        : Object.fromEntries(
+            Object.entries(said as Obj).map(([language, entry]): [string, SaidNote] => {
+              const at = `${where}.said.${language}`;
+              const sentence = record(entry, at);
+              return [
+                language,
+                {
+                  what: text(sentence, "what", at),
+                  why: sentence["why"] === undefined ? null : nullableText(sentence, "why", at),
+                },
+              ];
+            }),
+          ),
+  };
+}
+
+/** `say_notes`: the entries it was given, in the order they were given, each with its `said`. */
+export function parseSaidNotes(value: unknown): NotCarried[] {
+  const where = "say_notes";
+  return list(record(value, where), "notes", where).map((entry, i) => parseNotCarried(entry, `${where}.notes[${i}]`));
 }
 
 /** `import_document`: a document brought in, as a proposal waiting for its owner. */
@@ -2203,11 +2260,6 @@ export interface AssembledImport {
 }
 
 const CHANGE_OPS = ["keep", "add", "remove"] as const;
-
-function parseNotCarried(value: unknown, where: string): NotCarried {
-  const r = record(value, where);
-  return { what: text(r, "what", where), why: r["why"] === undefined ? null : nullableText(r, "why", where) };
-}
 
 /** `import_document`. */
 export function parseImportedDocument(value: unknown): ImportedDocument {

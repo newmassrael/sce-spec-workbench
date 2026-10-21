@@ -60,6 +60,7 @@ pub const COMMANDS: &[&str] = &[
     "assemble_import",
     "accept_import",
     "read_picture",
+    "say_notes",
 ];
 
 /// The version of the application's own commands and of what `describe` adds to the specs'
@@ -125,7 +126,12 @@ pub const COMMANDS: &[&str] = &[
 /// 11: `read_picture`, which gives a picture a document marks `[picture: NAME]` as it is in the original
 /// the specs folder keeps, so that a review shows it beside what was read of it. It is added, so no caller
 /// of 10 misreads it; the version moves because a screen that shows a picture is held to a core that gives it.
-pub const APPLICATION_COMMAND_SET_VERSION: u32 = 11;
+///
+/// 12: `say_notes`, which says what an extractor could not carry in every language the authoring tools write
+/// (ADR 0026 of SCE), so that a screen shows the sentences the tools wrote and writes none of its own. It is
+/// added, so no caller of 11 misreads it; the version moves because a screen that asks for it is held to a core
+/// that answers.
+pub const APPLICATION_COMMAND_SET_VERSION: u32 = 12;
 
 /// Every command an entrance of the application answers: the specs', then its own.
 pub fn all_commands() -> Vec<&'static str> {
@@ -174,6 +180,7 @@ pub const IMPORT_COMMANDS: &[&str] = &[
     "assemble_import",
     "accept_import",
     "read_picture",
+    "say_notes",
 ];
 
 /// Which door a command came in by. Who is asking decides what may be changed, so it is said
@@ -561,6 +568,7 @@ fn call_import<C: Clock>(
         "assemble_import" => import_host::assemble_import(context, arguments(args)?),
         "accept_import" => import_host::accept_import(context, arguments(args)?),
         "read_picture" => import_host::read_picture(context, arguments(args)?),
+        "say_notes" => import_host::say_notes(context, arguments(args)?),
         other => Err(unknown_command(other, &all_commands())),
     }
 }

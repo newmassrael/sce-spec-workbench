@@ -25,6 +25,7 @@ import type {
   IntakeView,
   LedgerCount,
   Listing,
+  NotCarried,
   PictureRead,
   PlannedAllotment,
   ReadDocument,
@@ -194,6 +195,15 @@ class FakeCore {
   notRead: ImportedDocument["not_read"] = [];
   /** The conversion every proposal is read as, when it is not the default two-paragraph one. */
   conversion: unknown = CONVERSION_TEXT;
+  /** The extraction every proposal is read from, when it is not the default one. */
+  original: unknown = ORIGINAL_TEXT;
+  /**
+   * What the tools write of an entry of `not_carried` by its code, in each other language: the fake says an
+   * entry as the tools do and leaves one with no code, or a code it holds nothing for, as it was.
+   */
+  sentences = new Map<string, Record<string, { what: string; why: string | null }>>();
+  /** What the next `say_notes` does instead, as a tools' failure is. */
+  sayWith: (() => Promise<NotCarried[]>) | null = null;
   /** The pictures a document holds, by NAME, as `read_picture` gives them; a name not here is refused. */
   pictures = new Map<string, PictureRead>();
   /** What the next `read_document` does, when it is not the default one-part document. */
@@ -446,7 +456,15 @@ class FakeCore {
     },
     readExtraction: async (id, digest) => {
       this.record("read_extraction", id, digest);
-      return { digest, text: JSON.stringify(ORIGINAL_TEXT) };
+      return { digest, text: JSON.stringify(this.original) };
+    },
+    sayNotes: async (notes) => {
+      this.record("say_notes", notes);
+      if (this.sayWith !== null) return this.sayWith();
+      return notes.map((entry) => {
+        const said = entry.code === null ? undefined : this.sentences.get(entry.code);
+        return said === undefined ? entry : { ...entry, said };
+      });
     },
     decideBlock: async (id, proposal, block, what, text): Promise<ProposalDecision> => {
       this.record("decide_block", id, proposal, block, what, text);
@@ -541,6 +559,7 @@ class FakeCore {
     | "readProposalDocuments"
     | "readExtraction"
     | "readPicture"
+    | "sayNotes"
     | "decideBlock"
     | "assembleImport"
     | "acceptImport"
@@ -560,6 +579,8 @@ interface Rig {
   root: HTMLElement;
   finished: Array<{ spec: Spec; info: string | null }>;
   handled: unknown[];
+  /** The language the screen is in, which a test changes as a person does. */
+  language: { current: string };
 }
 
 function rig(): Rig {
@@ -572,9 +593,11 @@ function rig(): Rig {
   const draw = (): void => {
     root.replaceChildren(flow.isOpen() ? flow.view() : document.createElement("p"));
   };
+  const language = { current: "ko" };
   flow = new ImportFlow({
     api: core.api,
     t: (key, values) => translate("ko", key, values),
+    locale: () => language.current,
     redraw: draw,
     handled: (error) => {
       handled.push(error);
@@ -586,7 +609,7 @@ function rig(): Rig {
     canLeave: () => canLeave.value,
     specs: () => core.listed,
   });
-  return { flow, core, root, finished, handled };
+  return { flow, core, root, finished, handled, language };
 }
 
 /** Whether the first screen has a spec to go back to: false on the very first run. */
@@ -766,6 +789,94 @@ describe("a document that is read", () => {
     expect(r.root.textContent).toContain(say("rvwNotCarried", { n: "1" }));
     expect(r.root.textContent).toContain("a footer");
     expect(r.root.textContent).toContain("page furniture");
+  });
+
+  describe("said in the language of the screen", () => {
+    /** An entry as an extraction of the tools holds it: English beside its code and facts. */
+    const typed = {
+      what: "1 picture(s) were not read",
+      code: "docx-pictures-unread",
+      facts: { pictures: 1 },
+    };
+    const korean = { ko: { what: "그림 1개를 읽지 않았어요", why: null } };
+
+    beforeEach(() => {
+      r.core.original = { ...ORIGINAL_TEXT, not_carried: [typed, { what: "a footer", why: "page furniture" }] };
+      r.core.sentences.set("docx-pictures-unread", korean);
+    });
+
+    async function open(): Promise<void> {
+      r.flow.open({ kind: "new" });
+      await chooseFile(r, file("door.md", "# Door lock\n"));
+    }
+
+    it("shows the sentence the tools wrote in the screen's language, and none the screen wrote", async () => {
+      await open();
+
+      expect(r.root.textContent).toContain("그림 1개를 읽지 않았어요");
+      expect(r.root.textContent).not.toContain("1 picture(s) were not read");
+    });
+
+    it("shows the English an entry was stored with when the tools have no sentence for it in that language", async () => {
+      r.language.current = "en";
+      await open();
+
+      expect(r.root.textContent).toContain("1 picture(s) were not read");
+      expect(r.root.textContent).not.toContain("그림 1개를 읽지 않았어요");
+    });
+
+    it("leaves an entry with no code as it was stored, in any language", async () => {
+      await open();
+
+      expect(r.root.textContent).toContain("a footer");
+      expect(r.root.textContent).toContain("page furniture");
+    });
+
+    it("asks once, and changing the language is not another request", async () => {
+      await open();
+      r.language.current = "en";
+      r.flow.view();
+
+      expect(r.core.callsOf("say_notes")).toHaveLength(1);
+      expect(r.flow.view().textContent).toContain("1 picture(s) were not read");
+    });
+
+    it("sends the tools the code and the facts and not the sentence the screen was shown", async () => {
+      await open();
+
+      const sent = r.core.callsOf("say_notes")[0]?.[0] as readonly NotCarried[];
+      expect(sent[0]).toMatchObject({ what: "1 picture(s) were not read", code: "docx-pictures-unread", facts: { pictures: 1 } });
+      expect(sent[0]?.said).toBeNull();
+    });
+
+    it("is not asked when nothing could not be carried", async () => {
+      r.core.original = { ...ORIGINAL_TEXT, not_carried: [] };
+
+      await open();
+
+      expect(r.core.callsOf("say_notes")).toHaveLength(0);
+    });
+
+    it("shows the stored English when the tools cannot say it, and the review is not refused for that", async () => {
+      r.core.sayWith = async () => {
+        throw new CommandFailure("import-tool-failed", "render-notes ended with 1");
+      };
+
+      await open();
+
+      expect(r.root.textContent).toContain("1 picture(s) were not read");
+      expect(r.root.textContent).toContain(say("rvwNotCarried", { n: "2" }));
+      expect(r.handled).toEqual([]);
+    });
+
+    it("shows the stored English when the tools answer with other entries than were asked", async () => {
+      r.core.sayWith = async () => [];
+
+      await open();
+
+      expect(r.root.textContent).toContain("a footer");
+      expect(r.root.textContent).toContain("1 picture(s) were not read");
+    });
   });
 });
 

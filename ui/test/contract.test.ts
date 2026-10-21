@@ -42,6 +42,7 @@ import {
   parseImportAccepted,
   parseImportedDocument,
   parsePictureRead,
+  parseSaidNotes,
   parseProposalAccepted,
   parseProposalDecided,
   parseProposalDocuments,
@@ -120,6 +121,7 @@ const parsers: Record<string, (value: unknown) => unknown> = {
   import_document: parseImportedDocument,
   read_document: parseReadDocument,
   read_picture: parsePictureRead,
+  say_notes: parseSaidNotes,
   import_selection: parseImportedDocument,
   assemble_import: parseAssembledImport,
   accept_import: parseImportAccepted,
@@ -750,6 +752,22 @@ describe("the replies the core gives", () => {
     const bare = importReplies.answers["read_picture"] as Record<string, unknown>;
     expect(() => parsePictureRead({ ...bare, data: null })).toThrow(/read_picture\.data/);
     expect(() => parsePictureRead({ ...bare, media_type: null })).toThrow(/read_picture\.data/);
+  });
+
+  it("say what could not be carried in each language, as the tools wrote it, and leave the rest as it was", () => {
+    const [typed, older, newer] = parseSaidNotes(importReplies.answers["say_notes"]);
+
+    expect(typed).toMatchObject({ code: "pdf-pages-without-text", facts: { blank: [2, 3], pages: 3 } });
+    // The sentence of another language is the tools' own, written from the code and the facts.
+    expect(typed?.said?.["ko"]?.what).toContain("3쪽 중 2쪽에 글이 없어요");
+    expect(typed?.said?.["ko"]?.why).not.toBeNull();
+    expect(typed?.said?.["en"]).toBeUndefined();
+    // An entry with no code, and one whose code the tools do not know, have no sentence of another language.
+    expect(older).toMatchObject({ what: "a footer", code: null, said: null });
+    expect(newer).toMatchObject({ code: "a-code-from-a-newer-tool", said: null });
+    for (const kind of ["bad-notes", "too-many-notes"]) {
+      expect(asCommandError(importReplies.refusals[kind])?.kind).toBe(kind);
+    }
   });
 
   it("say the parts of a document being divided, SCE's count of a plan and what became of each spec", () => {

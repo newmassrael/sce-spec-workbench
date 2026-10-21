@@ -87,6 +87,7 @@ export interface ImportHost {
     | "readProposalDocuments"
     | "readExtraction"
     | "readPicture"
+    | "sayNotes"
     | "decideBlock"
     | "assembleImport"
     | "acceptImport"
@@ -94,6 +95,8 @@ export interface ImportHost {
     | "rebaseProposal"
   >;
   readonly t: Say;
+  /** The language the screen is in: the one of the sentences the tools wrote that is shown. */
+  readonly locale: () => string;
   readonly redraw: () => void;
   /** A failure that is not about the document (no server, no token): the screen's own handling is the whole answer. */
   readonly handled: (error: unknown) => boolean;
@@ -276,13 +279,16 @@ export class ImportFlow {
       if (ticket !== this.ticket) return;
       const read = parseExtraction(extraction.text);
       const written = parseConversion(documents.conversion);
-      const pictures = await this.picturesRead(spec, view.proposal.original, view.proposal.extraction, written);
+      const [pictures, notCarried] = await Promise.all([
+        this.picturesRead(spec, view.proposal.original, view.proposal.extraction, written),
+        this.notesSaid(notCarriedOf(documents.report, read.notCarried)),
+      ]);
       if (ticket !== this.ticket) return;
       this.parts = {
         written,
         pictures,
         original: read.blocks,
-        notCarried: notCarriedOf(documents.report, read.notCarried),
+        notCarried,
         notRead,
         member: read.member,
         part: partOf(documents.scope, documents.report),
@@ -291,6 +297,23 @@ export class ImportFlow {
     } catch (error) {
       if (ticket !== this.ticket) return;
       this.fail(error);
+    }
+  }
+
+  /**
+   * What could not be carried, with the sentences the authoring tools wrote of it in each language, asked once
+   * so that changing the screen's language is not another request. The screen writes none of them (ADR 0026 of
+   * SCE). When the tools cannot be asked, the entries are shown as the English they were stored with, which
+   * is what an entry with no sentence in the reader's language is shown as anyway: the review does not wait on
+   * a translation and does not fail for one.
+   */
+  private async notesSaid(entries: readonly NotCarried[]): Promise<readonly NotCarried[]> {
+    if (entries.length === 0) return entries;
+    try {
+      const said = await this.host.api.sayNotes(entries);
+      return said.length === entries.length ? said : entries;
+    } catch {
+      return entries;
     }
   }
 
@@ -960,7 +983,7 @@ export class ImportFlow {
           : null,
         comparison,
         notReadList(say, panel.notRead),
-        notCarriedList(say, panel.notCarried),
+        notCarriedList(say, panel.notCarried, this.host.locale()),
       ),
     );
   }
