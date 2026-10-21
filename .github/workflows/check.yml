@@ -44,6 +44,14 @@ jobs:
         # PyYAML (`python3-yaml` is the package the installer declares for it). A machine
         # without it fails those tests and says so; it does not skip them.
         run: sudo apt-get install -y python3-yaml
+      - name: Install the PDF text pack
+        # A PDF is read by a library that is a pack of SCE's tools and not a dependency of them
+        # (`pypdfium2`, ADR 0035 of SCE). The core's cases that bring a PDF in need it, and a machine
+        # without it fails them with `pack-missing` and does not skip them. It goes into the system
+        # Python, which is the one the tools are started with (`sce/scripts/sce_author.sh`); that
+        # Python is externally managed on this image, so pip is told it may, in a machine that is
+        # thrown away after the run.
+        run: sudo python3 -m pip install --break-system-packages pypdfium2
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
