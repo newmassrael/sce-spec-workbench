@@ -1622,6 +1622,24 @@ describe("the model panel", () => {
     // A new screen starts at the size the person chose.
     await open();
     expect(zoom()).toContain("--sheet-zoom: 2");
+
+    // The overview sets a sheet to the width of the page: it says no multiple, is kept like a size, and
+    // is left by choosing a size again.
+    const sheets = (): HTMLElement | null => root.querySelector<HTMLElement>(".sheets");
+    await click("Fit width");
+    expect(sheets()?.classList.contains("fit")).toBe(true);
+    expect(zoom()).not.toContain("--sheet-zoom");
+    expect(buttons("Fit width")[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(buttons("200%")[0]?.getAttribute("aria-pressed")).toBe("false");
+    expect(kept.get("sce.zoom")).toBe("0");
+    expect(core.callsOf("figures")).toHaveLength(1);
+
+    await open();
+    expect(sheets()?.classList.contains("fit")).toBe(true);
+
+    await click("100%");
+    expect(sheets()?.classList.contains("fit")).toBe(false);
+    expect(zoom()).toContain("--sheet-zoom: 1");
   });
 
   it("reports a model that cannot be read as the panel's own message, not as an empty one", async () => {

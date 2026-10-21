@@ -564,6 +564,19 @@ textarea:focus-visible {
   zoom: var(--sheet-zoom, 1.5);
 }
 
+/* Set to the width of the page, to see the whole of a drawing at once: the sheet no longer scrolls
+   sideways, and its type is whatever the width makes it. A person asks for this to look over a drawing;
+   the sizes above are the ones that keep the minimum type size. */
+.sheets.fit .sheet {
+  overflow-x: hidden;
+}
+
+.sheets.fit .sheet img {
+  zoom: 1;
+  width: 100%;
+  max-width: 100%;
+}
+
 .zoom {
   display: inline-flex;
   align-items: center;

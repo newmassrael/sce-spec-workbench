@@ -68,6 +68,7 @@ const en = {
   modelDrawing: "SCE is drawing the model...",
   modelRead: "Read again",
   modelZoom: "Size",
+  modelZoomFit: "Fit width",
   modelCurrent: "This model was written for the text as it is now.",
   modelBehind:
     "This model was written for an earlier text ({written}). The text is now at {now}. Ask the authoring client to read it again and save the model.",
@@ -772,6 +773,7 @@ const ko: Record<Key, string> = {
   modelDrawing: "SCE가 모델을 그리는 중...",
   modelRead: "다시 읽기",
   modelZoom: "크기",
+  modelZoomFit: "폭에 맞춤",
   modelCurrent: "이 모델은 지금의 글을 보고 쓴 거예요.",
   modelBehind:
     "이 모델은 이전 글({written})을 보고 쓴 거예요. 지금 글({now})을 AI 클라이언트가 다시 읽고 모델을 저장하게 하세요.",

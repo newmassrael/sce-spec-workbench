@@ -7,7 +7,16 @@
 import { describe, expect, it } from "vitest";
 
 import { CommandFailure } from "../src/ipc";
-import { DEFAULT_ZOOM, drawFailureOf, sheetName, svgAddress, zoomFrom, ZOOMS } from "../src/model_view";
+import {
+  DEFAULT_ZOOM,
+  drawFailureOf,
+  FIT,
+  sheetName,
+  svgAddress,
+  zoomFrom,
+  ZOOM_CHOICES,
+  ZOOMS,
+} from "../src/model_view";
 
 describe("a failure to draw", () => {
   it("is SCE's refusal, with the product's code when it gave one", () => {
@@ -56,8 +65,17 @@ describe("the size a drawing is shown at", () => {
     for (const zoom of ZOOMS) expect(zoomFrom(String(zoom))).toBe(zoom);
   });
 
+  it("offers the overview first, and keeps it as a choice that is not a multiple and is never the default", () => {
+    expect(ZOOM_CHOICES[0]).toBe(FIT);
+    expect(ZOOM_CHOICES.slice(1)).toEqual(ZOOMS);
+    expect(ZOOMS).not.toContain(FIT);
+    expect(FIT).not.toBe(DEFAULT_ZOOM);
+    expect(zoomFrom(String(FIT))).toBe(FIT);
+  });
+
   it("falls back to the default for anything kept that is not one of them", () => {
-    for (const kept of [null, "", "abc", "0", "-2", "1.7", "NaN", "Infinity", "1e1"]) {
+    // An empty or blank value, a negative zero and a hexadecimal zero read as the number 0 and are not the overview.
+    for (const kept of [null, "", " ", "abc", "-2", "1.7", "NaN", "Infinity", "1e1", "-0.5", "-0", "0x0", "0.0", "00"]) {
       expect(zoomFrom(kept), String(kept)).toBe(DEFAULT_ZOOM);
     }
   });

@@ -89,10 +89,24 @@ export const ZOOMS: readonly number[] = [1, 1.5, 2, 3];
 
 export const DEFAULT_ZOOM = 1.5;
 
-/** The kept size, if it is one the screen offers; the default otherwise. */
+/**
+ * The choice that sets a sheet to the width of the page instead of a multiple of its own size, to see the
+ * whole of a large drawing at once. It is a choice a person makes to look over a drawing and never the
+ * default, because it can set the type below the minimum SCE drew it at; the sizes above are the ones that
+ * keep that promise. Kept beside them as 0, which no multiple can be.
+ */
+export const FIT = 0;
+
+/** Every choice the screen offers, in the order it shows them: the overview first, then the sizes. */
+export const ZOOM_CHOICES: readonly number[] = [FIT, ...ZOOMS];
+
+/**
+ * The kept choice, if it is one the screen offers; the default otherwise. A choice is kept as the text the screen
+ * writes it as and is read back as exactly that: reading it as a number would take an empty value, a blank, `-0` or
+ * `0x0` for 0, which is the overview, and a person who never chose it would find it chosen.
+ */
 export function zoomFrom(saved: string | null): number {
-  const value = Number(saved);
-  return saved !== null && ZOOMS.includes(value) ? value : DEFAULT_ZOOM;
+  return ZOOM_CHOICES.find((choice) => String(choice) === saved) ?? DEFAULT_ZOOM;
 }
 
 /** The text a sheet is named by: the file the product wrote, without its extension. */

@@ -119,7 +119,8 @@ import {
   sheetName,
   svgAddress,
   zoomFrom,
-  ZOOMS,
+  FIT,
+  ZOOM_CHOICES,
   type ModelPanel,
   type ModelRead,
   type ReviewPanel,
@@ -3309,7 +3310,7 @@ export class App {
       "span",
       { class: "zoom", role: "group", "aria-label": this.t("modelZoom") },
       this.t("modelZoom"),
-      ...ZOOMS.map((zoom) =>
+      ...ZOOM_CHOICES.map((zoom) =>
         h(
           "button",
           {
@@ -3317,7 +3318,7 @@ export class App {
             "aria-pressed": String(zoom === this.zoom),
             onclick: () => this.chooseZoom(zoom),
           },
-          `${Math.round(zoom * 100)}%`,
+          zoom === FIT ? this.t("modelZoomFit") : `${Math.round(zoom * 100)}%`,
         ),
       ),
     );
@@ -3380,7 +3381,10 @@ export class App {
           {},
           h(
             "div",
-            { class: "sheets", style: `--sheet-zoom: ${this.zoom}` },
+            // A sheet set to the page's width has no multiple of its own size to say.
+            this.zoom === FIT
+              ? { class: "sheets fit" }
+              : { class: "sheets", style: `--sheet-zoom: ${this.zoom}` },
             ...model.figures.sheets.map((sheet) =>
               h(
                 "figure",
