@@ -1697,11 +1697,20 @@ textarea:focus-visible {
 
 .imp .imp-notes .note-what,
 .imp .imp-notes .note-why {
+  max-width: 68ch;
   overflow-wrap: anywhere;
 }
 
+/* What happened leads and is read first; why it matters and what to do follows it, quieter and one step
+   under. A note that gives no reason is the lead alone, as it always was. */
+.imp .imp-notes .with-why .note-what {
+  font-weight: 600;
+}
+
 .imp .imp-notes .note-why {
+  margin-top: 2px;
   color: var(--ink-2);
+  line-height: 24px;
 }
 
 /* A phone: the two columns become one, each cell under the one it is compared with. The headings are

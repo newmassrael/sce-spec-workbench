@@ -825,11 +825,13 @@ function notesList(say: Say, title: Key, items: readonly { what: string; why: st
     h(
       "ul",
       {},
-      // A note is sentences, not a label: it is set as a paragraph beside its mark, and wraps as one.
+      // A note is sentences, not a label: it is set as a paragraph beside its mark, and wraps as one. When it
+      // gives a reason, what happened leads and the reason is set under it; the lead is only set apart when
+      // there is something under it, because a long sentence set bold is harder to read, not easier.
       ...items.map((item) =>
         h(
           "li",
-          {},
+          { class: item.why === null ? undefined : "with-why" },
           icon("alert"),
           h("span", { class: "note-what" }, item.what),
           item.why === null ? null : h("span", { class: "note-why" }, item.why),

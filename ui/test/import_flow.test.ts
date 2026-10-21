@@ -791,6 +791,18 @@ describe("a document that is read", () => {
     expect(r.root.textContent).toContain("page furniture");
   });
 
+  it("sets what happened apart from its reason only when a note gives one", async () => {
+    r.core.original = { ...ORIGINAL_TEXT, not_carried: [{ what: "a footer", why: "page furniture" }, { what: "a header" }] };
+    r.flow.open({ kind: "new" });
+    await chooseFile(r, file("door.md", "# Door lock\n"));
+
+    const rows = Array.from(r.root.querySelectorAll(".imp-notes li"));
+    expect(rows.map((row) => row.classList.contains("with-why"))).toEqual([true, false]);
+    expect(rows[0]?.querySelector(".note-what")?.textContent).toBe("a footer");
+    expect(rows[0]?.querySelector(".note-why")?.textContent).toBe("page furniture");
+    expect(rows[1]?.querySelector(".note-why")).toBeNull();
+  });
+
   describe("said in the language of the screen", () => {
     /** An entry as an extraction of the tools holds it: English beside its code and facts. */
     const typed = {
